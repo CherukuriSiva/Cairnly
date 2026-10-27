@@ -1,0 +1,42 @@
+---
+title: Arrays and Frequency Maps
+topic: dsa
+kind: lesson
+level: beginner
+tags:
+- dsa
+- foundations
+---
+
+## What you will learn
+- Recognize when a problem needs a frequency map
+- Implement the frequency map pattern in Python
+- Solve "two sum" and "contains duplicate" in O(n) time
+
+## Why this matters
+Arrays and hash maps are tested in almost every coding interview. The frequency map pattern alone solves dozens of LeetCode problems. If you master one pattern first, make it this one.
+
+## The pattern
+
+A frequency map counts how many times each element appears. In Python, use `collections.Counter` or build one manually with a dictionary.
+
+## When to use it
+
+- "Find duplicates" → frequency map, check for count > 1
+- "Find the most common element" → frequency map, take the max
+- "Check if two strings are anagrams" → compare frequency maps
+
+## Two Sum (the classic)
+
+Given an array and a target, find two indices whose values sum to the target. With a hash map storing `{value: index}`, you scan once: for each element, check if `target - element` is already in the map.
+
+## Quick quiz
+**Q: You need to check if an array has any duplicate values. What's the time complexity with a frequency map?**
+
+- A) O(n²)
+- B) O(n log n)
+- C) O(n) ✅
+- D) O(1)
+
+## How to explain it in an interview
+"I'd use a hash set — scan the array once, checking if each element is already in the set before adding it. If I find a duplicate, return true immediately. Time O(n), space O(n)."

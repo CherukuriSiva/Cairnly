@@ -1,0 +1,113 @@
+---
+title: 'Two Pointers: When One Loop Isn''t Enough'
+topic: dsa
+kind: lesson
+level: beginner
+tags:
+- dsa
+- foundations
+---
+
+## What you will learn
+- Identify problems that benefit from a two-pointer approach
+- Apply the converging-pointers pattern on sorted arrays
+- Apply the fast/slow pointer pattern for linked lists and cycle detection
+- Solve classic problems like 3Sum, container with most water, and palindrome check
+
+## Why this matters
+Two pointers is the single most common optimization trick in array and string problems. It turns O(n^2) brute-force into O(n) by exploiting sorted order or structural constraints. Interviewers expect you to reach for this pattern immediately when you see a sorted input or a pair/triplet search.
+
+## The core idea
+
+Instead of scanning every pair with nested loops, place two pointers at strategic positions and move them toward each other based on a condition. Each pointer moves at most n times, so the total work is O(n).
+
+## Pattern 1: Converging pointers (sorted array)
+
+Place `left` at the start, `right` at the end. Compare a condition and move the appropriate pointer inward.
+
+```python
+def two_sum_sorted(nums, target):
+    """Given a SORTED array, find two numbers that sum to target."""
+    left, right = 0, len(nums) - 1
+    while left < right:
+        current = nums[left] + nums[right]
+        if current == target:
+            return [left, right]
+        elif current < target:
+            left += 1   # need a bigger sum
+        else:
+            right -= 1  # need a smaller sum
+    return []
+```
+
+**Why it works:** If the sum is too small, moving `left` right increases it. If too big, moving `right` left decreases it. We never skip a valid pair because sorted order guarantees monotonic change.
+
+**Time:** O(n) &mdash; each pointer moves at most n steps.
+**Space:** O(1).
+
+## Pattern 2: The 3Sum technique
+
+3Sum asks: find all unique triplets that sum to zero. Fix one element, then run two-pointer on the remainder.
+
+```python
+def three_sum(nums):
+    nums.sort()
+    result = []
+    for i in range(len(nums) - 2):
+        if i > 0 and nums[i] == nums[i - 1]:
+            continue  # skip duplicates
+        left, right = i + 1, len(nums) - 1
+        while left < right:
+            total = nums[i] + nums[left] + nums[right]
+            if total == 0:
+                result.append([nums[i], nums[left], nums[right]])
+                while left < right and nums[left] == nums[left + 1]:
+                    left += 1
+                while left < right and nums[right] == nums[right - 1]:
+                    right -= 1
+                left += 1
+                right -= 1
+            elif total < 0:
+                left += 1
+            else:
+                right -= 1
+    return result
+```
+
+**Time:** O(n^2) &mdash; sort is O(n log n), then for each of n elements we do an O(n) two-pointer scan.
+
+## Pattern 3: Fast and slow pointers
+
+Used for cycle detection in linked lists (Floyd's algorithm) and finding the middle of a list.
+
+```python
+def has_cycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+        if slow == fast:
+            return True
+    return False
+```
+
+## When to reach for two pointers
+
+| Signal in the problem | Pointer style |
+|---|---|
+| Sorted array + pair/triplet search | Converging left/right |
+| "Container with most water," "trapping rain water" | Converging left/right |
+| Linked list cycle or middle element | Fast/slow |
+| Palindrome check on string | Converging from both ends |
+| Remove duplicates in-place | Read/write pointers |
+
+## Quick quiz
+**Q: You have a sorted array and need to find if any two elements sum to a target. What is the optimal time complexity?**
+
+- A) O(n^2)
+- B) O(n log n)
+- C) O(n) ✅
+- D) O(log n)
+
+## How to explain it in an interview
+"Since the array is sorted, I'd place one pointer at the start and one at the end. If their sum is too small I move the left pointer right; if too large I move the right pointer left. Each pointer moves at most n times, so this runs in O(n) time with O(1) space. For unsorted input I'd sort first for O(n log n), or use a hash map for O(n) time and O(n) space."
