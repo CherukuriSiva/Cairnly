@@ -22,6 +22,17 @@ def cmd_migrate(args: argparse.Namespace) -> None:
     print("schema ready")
 
 
+def cmd_ingest(args: argparse.Namespace) -> None:
+    from cairnly.db import connect
+    from cairnly.ingest import ingest_folder
+
+    folder = Path(args.folder)
+    with connect() as conn:
+        stats = ingest_folder(conn, folder, args.source or folder.name)
+    print(f"added {stats.added}, updated {stats.updated}, unchanged {stats.unchanged}, "
+          f"deleted {stats.deleted}; {stats.chunks} chunks embedded")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="cairnly")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -34,6 +45,11 @@ def main(argv: list[str] | None = None) -> None:
 
     p = sub.add_parser("migrate", help="create the database schema")
     p.set_defaults(func=cmd_migrate)
+
+    p = sub.add_parser("ingest", help="chunk, embed and store a folder of markdown")
+    p.add_argument("folder")
+    p.add_argument("--source", help="label for this folder (default: its name)")
+    p.set_defaults(func=cmd_ingest)
 
     args = parser.parse_args(argv)
     args.func(args)
