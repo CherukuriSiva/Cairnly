@@ -50,7 +50,8 @@ cd web && npm install && npm run dev   # UI on http://localhost:3010
 To use Claude instead of the local model: set `LLM_PROVIDER=anthropic` and
 `ANTHROPIC_API_KEY` in `.env`, or pick "Claude API" in the UI.
 
-Run the API in Docker instead: `docker compose --profile full up -d --build`.
+Run the whole stack (database, API, UI) in Docker instead: `docker compose --profile full up -d --build`.
+Ollama stays on the host; the API container reaches it at `host.docker.internal:11434`.
 
 ## Tests
 

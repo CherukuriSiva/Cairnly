@@ -28,5 +28,13 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    build: ./web
+    profiles: ["full"]
+    ports:
+      - "3010:3010"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
