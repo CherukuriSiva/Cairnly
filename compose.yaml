@@ -1,0 +1,32 @@
+# Local stack. Ports avoid the ones already used on the dev machine (5432/5433, 3001, 8080, ...).
+# Ollama runs natively on the host (port 11434), not in Docker: GPU access on macOS needs that.
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: cairnly
+      POSTGRES_PASSWORD: cairnly
+      POSTGRES_DB: cairnly
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cairnly"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    profiles: ["full"]
+    environment:
+      DATABASE_URL: postgresql://cairnly:cairnly@db:5432/cairnly
+      OLLAMA_URL: http://host.docker.internal:11434
+    ports:
+      - "8010:8010"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
