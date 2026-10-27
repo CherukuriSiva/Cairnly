@@ -47,7 +47,7 @@ def get_settings() -> Settings:
         embed_dim=int(env("EMBED_DIM", "768")),
         llm_provider=env("LLM_PROVIDER", "ollama"),
         ollama_chat_model=env("OLLAMA_CHAT_MODEL", "qwen3:8b"),
-        anthropic_model=env("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
+        anthropic_model=env("ANTHROPIC_MODEL", "claude-opus-5-5"),
         anthropic_api_key=env("ANTHROPIC_API_KEY", ""),
         min_score=float(env("MIN_SCORE", "0.55")),
         top_k=int(env("TOP_K", "6")),
