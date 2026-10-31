@@ -42,7 +42,7 @@ resource "aws_lb_target_group" "web" {
 
 locals {
   https       = var.certificate_arn != ""
-  api_paths   = ["/ask", "/search", "/kbs", "/health", "/livez"]
+  api_paths   = ["/ask", "/search", "/kbs", "/health", "/livez", "/config"]
   listener_id = local.https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
 }
 
@@ -81,9 +81,11 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+# An ALB rule holds at most 5 path patterns, so the API paths are split across rules.
 resource "aws_lb_listener_rule" "api" {
+  count        = length(chunklist(local.api_paths, 5))
   listener_arn = local.listener_id
-  priority     = 10
+  priority     = 10 + count.index
 
   action {
     type             = "forward"
@@ -91,7 +93,12 @@ resource "aws_lb_listener_rule" "api" {
   }
   condition {
     path_pattern {
-      values = local.api_paths
+      values = chunklist(local.api_paths, 5)[count.index]
     }
   }
+}
+
+moved {
+  from = aws_lb_listener_rule.api
+  to   = aws_lb_listener_rule.api[0]
 }

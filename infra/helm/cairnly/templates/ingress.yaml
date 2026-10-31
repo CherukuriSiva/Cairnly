@@ -13,7 +13,7 @@ spec:
     - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          {{- range list "/ask" "/search" "/kbs" "/health" }}
+          {{- range list "/ask" "/search" "/kbs" "/health" "/livez" "/config" }}
           - path: {{ . }}
             pathType: Prefix
             backend: { service: { name: {{ $.Release.Name }}-api, port: { name: http } } }

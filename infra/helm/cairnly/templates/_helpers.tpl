@@ -33,11 +33,30 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
     secretKeyRef: { name: {{ include "cairnly.dbSecret" . }}, key: password }
 - name: OLLAMA_URL
   value: {{ include "cairnly.ollamaUrl" . | quote }}
-- name: LLM_PROVIDER
-  value: {{ .Values.api.llmProvider | quote }}
-- name: ANTHROPIC_MODEL
-  value: {{ .Values.api.anthropicModel | quote }}
-- name: ANTHROPIC_API_KEY
+- name: CAIRNLY_ENV
+  value: {{ .Values.api.environment | quote }}
+- name: TRUST_PROXY
+  value: {{ .Values.api.trustProxy | quote }}
+{{- with .Values.ollama.proxyTokenSecret }}
+- name: MODAL_PROXY_TOKEN_ID
   valueFrom:
-    secretKeyRef: { name: {{ .Release.Name }}-secrets, key: anthropicApiKey, optional: true }
+    secretKeyRef: { name: {{ . }}, key: token_id }
+- name: MODAL_PROXY_TOKEN_SECRET
+  valueFrom:
+    secretKeyRef: { name: {{ . }}, key: token_secret }
+{{- end }}
+{{- if .Values.langfuse.host }}
+- name: LANGFUSE_HOST
+  value: {{ .Values.langfuse.host | quote }}
+- name: LANGFUSE_TRACING_ENVIRONMENT
+  value: {{ .Values.api.environment | quote }}
+- name: LANGFUSE_RELEASE
+  value: {{ splitList ":" .Values.image.api | last | quote }}
+- name: LANGFUSE_PUBLIC_KEY
+  valueFrom:
+    secretKeyRef: { name: {{ required "langfuse.existingSecret is needed with langfuse.host" .Values.langfuse.existingSecret }}, key: public_key }
+- name: LANGFUSE_SECRET_KEY
+  valueFrom:
+    secretKeyRef: { name: {{ .Values.langfuse.existingSecret }}, key: secret_key }
+{{- end }}
 {{- end }}

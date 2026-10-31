@@ -1,0 +1,42 @@
+# Production overrides: helm upgrade --install cairnly infra/helm/cairnly \
+#   -f infra/helm/cairnly/values-production.yaml
+# Create the referenced secrets first (never put their values in this file):
+#   kubectl create secret generic cairnly-db --from-literal=password=...
+#   kubectl create secret generic cairnly-modal-proxy-token \
+#     --from-literal=token_id=... --from-literal=token_secret=...
+# The models run on the Modal GPU (deploy/modal_ollama.py), not in the cluster.
+
+image:
+  api: REPLACE-ME/cairnly-api:latest
+  web: REPLACE-ME/cairnly-web:latest
+
+api:
+  replicas: 2
+  environment: production        # the API refuses to start with the Claude API enabled
+  trustProxy: "1"                # behind the ingress, which appends the client IP
+
+ollama:
+  enabled: false                 # no in-cluster Ollama
+  externalUrl: https://REPLACE-ME--cairnly-ollama-ollama.modal.run
+  proxyTokenSecret: cairnly-modal-proxy-token
+
+database:
+  host: REPLACE-ME.rds.amazonaws.com
+  sslmode: require
+  existingSecret: cairnly-db
+
+postgres:
+  enabled: false
+
+ingest:
+  enabled: true                  # migrate + ingest the lessons after every upgrade
+  kb: lessons
+
+ingress:
+  enabled: true
+  host: REPLACE-ME.example.com
+
+# Optional tracing: set host and a secret with keys public_key/secret_key.
+langfuse:
+  host: ""
+  existingSecret: ""

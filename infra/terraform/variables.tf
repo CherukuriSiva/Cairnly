@@ -16,21 +16,15 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "llm_provider" {
-  description = "Who writes answers: \"anthropic\" (needs the API key secret) or \"ollama\" (needs a GPU-sized Ollama task)."
+variable "ollama_url" {
+  description = "The Modal Ollama URL printed by `modal deploy` (deploy/modal_ollama.py)."
   type        = string
-  default     = "anthropic"
-
-  validation {
-    condition     = contains(["anthropic", "ollama"], var.llm_provider)
-    error_message = "llm_provider must be \"anthropic\" or \"ollama\"."
-  }
 }
 
-variable "anthropic_model" {
-  description = "Claude model id used when llm_provider = anthropic."
+variable "langfuse_host" {
+  description = "Langfuse server for production traces, e.g. https://cloud.langfuse.com. Empty = tracing off."
   type        = string
-  default     = "claude-opus-5-5"
+  default     = ""
 }
 
 variable "db_instance_class" {

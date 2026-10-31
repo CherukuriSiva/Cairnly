@@ -32,19 +32,40 @@ resource "aws_db_instance" "main" {
   final_snapshot_identifier = var.deletion_protection ? "${var.project}-final" : null
 }
 
-# The Claude API key. Terraform creates the empty secret; you put the value in once:
-#   aws secretsmanager put-secret-value --secret-id cairnly/anthropic-api-key --secret-string "$KEY"
-# so the key is never in Terraform state or the repo.
-resource "aws_secretsmanager_secret" "anthropic" {
-  name                    = "${var.project}/anthropic-api-key"
+# The Modal proxy-auth token the api sends to the GPU-hosted Ollama. Terraform creates the
+# secret; you put the value in once (infra/README.md):
+#   aws secretsmanager put-secret-value --secret-id cairnly/modal-proxy-token \
+#     --secret-string '{"token_id":"...","token_secret":"..."}'
+# so the token is never in Terraform state or the repo.
+resource "aws_secretsmanager_secret" "modal_proxy_token" {
+  name                    = "${var.project}/modal-proxy-token"
   recovery_window_in_days = 7
 }
 
-# ECS will not start a task whose secret has no value, so seed a placeholder. Terraform never
-# touches the value again (ignore_changes), so the real key you put in later stays.
-resource "aws_secretsmanager_secret_version" "anthropic_placeholder" {
-  secret_id     = aws_secretsmanager_secret.anthropic.id
-  secret_string = "not-set"
+# ECS will not start a task whose secret (or JSON key) is missing, so seed a placeholder with
+# both keys. Terraform never touches the value again (ignore_changes), so the real token you
+# put in later stays.
+resource "aws_secretsmanager_secret_version" "modal_proxy_token_placeholder" {
+  secret_id     = aws_secretsmanager_secret.modal_proxy_token.id
+  secret_string = jsonencode({ token_id = "not-set", token_secret = "not-set" })
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# Langfuse keys, only when tracing is on (langfuse_host set). Same pattern:
+#   aws secretsmanager put-secret-value --secret-id cairnly/langfuse \
+#     --secret-string '{"public_key":"pk-lf-...","secret_key":"sk-lf-..."}'
+resource "aws_secretsmanager_secret" "langfuse" {
+  count                   = local.langfuse ? 1 : 0
+  name                    = "${var.project}/langfuse"
+  recovery_window_in_days = 7
+}
+
+resource "aws_secretsmanager_secret_version" "langfuse_placeholder" {
+  count         = local.langfuse ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.langfuse[0].id
+  secret_string = jsonencode({ public_key = "not-set", secret_key = "not-set" })
   lifecycle {
     ignore_changes = [secret_string]
   }

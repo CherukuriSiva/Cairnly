@@ -1,5 +1,6 @@
-# Defaults run the whole stack inside the cluster (good for kind). For production, point
-# database.host at a managed Postgres (RDS) and set postgres.enabled=false.
+# Defaults run the whole stack inside the cluster (good for kind). For production use
+# values-production.yaml: a managed Postgres, the models on the Modal GPU, no in-cluster
+# Ollama. The Claude API is local development only and has no setting here.
 
 image:
   api: cairnly-api:local
@@ -8,8 +9,8 @@ image:
 
 api:
   replicas: 1
-  llmProvider: ollama            # "anthropic" in production (key in secrets.anthropicApiKey)
-  anthropicModel: claude-opus-5-5
+  environment: development       # "production" makes the API refuse to enable the Claude API
+  trustProxy: "0"                # "1" behind the ingress: rate limits use the last X-Forwarded-For
   resources:
     requests: { cpu: 250m, memory: 512Mi }
     limits: { memory: 1Gi }
@@ -24,7 +25,8 @@ ollama:
   enabled: true                  # in-cluster embeddings (CPU is enough for nomic-embed-text)
   image: ollama/ollama:0.11.2
   models: [nomic-embed-text]     # pulled at start; add qwen3:8b for local chat (5 GB, slow on CPU)
-  externalUrl: ""                # used instead when enabled=false
+  externalUrl: ""                # used instead when enabled=false (the Modal URL in production)
+  proxyTokenSecret: ""           # secret with keys token_id/token_secret: Modal proxy auth
   resources:
     requests: { cpu: 500m, memory: 1Gi }
     limits: { memory: 3Gi }
@@ -44,7 +46,10 @@ postgres:
 
 secrets:
   dbPassword: cairnly-local      # local default only; use existingSecret in real clusters
-  anthropicApiKey: ""
+
+langfuse:
+  host: ""                       # empty = tracing off
+  existingSecret: ""             # secret with keys public_key/secret_key
 
 ingest:
   enabled: true                  # migrate + ingest the lessons after every install/upgrade

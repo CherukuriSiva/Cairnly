@@ -1,26 +1,35 @@
-# Compute: ECS on Fargate (no servers to patch). Four task definitions:
+# Compute: ECS on Fargate (no servers to patch). Three task definitions:
 #   api     FastAPI, behind the load balancer, autoscaled on CPU
 #   web     Next.js UI, behind the load balancer
-#   ollama  embeddings server (CPU), reachable only inside the VPC at ollama.<project>.internal
 #   ingest  one-off: `cairnly migrate && cairnly ingest --kb lessons` (run after each deploy)
+# The models (answers and embeddings) run on a Modal GPU outside AWS (deploy/modal_ollama.py);
+# the api reaches it over HTTPS with a proxy-auth token from Secrets Manager.
 
 locals {
-  db_secret  = aws_db_instance.main.master_user_secret[0].secret_arn
-  ollama_url = "http://ollama.${var.project}.internal:11434"
+  db_secret = aws_db_instance.main.master_user_secret[0].secret_arn
+  langfuse  = var.langfuse_host != ""
 
-  api_environment = [
+  api_environment = concat([
     { name = "DB_HOST", value = aws_db_instance.main.address },
     { name = "DB_NAME", value = "cairnly" },
     { name = "DB_SSLMODE", value = "require" },
-    { name = "OLLAMA_URL", value = local.ollama_url },
-    { name = "LLM_PROVIDER", value = var.llm_provider },
-    { name = "ANTHROPIC_MODEL", value = var.anthropic_model },
-  ]
-  api_secrets = [
+    { name = "OLLAMA_URL", value = var.ollama_url },
+    { name = "CAIRNLY_ENV", value = "production" }, # the Claude API can never be switched on
+    { name = "TRUST_PROXY", value = "1" },          # the ALB appends the client IP
+    ], local.langfuse ? [
+    { name = "LANGFUSE_HOST", value = var.langfuse_host },
+    { name = "LANGFUSE_TRACING_ENVIRONMENT", value = "production" },
+    { name = "LANGFUSE_RELEASE", value = var.image_tag },
+  ] : [])
+  api_secrets = concat([
     { name = "DB_USER", valueFrom = "${local.db_secret}:username::" },
     { name = "DB_PASSWORD", valueFrom = "${local.db_secret}:password::" },
-    { name = "ANTHROPIC_API_KEY", valueFrom = aws_secretsmanager_secret.anthropic.arn },
-  ]
+    { name = "MODAL_PROXY_TOKEN_ID", valueFrom = "${aws_secretsmanager_secret.modal_proxy_token.arn}:token_id::" },
+    { name = "MODAL_PROXY_TOKEN_SECRET", valueFrom = "${aws_secretsmanager_secret.modal_proxy_token.arn}:token_secret::" },
+    ], local.langfuse ? [
+    { name = "LANGFUSE_PUBLIC_KEY", valueFrom = "${aws_secretsmanager_secret.langfuse[0].arn}:public_key::" },
+    { name = "LANGFUSE_SECRET_KEY", valueFrom = "${aws_secretsmanager_secret.langfuse[0].arn}:secret_key::" },
+  ] : [])
   api_image = "${aws_ecr_repository.app["api"].repository_url}:${var.image_tag}"
   web_image = "${aws_ecr_repository.app["web"].repository_url}:${var.image_tag}"
 }
@@ -34,7 +43,7 @@ resource "aws_ecs_cluster" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "app" {
-  for_each          = toset(["api", "web", "ollama", "ingest"])
+  for_each          = toset(["api", "web", "ingest"])
   name              = "/ecs/${var.project}/${each.key}"
   retention_in_days = 14
 }
@@ -67,9 +76,10 @@ resource "aws_iam_role_policy" "read_secrets" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [local.db_secret, aws_secretsmanager_secret.anthropic.arn]
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      Resource = concat([local.db_secret, aws_secretsmanager_secret.modal_proxy_token.arn],
+      aws_secretsmanager_secret.langfuse[*].arn)
     }]
   })
 }
@@ -160,69 +170,7 @@ resource "aws_ecs_task_definition" "web" {
   }])
 }
 
-resource "aws_ecs_task_definition" "ollama" {
-  family                   = "${var.project}-ollama"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = 1024
-  memory                   = 3072
-  execution_role_arn       = aws_iam_role.execution.arn
-  task_role_arn            = aws_iam_role.task.arn
-
-  container_definitions = jsonencode([{
-    name         = "ollama"
-    image        = "ollama/ollama:0.11.2"
-    essential    = true
-    portMappings = [{ containerPort = 11434 }]
-    entryPoint   = ["/bin/sh", "-c"]
-    # Start the server, pull the embedding model, keep serving.
-    command = ["ollama serve & pid=$!; until ollama list >/dev/null 2>&1; do sleep 1; done; ollama pull nomic-embed-text; wait $pid"]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = aws_cloudwatch_log_group.app["ollama"].name
-        awslogs-region        = var.region
-        awslogs-stream-prefix = "ollama"
-      }
-    }
-  }])
-}
-
-# ---- Service discovery: the api finds Ollama by DNS name inside the VPC.
-
-resource "aws_service_discovery_private_dns_namespace" "main" {
-  name = "${var.project}.internal"
-  vpc  = aws_vpc.main.id
-}
-
-resource "aws_service_discovery_service" "ollama" {
-  name = "ollama"
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-    dns_records {
-      type = "A"
-      ttl  = 10
-    }
-  }
-}
-
 # ---- Services
-
-resource "aws_ecs_service" "ollama" {
-  name            = "ollama"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.ollama.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ollama.id]
-  }
-  service_registries {
-    registry_arn = aws_service_discovery_service.ollama.arn
-  }
-}
 
 resource "aws_ecs_service" "api" {
   name                              = "api"

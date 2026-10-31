@@ -1,5 +1,5 @@
 # Network: a VPC across two availability zones. Public subnets hold only the load balancer
-# and the NAT gateway; the app, Ollama and the database live in private subnets with no
+# and the NAT gateway; the app and the database live in private subnets with no
 # inbound route from the internet. One NAT gateway (not one per AZ) keeps the demo cheap.
 
 data "aws_availability_zones" "available" {
@@ -60,7 +60,7 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id # outbound only: image pulls, Claude API, model downloads
+    nat_gateway_id = aws_nat_gateway.main.id # outbound only: image pulls, the Modal GPU
   }
 }
 
@@ -118,25 +118,6 @@ resource "aws_security_group" "app" {
     to_port         = 8010
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_security_group" "ollama" {
-  name   = "${var.project}-ollama"
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    description     = "embeddings from the api and ingest tasks"
-    from_port       = 11434
-    to_port         = 11434
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app.id]
   }
   egress {
     from_port   = 0

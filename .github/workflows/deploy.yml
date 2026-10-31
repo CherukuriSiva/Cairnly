@@ -1,9 +1,12 @@
 name: deploy
 
 # Manual on purpose: a deploy is a decision. Run it from the Actions tab once CI is green.
-# Needs (set once, see infra/terraform/README.md):
+# Needs (set once, see infra/README.md):
 #   repository variables  AWS_REGION, TF_STATE_BUCKET
+#                         OLLAMA_URL      the Modal URL printed by `modal deploy deploy/modal_ollama.py`
+#                         LANGFUSE_HOST   optional; empty = production tracing off
 #   repository secret     AWS_DEPLOY_ROLE_ARN   (from infra/bootstrap; no AWS keys stored)
+# The Modal proxy token and the Langfuse keys live in AWS Secrets Manager, never in GitHub.
 on:
   workflow_dispatch:
 
@@ -42,7 +45,7 @@ jobs:
       # First run: the image registries must exist before images can be pushed.
       - name: Ensure registries
         working-directory: ${{ env.TF_DIR }}
-        run: terraform apply -input=false -auto-approve -var region=${{ vars.AWS_REGION }} -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
+        run: terraform apply -input=false -auto-approve -var region=${{ vars.AWS_REGION }} -var ollama_url=${{ vars.OLLAMA_URL }} -var langfuse_host="${{ vars.LANGFUSE_HOST }}" -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
 
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -58,10 +61,10 @@ jobs:
 
       - name: Terraform apply
         working-directory: ${{ env.TF_DIR }}
-        run: terraform apply -input=false -auto-approve -var region=${{ vars.AWS_REGION }} -var image_tag="$IMAGE_TAG"
+        run: terraform apply -input=false -auto-approve -var region=${{ vars.AWS_REGION }} -var image_tag="$IMAGE_TAG" -var ollama_url=${{ vars.OLLAMA_URL }} -var langfuse_host="${{ vars.LANGFUSE_HOST }}"
 
       - name: Wait for the services to be stable
-        run: aws ecs wait services-stable --cluster cairnly --services api web ollama
+        run: aws ecs wait services-stable --cluster cairnly --services api web
 
       - name: Migrate and ingest
         working-directory: ${{ env.TF_DIR }}
@@ -77,5 +80,6 @@ jobs:
         run: |
           URL=$(terraform output -raw url)
           curl -fsS "$URL/health"
+          curl -fsS "$URL/config"
           curl -fsS "$URL/" -o /dev/null
           echo "deployed: $URL"

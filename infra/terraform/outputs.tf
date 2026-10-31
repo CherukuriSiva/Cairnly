@@ -11,9 +11,14 @@ output "ecr_web" {
   value = aws_ecr_repository.app["web"].repository_url
 }
 
-output "anthropic_secret_id" {
-  description = "Put the Claude API key here once (see README)."
-  value       = aws_secretsmanager_secret.anthropic.name
+output "modal_token_secret_id" {
+  description = "Put the Modal proxy-auth token here once (see README)."
+  value       = aws_secretsmanager_secret.modal_proxy_token.name
+}
+
+output "langfuse_secret_id" {
+  description = "Put the Langfuse keys here once when tracing is on (see README)."
+  value       = local.langfuse ? aws_secretsmanager_secret.langfuse[0].name : null
 }
 
 output "run_ingest" {
