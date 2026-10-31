@@ -1,6 +1,8 @@
 # ADR 0007: Deploy to AWS on ECS Fargate with RDS, via Terraform and GitHub OIDC
 
-Status: accepted (M2), not yet applied
+Status: accepted (M2), not yet applied. Amended by
+[ADR 0013](0013-models-on-a-modal-gpu.md): the CPU Ollama task and the Claude API are gone;
+the models run on a Modal GPU.
 
 ## Context
 
