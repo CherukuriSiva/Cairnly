@@ -19,7 +19,6 @@ interface Turn extends PastTurn {
   meta?: string;
   searched?: string; // the rewritten query, shown when it differs from the question
   notice?: string;
-  guard?: string; // the safety rule that refused it
   waking?: boolean; // no token yet after WAKING_MS: the model is probably starting up
 }
 

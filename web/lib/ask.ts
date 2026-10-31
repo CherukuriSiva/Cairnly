@@ -51,6 +51,7 @@ export interface PastTurn {
   question: string;
   answer: string;
   status: "streaming" | "done" | "refused" | "error";
+  guard?: string; // the safety rule that refused it; such a turn is never sent back as history
 }
 
 export interface AskBody {
@@ -61,9 +62,12 @@ export interface AskBody {
   provider?: Provider; // only when the reader chose one; otherwise the server default applies
 }
 
-/** The request body: the last completed turns (errors and unfinished turns skipped), answers
- * cut to the API's limit, the optional track scope, the tab's session id, and the provider
- * only when the reader picked one. */
+/** The request body: the last completed turns (errors, unfinished turns and turns the safety
+ * check refused skipped), answers cut to the API's limit, the optional track scope, the tab's
+ * session id, and the provider only when the reader picked one.
+ *
+ * A refused attack must not travel on as history: the server checks every earlier question, so
+ * it would block each of the next follow-ups too. */
 export function buildAskBody(
   question: string,
   turns: PastTurn[],
@@ -72,7 +76,7 @@ export function buildAskBody(
   provider: Provider | null = null,
 ): AskBody {
   const history = turns
-    .filter((t) => t.status === "done" || t.status === "refused")
+    .filter((t) => (t.status === "done" || t.status === "refused") && !t.guard)
     .slice(-MAX_HISTORY_TURNS)
     .map((t) => ({ question: t.question, answer: t.answer.slice(0, MAX_ANSWER_CHARS) }));
   const body: AskBody = { question, history, track, session_id: sessionId };
