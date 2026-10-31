@@ -13,6 +13,13 @@ Metrics:
                    cover), plus the golden questions of any other knowledge base present
 - faithfulness     (--judge) share of answers an LLM judge finds fully supported by sources
 
+Red team (`cairnly eval-redteam`): the input guard (guard.py) on evals/redteam.jsonl, attacks
+labelled "block" and tricky but legitimate questions labelled "allow". Every golden quiz
+question and off-topic question must pass the guard too (the off-topic ones are refused later
+by the confidence gate, not by the guard). No database and no model are needed, so CI runs it.
+- false-block rate  legitimate questions the guard blocked
+- miss rate         attacks the guard let through
+
 Follow-ups (`cairnly eval-followups`): for each item in evals/followups.jsonl, recall@k of
 searching with the hand-written standalone question vs. with the follow-up rewritten by the
 LLM (rewrite.py). Rewriting passes when it is at least as good as the standalone baseline.
@@ -27,6 +34,7 @@ from pathlib import Path
 
 import yaml
 
+from cairnly.guard import Verdict, check_input
 from cairnly.kb import ROOT, KnowledgeBase, get_kb, load_kbs
 from cairnly.mdx import section_titles
 from cairnly.search import Hit, SearchResult
@@ -35,6 +43,7 @@ CANDIDATES = 30
 QUIZ = re.compile(r"^\*\*Q:\s*(.+?)\*\*\s*$", re.M)
 OFF_TOPIC_FILE = ROOT / "evals" / "off-topic.jsonl"
 FOLLOWUPS_FILE = ROOT / "evals" / "followups.jsonl"
+REDTEAM_FILE = ROOT / "evals" / "redteam.jsonl"
 
 
 @dataclass(frozen=True)
@@ -167,6 +176,43 @@ def followup_report(items: list[dict], rewrite_fn: Callable[[str, list[dict]], s
             "rows": rows}
 
 
+# ---- red team ---------------------------------------------------------------------------------
+
+def redteam_report(rows: list[dict], also_allowed: list[str],
+                   check: Callable[[str], Verdict] = check_input) -> dict:
+    """How the input guard does on labelled rows plus extra questions that must pass.
+
+    Each row: {"text", "label": "block" | "allow", "rule"?}. Per rule: how many attacks it
+    should catch, how many were caught, and how many texts it blocked in total.
+    """
+    allowed = [r["text"] for r in rows if r["label"] == "allow"] + also_allowed
+    attacks = [r for r in rows if r["label"] == "block"]
+    false_blocks = [(t, check(t).rule) for t in allowed if check(t).blocked]
+    verdicts = [(r, check(r["text"])) for r in attacks]
+    misses = [r["text"] for r, v in verdicts if not v.blocked]
+    per_rule: dict[str, dict] = {}
+
+    def counts(rule: str | None) -> dict:
+        return per_rule.setdefault(rule or "?", {"attacks": 0, "caught": 0, "blocked": 0})
+
+    for r, v in verdicts:
+        counts(r.get("rule"))["attacks"] += 1
+        counts(r.get("rule"))["caught"] += v.blocked
+        if v.blocked:
+            counts(v.rule)["blocked"] += 1
+    for _, rule in false_blocks:
+        counts(rule)["blocked"] += 1
+    return {
+        "allowed_questions": len(allowed),
+        "attacks": len(attacks),
+        "false_block_rate": round(len(false_blocks) / max(len(allowed), 1), 4),
+        "miss_rate": round(len(misses) / max(len(attacks), 1), 4),
+        "per_rule": per_rule,
+        "false_blocks": [{"text": t, "rule": rule} for t, rule in false_blocks],
+        "misses": misses,
+    }
+
+
 # ---- faithfulness (LLM as judge) ------------------------------------------------------------
 
 JUDGE_SYSTEM = """You grade whether an ANSWER is supported by the SOURCES.
@@ -247,13 +293,18 @@ def main(args) -> None:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n")
 
     if args.gate:
-        thresholds = (yaml.safe_load(Path(args.gate).read_text()) or {}).get(kb.name, {})
-        failures = check_gates(report, thresholds)
-        for failure in failures:
-            print(f"EVAL GATE FAILED: {failure}", file=sys.stderr)
-        if failures:
-            sys.exit(1)
-        print(f"eval gate passed ({len(thresholds)} checks)")
+        apply_gate(report, Path(args.gate), kb.name)
+
+
+def apply_gate(report: dict, gate_file: Path, section: str) -> None:
+    """Exit 1 (failing CI) when a metric breaks its limit in `section` of the gates file."""
+    thresholds = (yaml.safe_load(gate_file.read_text()) or {}).get(section, {})
+    failures = check_gates(report, thresholds)
+    for failure in failures:
+        print(f"EVAL GATE FAILED: {failure}", file=sys.stderr)
+    if failures:
+        sys.exit(1)
+    print(f"eval gate passed ({len(thresholds)} checks)")
 
 
 def followups_main(args) -> None:
@@ -274,6 +325,18 @@ def followups_main(args) -> None:
         print("FOLLOW-UP EVAL FAILED: rewritten recall is below the standalone baseline",
               file=sys.stderr)
         sys.exit(1)
+
+
+def redteam_main(args) -> None:
+    """The guard on the red-team set plus every golden and off-topic question (no DB, no model)."""
+    kb = get_kb(args.kb)
+    also_allowed = [i.question for i in golden_for(kb)] + off_topic_questions()
+    report = redteam_report(load_jsonl(Path(args.golden)), also_allowed)
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    if args.out:
+        Path(args.out).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    if args.gate:
+        apply_gate(report, Path(args.gate), "redteam")
 
 
 def _available(kb: KnowledgeBase) -> bool:

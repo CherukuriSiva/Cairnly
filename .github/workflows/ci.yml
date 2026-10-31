@@ -27,6 +27,8 @@ jobs:
       - run: uv run ruff check .
       # Tests use fake embedders and LLMs, so CI needs Postgres but not Ollama or an API key.
       - run: uv run pytest -q
+      # Guard gate: wrong blocks and missed attacks on evals/redteam.jsonl (no DB, no model).
+      - run: uv run cairnly eval-redteam --gate evals/gates.yaml
 
   # Eval gate: real embeddings over all of content/ (127 quiz questions plus 40 off-topic ones);
   # fails the build if retrieval quality drops below evals/gates.yaml. Only the embedding model

@@ -142,3 +142,36 @@ def test_judge_parses_json_even_with_surrounding_text():
             yield "no json here"
 
     assert judge("q", [], "plain", Broken())["supported"] is False
+
+
+def test_redteam_report_counts_wrong_blocks_and_misses():
+    from cairnly.evals import redteam_report
+    from cairnly.guard import Verdict
+
+    def check(text):  # a stand-in guard: blocks texts starting with "bad"
+        return Verdict(True, "injection") if text.startswith("bad") else Verdict(False)
+
+    rows = [{"text": "bad one", "label": "block", "rule": "injection"},
+            {"text": "sneaky", "label": "block", "rule": "jailbreak"},
+            {"text": "fine", "label": "allow"},
+            {"text": "bad but legit", "label": "allow"}]
+    report = redteam_report(rows, ["golden question", "off-topic question"], check=check)
+
+    assert report["allowed_questions"] == 4 and report["attacks"] == 2
+    assert report["false_block_rate"] == 0.25 and report["miss_rate"] == 0.5
+    assert report["misses"] == ["sneaky"]
+    assert report["false_blocks"] == [{"text": "bad but legit", "rule": "injection"}]
+    assert report["per_rule"]["injection"] == {"attacks": 1, "caught": 1, "blocked": 2}
+    assert report["per_rule"]["jailbreak"] == {"attacks": 1, "caught": 0, "blocked": 0}
+    assert check_gates(report, {"false_block_rate": 0.02, "miss_rate": 0.10}) == [
+        "false_block_rate = 0.25 is above the limit 0.02", "miss_rate = 0.5 is above the limit 0.1"]
+
+
+def test_redteam_set_is_well_formed():
+    from cairnly.evals import REDTEAM_FILE
+
+    rows = load_jsonl(REDTEAM_FILE)
+    assert len(rows) >= 100
+    assert {r["label"] for r in rows} == {"block", "allow"}
+    rules = {r["rule"] for r in rows if r["label"] == "block"}
+    assert rules == {"injection", "jailbreak", "prompt_extraction", "junk"}

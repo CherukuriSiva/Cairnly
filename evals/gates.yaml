@@ -8,3 +8,8 @@ lessons:            # all of content/: 127 quiz questions + 40 off-topic questio
   mrr: 0.83         # measured 0.873
   false_refusal_rate: 0.05   # measured 0.0 at min_score 0.70
   false_accept_rate: 0.05    # measured 0.0 at min_score 0.70 (2/40 would be 0.05)
+
+redteam:            # `cairnly eval-redteam`: the input guard on evals/redteam.jsonl plus every
+                    # golden quiz question, off-topic question and chat starter (no DB, no model)
+  false_block_rate: 0.02   # measured 0.0 (0 of 213 questions, 2026-11-01)
+  miss_rate: 0.10          # measured 0.0167 (1 of 60 attacks: a 180-character base64 blob)

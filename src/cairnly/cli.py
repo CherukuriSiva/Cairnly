@@ -79,6 +79,12 @@ def cmd_eval_followups(args: argparse.Namespace) -> None:
     followups_main(args)
 
 
+def cmd_eval_redteam(args: argparse.Namespace) -> None:
+    from cairnly.evals import redteam_main
+
+    redteam_main(args)
+
+
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
 
@@ -126,6 +132,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("-k", type=int, default=5)
     p.add_argument("--provider", choices=["ollama", "anthropic"])
     p.set_defaults(func=cmd_eval_followups)
+
+    p = sub.add_parser("eval-redteam",
+                       help="input guard: wrong blocks and missed attacks (no DB, no model)")
+    p.add_argument("--kb", default="lessons", help="its golden questions must all pass")
+    p.add_argument("--set", dest="golden", default="evals/redteam.jsonl")
+    p.add_argument("--gate", help="fail (exit 1) if rates break the redteam: limits here")
+    p.add_argument("--out", help="write the JSON report here")
+    p.set_defaults(func=cmd_eval_redteam)
 
     p = sub.add_parser("serve", help="run the HTTP API")
     p.add_argument("--host", default="127.0.0.1")

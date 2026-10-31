@@ -58,7 +58,7 @@ RULES: dict[str, list[str]] = {
         r"\byou\s+(?:\w+\s+){0,3}?" + _OVERRIDE + r"\s+" + _DETERMINERS + _RULE_WORDS + r"\b",
         r"\b(?:new|updated|real|actual|revised)\s+(?:system\s+)?(?:instructions|rules|prompt)"
         r"\s*:",
-        r"\byou\s+are\s+now\b",
+        _START + r"you\s+are\s+now\b",
         r"\bfrom\s+now\s+on,?\s+(?:you|act|respond|answer|reply|only|always|never|ignore)\b",
         r"(?:^|\n)\s*(?:system|assistant|admin|developer)\s*(?:prompt\s*)?:",
         r"<\|?\s*(?:system|im_start|im_end|endoftext)",
@@ -82,7 +82,8 @@ RULES: dict[str, list[str]] = {
         r"\byou\s+(?:can|will|are\s+going\s+to|must|shall)\s+(?:now\s+)?do\s+anything\s+now\b",
         r"\b(?:pretend|imagine|act\s+as\s+if|assume|suppose)\s+(?:that\s+)?you\s+(?:have|had|"
         r"are\s+under|were\s+under)\s+no\s+" + _RESTRICTIONS,
-        r"\byou\b[^.?!\n]{0,40}\bwithout\s+(?:any\s+)?(?:of\s+)?(?:your\s+)?" + _RESTRICTIONS,
+        r"\byou\b[^.?!\n]{0,40}\bwithout\s+(?:any\s+)?(?:of\s+)?(?:your\s+)?(?:\w+\s+)?"
+        + _RESTRICTIONS,
         r"(?:^|[.!?\n]\s*)(?:please\s+)?(?:answer|respond|reply|act|behave|write|speak|talk)"
         r"\b[^.?!\n]{0,40}\bwithout\s+(?:any\s+)?" + _RESTRICTIONS,
         r"\byou\s+(?:are|'re)\s+(?:now\s+)?(?:no\s+longer\s+(?:bound|restricted|limited|"
