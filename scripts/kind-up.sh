@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 kind get clusters | grep -qx cairnly || kind create cluster --name cairnly
 docker build -t cairnly-api:local .
-docker build -t cairnly-web:local --build-arg NEXT_PUBLIC_API_URL= web   # same-origin API
+docker build -f web/Dockerfile -t cairnly-web:local --build-arg NEXT_PUBLIC_API_URL= .   # same-origin API
 kind load docker-image cairnly-api:local cairnly-web:local --name cairnly
 
 helm --kube-context kind-cairnly upgrade --install cairnly infra/helm/cairnly --wait --timeout 10m

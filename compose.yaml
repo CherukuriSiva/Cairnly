@@ -29,7 +29,9 @@ services:
         condition: service_healthy
 
   web:
-    build: ./web
+    build:
+      context: .
+      dockerfile: web/Dockerfile
     profiles: ["full"]
     ports:
       - "3010:3010"

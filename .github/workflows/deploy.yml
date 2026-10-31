@@ -52,7 +52,7 @@ jobs:
           API=${{ steps.ecr.outputs.registry }}/cairnly-api:$IMAGE_TAG
           WEB=${{ steps.ecr.outputs.registry }}/cairnly-web:$IMAGE_TAG
           docker build -t "$API" .
-          docker build -t "$WEB" --build-arg NEXT_PUBLIC_API_URL= web   # same origin via the load balancer
+          docker build -f web/Dockerfile -t "$WEB" --build-arg NEXT_PUBLIC_API_URL= .   # same origin via the load balancer
           docker push "$API"
           docker push "$WEB"
 

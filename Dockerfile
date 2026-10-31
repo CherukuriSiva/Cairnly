@@ -1,6 +1,7 @@
 # API image. Two stages: install dependencies with uv, then copy only the virtualenv and code
-# into a slim runtime image (no build tools, no uv) that runs as a non-root user. The public
-# corpus is included so a one-off job can run `cairnly migrate && cairnly ingest --kb lessons`.
+# into a slim runtime image (no build tools, no uv) that runs as a non-root user. The content
+# folder is included so a one-off job can run `cairnly migrate && cairnly ingest --kb lessons`,
+# and because the API reads content/syllabus.yaml and content/sections.json.
 # The reranker (CPU PyTorch) and its model are baked in, so production runs the same retrieval
 # pipeline that CI evaluates, with no model download at startup.
 FROM python:3.12-slim AS build
@@ -13,7 +14,7 @@ RUN uv sync --frozen --no-dev --extra rerank --no-install-project
 COPY src ./src
 COPY kbs.yaml ./
 COPY prompts ./prompts
-COPY corpus/public ./corpus/public
+COPY content ./content
 RUN uv sync --frozen --no-dev --extra rerank
 RUN .venv/bin/python -c "from cairnly.rerank import MODEL; from sentence_transformers import CrossEncoder; CrossEncoder(MODEL)"
 
