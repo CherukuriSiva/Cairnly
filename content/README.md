@@ -70,3 +70,11 @@ Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter N
 
 Insights summarise recurring public industry discussions in our own words.
 Each insight page keeps its own source note at the bottom.
+
+## News
+
+The News page (`/news`) lists fresh items from open feeds, fetched when the server
+refreshes the page, and a few hand-picked LinkedIn posts. The picks live in
+`news/linkedin.yaml`: each entry has a `url` (an https `linkedin.com` link), an
+`author`, a `title`, and optionally a `note` and a `date`. Entries that do not fit
+are skipped. This file is not MDX, so the chat never indexes it.

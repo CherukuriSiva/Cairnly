@@ -36,7 +36,7 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Piece | What it does | Code |
 |---|---|---|
 | Content | All lessons, insights and roadmaps as MDX; `syllabus.yaml` sets the order ([content/README.md](content/README.md)) | `content/`, `mdx.py`, `syllabus.py` |
-| Pages | Static Next.js pages: syllabus, tracks, lessons with sidebar and prev/next, roadmaps, insights | `web/app/`, `web/components/` |
+| Pages | Static Next.js pages: syllabus, tracks, lessons with sidebar and prev/next, roadmaps, insights; plus a News page that reads open feeds and refreshes every hour | `web/app/`, `web/components/`, `web/lib/news/` |
 | Anchors | One heading-id rule shared by Python and the web, so citations open the right section | `pages.py`, `web/lib/anchors.ts` |
 | Ingestion | One chunk per heading section with its page anchor; local embeddings; only changed files re-embedded | `chunk.py`, `embed.py`, `ingest.py` |
 | Knowledge bases | Each with its own gate, prompt version and notice ([kbs.yaml](kbs.yaml)) | `kb.py` |

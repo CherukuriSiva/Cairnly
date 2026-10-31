@@ -131,6 +131,25 @@ hallucinations lesson, or exact versus semantic caches next to semantic caching.
 - Each note ends with `Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter N`.
 - The note is a normal section with its own heading, so the chat can find and cite it.
 
+## 9. News page (`web/lib/news/`, `web/app/news/page.tsx`)
+
+`/news` shows fresh AI-engineering reading. It is the one page that is not fully static.
+
+- **Sources.** Hacker News (only titles that look like AI), arXiv, Hugging Face daily papers,
+  and the blogs of AI labs and practitioners. They are listed as data in `sources.ts`.
+- **ISR.** ISR means "incremental static regeneration". The page is built once, served fast, and
+  rebuilt in the background at most once an hour (`revalidate = 3600`). Readers never wait for
+  the feeds.
+- **Last good.** If a source is down, the server keeps showing the last items it got from that
+  source. The copy lives in the server's memory, so a restart starts empty until the next good
+  fetch. One failing source never breaks the page or the build.
+- **Safe text.** Feed text is untrusted. It is turned into plain text (tags removed, entities
+  decoded, 200 characters at most) and only http and https links are shown. Links open in a new tab.
+- **LinkedIn.** LinkedIn gives no public way to read other people's posts and forbids scraping,
+  so we do not do that (see ADR 0012). The owner adds links by hand in
+  `content/news/linkedin.yaml`. Only the link is shown; no LinkedIn script is loaded.
+- **Chat.** News is not indexed, so the chat cannot cite it.
+
 ## Try it
 
 ```bash
