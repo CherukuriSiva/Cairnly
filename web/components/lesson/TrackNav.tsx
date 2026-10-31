@@ -1,0 +1,52 @@
+import Link from "next/link";
+
+export interface NavTrack {
+  id: string;
+  title: string;
+  modules: { title: string; lessons: { slug: string; title: string }[] }[];
+}
+
+const TINT = "color-mix(in srgb, var(--accent) 12%, transparent)";
+
+/** One track's modules and lessons, with the current lesson highlighted. Used by the desktop
+ * sidebar and the mobile drawer. */
+export function TrackNav({ track, active }: { track: NavTrack; active: string }) {
+  return (
+    <nav aria-label={`${track.title} lessons`} className="space-y-5 p-4">
+      <Link href={`/${track.id}`} className="block px-3 font-mono text-xs" style={{ color: "var(--muted)" }}>
+        ← {track.title}
+      </Link>
+      {track.modules.map((module) => (
+        <div key={module.title}>
+          <p
+            className="px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--muted)" }}
+          >
+            {module.title}
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {module.lessons.map((lesson) => {
+              const current = lesson.slug === active;
+              return (
+                <li key={lesson.slug}>
+                  <Link
+                    href={`/${track.id}/${lesson.slug}`}
+                    aria-current={current ? "page" : undefined}
+                    className={`block rounded-lg px-3 py-2 text-sm hover:text-[var(--ink)] ${current ? "font-semibold" : ""}`}
+                    style={
+                      current
+                        ? { background: TINT, color: "var(--accent)" }
+                        : { color: "var(--muted)" }
+                    }
+                  >
+                    {lesson.title}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}

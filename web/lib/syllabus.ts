@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
-import { CONTENT_DIR } from "@/lib/content";
+import { CONTENT_DIR, getLesson, type Lesson } from "@/lib/content";
 
 export interface Module {
   title: string;
@@ -36,6 +36,21 @@ export function getTracks(): Track[] {
 
 export function getTrack(id: string): Track | undefined {
   return getTracks().find((t) => t.id === id);
+}
+
+export interface ResolvedTrack extends Omit<Track, "modules"> {
+  modules: { title: string; lessons: Lesson[] }[];
+}
+
+/** A track with each slug replaced by its lesson (title, minutes, difficulty, ...). */
+export function resolveTrack(track: Track): ResolvedTrack {
+  return {
+    ...track,
+    modules: track.modules.map((m) => ({
+      title: m.title,
+      lessons: m.lessons.flatMap((slug) => getLesson(track.id, slug) ?? []),
+    })),
+  };
 }
 
 /** Every lesson in reading order across the whole syllabus. */
