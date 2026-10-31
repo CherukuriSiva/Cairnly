@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ask, buildAskBody, type AskEvent, type PastTurn, type Provider, type Source } from "@/lib/ask";
+import {
+  ask,
+  buildAskBody,
+  fetchConfig,
+  getSessionId,
+  PROVIDER_LABELS,
+  type AskEvent,
+  type PastTurn,
+  type Provider,
+  type Source,
+} from "@/lib/ask";
 import { inlineTokens } from "@/lib/inline";
 
 interface Turn extends PastTurn {
@@ -9,7 +19,11 @@ interface Turn extends PastTurn {
   meta?: string;
   searched?: string; // the rewritten query, shown when it differs from the question
   notice?: string;
+  guard?: string; // the safety rule that refused it
+  waking?: boolean; // no token yet after WAKING_MS: the model is probably starting up
 }
+
+const WAKING_MS = 5000;
 
 const STARTERS = [
   "What is RAG, and when should I use it instead of fine-tuning?",
@@ -30,7 +44,9 @@ function dropParam(name: string) {
 export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
+  const [providers, setProviders] = useState<Provider[]>(["ollama"]);
   const [provider, setProvider] = useState<Provider>("ollama");
+  const chooseProvider = providers.length > 1; // the select only appears when there is a choice
   const [track, setTrack] = useState<string | null>(null);
   const busy = turns.at(-1)?.status === "streaming";
   const abortRef = useRef<AbortController | null>(null);
@@ -50,6 +66,19 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Which providers this server allows. Without an answer, the chat uses the server default.
+  useEffect(() => {
+    let live = true;
+    fetchConfig().then((config) => {
+      if (!live || !config) return;
+      setProviders(config.providers);
+      if (config.providers.includes(config.default_provider)) setProvider(config.default_provider);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
   function update(fn: (t: Turn) => Turn) {
     setTurns((all) => [...all.slice(0, -1), fn(all[all.length - 1])]);
   }
@@ -61,27 +90,49 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
 
   async function submit(question: string, scope: string | null = track) {
     if (!question.trim() || busy) return;
-    const body = buildAskBody(question, turns, scope, provider);
+    const body = buildAskBody(
+      question,
+      turns,
+      scope,
+      getSessionId(),
+      chooseProvider ? provider : null,
+    );
     setInput("");
     setTurns((all) => [...all, { question, answer: "", sources: [], status: "streaming" }]);
     abortRef.current = new AbortController();
+    // A cold GPU can take a while for the first token: say so instead of "Searching…".
+    const waking = setTimeout(
+      () => update((t) => (t.status === "streaming" && !t.answer ? { ...t, waking: true } : t)),
+      WAKING_MS,
+    );
     const onEvent = (e: AskEvent) => {
+      if (e.type !== "sources") clearTimeout(waking);
       if (e.type === "sources") update((t) => ({ ...t, sources: e.sources }));
-      else if (e.type === "token") update((t) => ({ ...t, answer: t.answer + e.text }));
-      else if (e.type === "error") update((t) => ({ ...t, status: "error", meta: e.message }));
+      else if (e.type === "token")
+        update((t) => ({ ...t, answer: t.answer + e.text, waking: false }));
+      else if (e.type === "retract")
+        update((t) => ({ ...t, answer: e.message, status: "refused" }));
+      else if (e.type === "error")
+        update((t) => ({ ...t, status: "error", meta: e.message, waking: false }));
       else if (e.type === "done")
         update((t) => ({
           ...t,
           status: e.refused ? "refused" : "done",
-          meta: `${e.model} · best match ${e.top_similarity.toFixed(2)}`,
+          waking: false,
+          meta:
+            `${e.model} · best match ${e.top_similarity.toFixed(2)}` +
+            (e.uncited ? " · no citations, check the sources" : ""),
           searched: e.query && e.query !== t.question ? e.query : undefined,
           notice: e.notice || undefined,
+          guard: e.guard || undefined,
         }));
     };
     try {
       await ask(body, onEvent, abortRef.current.signal);
     } catch (err) {
-      update((t) => ({ ...t, status: "error", meta: (err as Error).message }));
+      update((t) => ({ ...t, status: "error", meta: (err as Error).message, waking: false }));
+    } finally {
+      clearTimeout(waking);
     }
   }
 
@@ -95,15 +146,20 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
             comes from.
           </p>
         </div>
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value as Provider)}
-          className="shrink-0 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 pr-7 text-sm"
-          aria-label="Model provider"
-        >
-          <option value="ollama">Local (Ollama)</option>
-          <option value="anthropic">Claude API</option>
-        </select>
+        {chooseProvider && (
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as Provider)}
+            className="shrink-0 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 pr-7 text-sm"
+            aria-label="Model provider"
+          >
+            {providers.map((p) => (
+              <option key={p} value={p}>
+                {PROVIDER_LABELS[p]}
+              </option>
+            ))}
+          </select>
+        )}
       </header>
 
       <section className="flex-1 space-y-6">
@@ -191,7 +247,13 @@ function TurnView({ turn }: { turn: Turn }) {
     <article className="space-y-3">
       <p className="font-medium">{turn.question}</p>
       <div className="whitespace-pre-wrap rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 text-sm leading-relaxed">
-        {turn.answer ? <Cited text={turn.answer} onCite={setActive} /> : <span className="text-[var(--muted)]">Searching…</span>}
+        {turn.answer ? (
+          <Cited text={turn.answer} onCite={setActive} />
+        ) : (
+          <span className="text-[var(--muted)]">
+            {turn.waking ? "Waking up the model, the first answer can take up to a minute…" : "Searching…"}
+          </span>
+        )}
         {turn.status === "streaming" && turn.answer && <span className="animate-pulse">▍</span>}
       </div>
       {turn.sources.length > 0 && (
@@ -204,7 +266,8 @@ function TurnView({ turn }: { turn: Turn }) {
       {turn.notice && <p className="text-xs italic text-[var(--muted)]">{turn.notice}</p>}
       {turn.meta && (
         <p className={`text-xs ${turn.status === "error" ? "text-red-500" : "text-[var(--muted)]"}`}>
-          {turn.status === "refused" && "Not in the lessons · "}
+          {turn.status === "refused" &&
+            (turn.guard ? "Blocked by the safety check · " : "Not in the lessons · ")}
           {turn.searched && `Searched: ${turn.searched} · `}
           {turn.meta}
         </p>
