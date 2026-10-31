@@ -1,0 +1,21 @@
+# LinkedIn picks shown on the News page (/news).
+#
+# Add one entry per post you want to share. Each entry needs:
+#   url:    the link to the post, an https link on linkedin.com
+#   author: who wrote it
+#   title:  a short title for the card
+# And may have:
+#   note:   one or two plain sentences on why it is worth reading (300 characters at most)
+#   date:   YYYY-MM-DD, used to put the newest first
+#
+# Entries with a missing field or a link that is not on linkedin.com are skipped.
+# Only the link is shown. Nothing is loaded from LinkedIn.
+#
+# Example:
+#   - url: https://www.linkedin.com/posts/example-post
+#     author: Jane Doe
+#     title: How we evaluate RAG answers
+#     note: A short, practical look at checking answers against sources.
+#     date: 2026-11-01
+
+picks: []

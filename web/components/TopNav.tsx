@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/syllabus", label: "Syllabus" },
   { href: "/roadmap", label: "Roadmaps" },
   { href: "/insights", label: "Insights" },
+  { href: "/news", label: "News" },
 ];
 
 /** True when `pathname` belongs to the section a nav link opens. */
