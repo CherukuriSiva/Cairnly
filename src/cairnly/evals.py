@@ -19,6 +19,9 @@ question and off-topic question must pass the guard too (the off-topic ones are 
 by the confidence gate, not by the guard). No database and no model are needed, so CI runs it.
 - false-block rate  legitimate questions the guard blocked
 - miss rate         attacks the guard let through
+The rules were tuned on that set, so its rates flatter the guard. evals/redteam-heldout.jsonl
+holds rows that were never used for tuning; its rates are reported next to the tuning ones (not
+gated), as the honest estimate of how the guard does on text it has not seen.
 
 Follow-ups (`cairnly eval-followups`): for each item in evals/followups.jsonl, recall@k of
 searching with the hand-written standalone question vs. with the follow-up rewritten by the
@@ -44,6 +47,7 @@ QUIZ = re.compile(r"^\*\*Q:\s*(.+?)\*\*\s*$", re.M)
 OFF_TOPIC_FILE = ROOT / "evals" / "off-topic.jsonl"
 FOLLOWUPS_FILE = ROOT / "evals" / "followups.jsonl"
 REDTEAM_FILE = ROOT / "evals" / "redteam.jsonl"
+REDTEAM_HELDOUT_FILE = ROOT / "evals" / "redteam-heldout.jsonl"
 
 
 @dataclass(frozen=True)
@@ -213,6 +217,21 @@ def redteam_report(rows: list[dict], also_allowed: list[str],
     }
 
 
+def heldout_report(rows: list[dict],
+                   check: Callable[[str], Verdict] = check_input) -> dict:
+    """The red-team report on rows never used for tuning, plus the two rates per row `source`."""
+    report = redteam_report(rows, [], check)
+    sources = sorted({r.get("source", "") for r in rows})
+    if len(sources) > 1:
+        report["by_source"] = {}
+        for source in sources:
+            part = redteam_report([r for r in rows if r.get("source", "") == source], [], check)
+            report["by_source"][source] = {k: part[k] for k in
+                                           ("allowed_questions", "attacks", "false_block_rate",
+                                            "miss_rate")}
+    return report
+
+
 # ---- faithfulness (LLM as judge) ------------------------------------------------------------
 
 JUDGE_SYSTEM = """You grade whether an ANSWER is supported by the SOURCES.
@@ -332,9 +351,19 @@ def redteam_main(args) -> None:
     kb = get_kb(args.kb)
     also_allowed = [i.question for i in golden_for(kb)] + off_topic_questions()
     report = redteam_report(load_jsonl(Path(args.golden)), also_allowed)
+    if args.heldout:  # reported next to the tuning rates; the gate reads only the tuning ones
+        report["heldout"] = heldout_report(load_jsonl(Path(args.heldout)))
     print(json.dumps(report, indent=2, ensure_ascii=False))
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    print(f"tuning set:   false_block_rate {report['false_block_rate']} "
+          f"({report['allowed_questions']} questions), miss_rate {report['miss_rate']} "
+          f"({report['attacks']} attacks)")
+    if "heldout" in report:
+        held = report["heldout"]
+        print(f"held-out set: false_block_rate {held['false_block_rate']} "
+              f"({held['allowed_questions']} questions), miss_rate {held['miss_rate']} "
+              f"({held['attacks']} attacks), not gated")
     if args.gate:
         apply_gate(report, Path(args.gate), "redteam")
 

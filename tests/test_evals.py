@@ -167,6 +167,36 @@ def test_redteam_report_counts_wrong_blocks_and_misses():
         "false_block_rate = 0.25 is above the limit 0.02", "miss_rate = 0.5 is above the limit 0.1"]
 
 
+def test_heldout_report_splits_rates_by_source():
+    from cairnly.evals import heldout_report
+    from cairnly.guard import Verdict
+
+    def check(text):
+        return Verdict(True, "injection") if text.startswith("bad") else Verdict(False)
+
+    rows = [{"text": "bad a", "label": "block", "rule": "injection", "source": "fresh"},
+            {"text": "sneaky", "label": "block", "rule": "injection", "source": "fresh"},
+            {"text": "fine", "label": "allow", "source": "fresh"},
+            {"text": "bad b", "label": "block", "rule": "injection", "source": "review-1"}]
+    report = heldout_report(rows, check=check)
+
+    assert report["miss_rate"] == round(1 / 3, 4) and report["false_block_rate"] == 0.0
+    assert report["by_source"]["fresh"]["miss_rate"] == 0.5
+    assert report["by_source"]["review-1"] == {"allowed_questions": 0, "attacks": 1,
+                                               "false_block_rate": 0.0, "miss_rate": 0.0}
+
+
+def test_heldout_set_is_well_formed_and_apart_from_the_tuning_set():
+    from cairnly.evals import REDTEAM_FILE, REDTEAM_HELDOUT_FILE
+
+    held = load_jsonl(REDTEAM_HELDOUT_FILE)
+    assert len(held) >= 30
+    assert {r["label"] for r in held} == {"block", "allow"}
+    assert {r["source"] for r in held} == {"review-1", "fresh"}
+    tuning = {r["text"] for r in load_jsonl(REDTEAM_FILE)}
+    assert not tuning & {r["text"] for r in held}  # a row in both would not be held out
+
+
 def test_redteam_set_is_well_formed():
     from cairnly.evals import REDTEAM_FILE
 

@@ -137,6 +137,8 @@ def main(argv: list[str] | None = None) -> None:
                        help="input guard: wrong blocks and missed attacks (no DB, no model)")
     p.add_argument("--kb", default="lessons", help="its golden questions must all pass")
     p.add_argument("--set", dest="golden", default="evals/redteam.jsonl")
+    p.add_argument("--heldout", default="evals/redteam-heldout.jsonl",
+                   help="rows never used for tuning: reported next to the set, not gated")
     p.add_argument("--gate", help="fail (exit 1) if rates break the redteam: limits here")
     p.add_argument("--out", help="write the JSON report here")
     p.set_defaults(func=cmd_eval_redteam)

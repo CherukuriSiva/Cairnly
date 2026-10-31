@@ -39,27 +39,59 @@ MAX_REPEAT = 30  # one character repeated this many times
 # ("... and ignore ..."), or after "please". Asking about a phrase mid-sentence does not match.
 _START = r"(?:^|[.!?\n]\s*|\b(?:and|then|now|so|but|also|please|just|first|instead),?\s+)" \
          r"[\"'“‘(\[]?\s*"
-_OVERRIDE = r"(?:ignore|disregard|forget|override|bypass|skip|drop|discard|abandon)"
+
+
+def _split(word: str) -> str:
+    """`word`, still matched when one space or symbol is slipped between letters ("igno re")."""
+    return r"\W?".join(word)
+
+
+_OVERRIDE = r"(?:" + "|".join(_split(w) for w in ("ignore", "disregard", "forget")) + \
+            r"|override|bypass|skip|drop|discard|abandon)"
+# The phrase used as a noun ("ignore previous instructions attacks") names an attack; it is
+# not a command.
+_AS_NOUN = r"(?![\s-]+(?:attacks?|injections?|exploits?|payloads?|jailbreaks?|style|phrases?|" \
+           r"strings?|examples?|prompts?|tricks?|techniques?)\b)"
+# A hypothetical question about what the model does: "what happens if you skip the rules".
+_HYPOTHETICAL = r"(?<!happens if )(?<!happen if )(?<!what if )"
+# What a command can point back at: "everything above", "what you were told before".
+_EARLIER = r"\s+(?:all\s+of\s+)?(?:everything|anything|all|whatever|what|the)\s+" \
+           r"(?:you\s+)?(?:(?:were|was|have\s+been|had\s+been)\s+)?" \
+           r"(?:(?:told|said|written|given|stated|instructed|text|messages?|content)\s+)?" \
+           r"(?:above|before|earlier|previously|so\s+far|until\s+now)" \
+           r"(?=\s*(?:[.,;:!?]|$|and\b|then\b))"
 _DETERMINERS = r"(?:(?:all|any|every|each|of|the|your|my|these|those|this|its|previous|prior|" \
                r"above|earlier|preceding|former|original|initial|system|old|existing|safety|" \
                r"current)\s+)*"
 _RULE_WORDS = r"(?:instructions?|rules?|prompts?|directions?|directives?|guidelines?|" \
               r"guardrails?|constraints?|programming|policies|policy|restrictions?|context)"
 _RESTRICTIONS = r"(?:restrictions?|rules?|limits?|limitations?|filters?|guidelines?|" \
-                r"guardrails?|censorship|safety|boundaries|constraints?|morals?|ethics)"
+                r"guardrails?|censorship|safety|boundaries|constraints?|morals?|ethics|" \
+                r"(?:content\s+)?polic(?:y|ies))"
 _REVEAL = r"(?:show|print|reveal|repeat|output|display|give|tell|list|share|dump|leak|paste|" \
-          r"spell|recite|translate|summari[sz]e|paraphrase|encode|copy|expose|return|state)"
+          r"spell|recite|translate|summari[sz]e|paraphrase|encode|copy|expose|return|state|" \
+          r"write|type|reverse|echo)"
+# "your instructions about citations" asks about one topic, not for the prompt itself.
+_ON_A_TOPIC = r"(?!\s+(?:about|on|for)\s+(?!(?:you|yourself|everything|anything|what|how|" \
+              r"this\s+chat|the\s+(?:system|chat|conversation))\b))"
 _PROMPT_WORDS = r"(?:system\s+prompt|prompt|instructions|rules|guidelines|directives|" \
                 r"system\s+message|initial\s+message|configuration|pre-?prompt)"
 
 RULES: dict[str, list[str]] = {
     "injection": [
-        _START + _OVERRIDE + r"\s+" + _DETERMINERS + _RULE_WORDS + r"\b",
-        r"\byou\s+(?:\w+\s+){0,3}?" + _OVERRIDE + r"\s+" + _DETERMINERS + _RULE_WORDS + r"\b",
+        _START + _OVERRIDE + r"\s+" + _DETERMINERS + _RULE_WORDS + r"\b" + _AS_NOUN,
+        _HYPOTHETICAL + r"\byou\s+(?:\w+\s+){0,3}?" + _OVERRIDE + r"\s+" + _DETERMINERS
+        + _RULE_WORDS + r"\b" + _AS_NOUN,
+        _START + _OVERRIDE + _EARLIER,
+        r"\b(?:pretend|imagine|assume|suppose|act\s+as\s+if)\s+(?:that\s+)?" + _DETERMINERS
+        + _RULE_WORDS + r"\s+(?:do\s+not|don't|does\s+not|doesn't|no\s+longer|never)\s+"
+        r"(?:exist|exists|apply|applies|matter|matters|count)",
         r"\b(?:new|updated|real|actual|revised)\s+(?:system\s+)?(?:instructions|rules|prompt)"
         r"\s*:",
         _START + r"you\s+are\s+now\b",
-        r"\bfrom\s+now\s+on,?\s+(?:you|act|respond|answer|reply|only|always|never|ignore)\b",
+        r"\b(?:from\s+(?:now|this\s+point|here)\s+(?:on|onwards?|forward)|henceforth|"
+        r"for\s+the\s+rest\s+of\s+(?:this|the)\s+(?:chat|conversation)),?\s+"
+        r"(?:you|act|respond|answer|reply|only|always|never|ignore|speak|talk|write|behave)\b",
         r"(?:^|\n)\s*(?:system|assistant|admin|developer)\s*(?:prompt\s*)?:",
         r"<\|?\s*(?:system|im_start|im_end|endoftext)",
         r"\[\s*(?:system|inst)\s*\]",
@@ -93,11 +125,14 @@ RULES: dict[str, list[str]] = {
         r"(?:unfiltered|uncensored|unrestricted|evil|amoral|jailbroken|rogue|unaligned)",
         r"\b(?:you\s+are|you're|become)\s+(?:now\s+)?(?:an?\s+)?(?:unfiltered|uncensored|"
         r"unrestricted|evil|amoral|jailbroken|rogue|unaligned)\b",
+        r"\b(?:act|behave|respond|answer|reply|talk|be|become|play)\s+(?:as|like)\s+(?:an?\s+)?"
+        r"(?:\w+\s+){0,2}?(?:with|that\s+has|who\s+has|having)\s+(?:no|zero)\s+(?:\w+\s+)?"
+        + _RESTRICTIONS,
         r"\bstay\s+in\s+character\b",
     ],
     "prompt_extraction": [
         r"\b" + _REVEAL + r"\s+(?:me\s+|us\s+)?(?:back\s+)?(?:out\s+)?(?:all\s+of\s+|all\s+)?"
-        r"your\s+(?:\w+\s+){0,2}?" + _PROMPT_WORDS + r"\b",
+        r"your\s+(?!own\b)(?:\w+\s+){0,2}?" + _PROMPT_WORDS + r"\b" + _ON_A_TOPIC,
         _START + _REVEAL + r"\s+(?:me\s+|us\s+)?(?:the|this)\s+(?:\w+\s+){0,2}?"
         r"(?:system\s+prompt|system\s+message|hidden\s+prompt|initial\s+prompt|"
         r"prompt\s+above|instructions\s+above|instructions\s+you\s+were\s+given)\b",
@@ -110,11 +145,20 @@ RULES: dict[str, list[str]] = {
         r"\b(?:repeat|print|output|recite|copy)\s+(?:the\s+|all\s+)?(?:text|words|everything|"
         r"content)\s+(?:above|before|preceding)",
         r"\b(?:what|everything)\s+(?:was|is)\s+written\s+(?:above|before)\s+(?:this|my)",
-        r"\bhow\s+(?:were|are)\s+you\s+(?:instructed|prompted|configured|programmed)\b",
+        # "How were you instructed?" asks for the prompt; "How were you configured to cite
+        # sources?" asks how a feature works, so only the general form is blocked.
+        r"\bhow\s+(?:were|are)\s+you\s+(?:instructed|prompted|configured|programmed)"
+        r"(?:\s+to\s+(?:answer|respond|reply|behave|act|talk)(?:\s+(?:questions|users|people|"
+        r"me|us))?)?\s*(?:[?.!]|$)",
     ],
 }
 _COMPILED = {rule: [re.compile(p, re.I) for p in patterns] for rule, patterns in RULES.items()}
 _URL = re.compile(r"https?://|www\.", re.I)
+# Greek and Cyrillic letters that look like Latin ones (NFKC keeps them apart): "Ιgnore" with a
+# Greek capital Iota reads as "Ignore" to a person, so the rules must read it that way too.
+_CONFUSABLES = str.maketrans(
+    "ΑΒΕΖΗΙΚΜΝΟΡΤΥΧαεικνορτυχ" "АВЕКМНОРСТУХаеорсухіјѕ",
+    "ABEZHIKMNOPTYXaeikvoptux" "ABEKMHOPCTYXaeopcyxijs")
 _INVISIBLE = re.compile(r"[​-‏⁠﻿­]")
 
 
@@ -128,8 +172,9 @@ ALLOW = Verdict(False)
 
 
 def normalize(text: str) -> str:
-    """Undo cheap disguises: Unicode look-alike forms, invisible characters, extra spaces."""
-    text = _INVISIBLE.sub("", unicodedata.normalize("NFKC", text))
+    """Undo cheap disguises: Unicode look-alike forms, Greek and Cyrillic look-alike letters,
+    invisible characters, extra spaces."""
+    text = _INVISIBLE.sub("", unicodedata.normalize("NFKC", text)).translate(_CONFUSABLES)
     return re.sub(r"[ \t]+", " ", text).strip()
 
 
