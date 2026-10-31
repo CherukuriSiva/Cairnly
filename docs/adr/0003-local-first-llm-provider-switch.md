@@ -1,6 +1,7 @@
 # ADR 0003: Local-first LLMs behind one provider interface
 
-Status: accepted (M1)
+Status: accepted (M1). Superseded in part by [ADR 0013](0013-models-on-a-modal-gpu.md): Claude
+is no longer a production option; it works only locally with `ALLOW_ANTHROPIC=true`.
 
 ## Context
 

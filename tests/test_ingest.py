@@ -100,3 +100,12 @@ def test_sources_are_isolated_from_each_other(conn, tmp_path, fake_embedder):
 
     counts = dict(conn.execute("SELECT source, count(*) FROM documents GROUP BY source").fetchall())
     assert counts == {"two": 1}
+
+
+def test_folder_notices_are_not_ingested(tmp_path):
+    from cairnly.ingest import markdown_docs
+
+    (tmp_path / "lesson.md").write_text("# Lesson\nText.\n")
+    (tmp_path / "README.md").write_text("# About this folder\n")
+    (tmp_path / "LICENSE.md").write_text("# Content license\n")
+    assert [doc.path for doc in markdown_docs(tmp_path)] == ["lesson.md"]

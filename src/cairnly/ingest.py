@@ -46,14 +46,17 @@ class SourceDoc:
     build: Callable[[], tuple[str, dict, list[Chunk]]]  # -> (title, meta, chunks)
 
 
+NOT_CONTENT = {"README.md", "LICENSE.md"}  # notices about a folder, not lessons to answer from
+
+
 def markdown_docs(folder: Path) -> Iterator[SourceDoc]:
-    """Connector: every .md and .mdx file under a folder (README.md files are skipped).
+    """Connector: every .md and .mdx file under a folder (folder notices are skipped).
 
     MDX is converted to markdown first. One chunk per heading section, each carrying the
     anchor of its heading on the rendered page. The hash is taken on the raw file text.
     """
     paths = [p for p in folder.rglob("*") if p.suffix in (".md", ".mdx") and p.is_file()]
-    for path in sorted(p for p in paths if p.name != "README.md"):
+    for path in sorted(p for p in paths if p.name not in NOT_CONTENT):
         raw = path.read_text()
 
         def build(raw=raw, path=path):

@@ -79,3 +79,9 @@ refreshes the page, and a few hand-picked LinkedIn posts. The picks live in
 `author`, a `title`, and optionally a `note` and a `date`. Entries that do not fit
 are skipped. This file is not MDX, so the chat never indexes it. The web server reads it at each
 hourly refresh, so the web image includes `content/news`.
+
+## License
+
+The content in this folder is licensed under CC BY-NC-SA 4.0, with a note on insights and
+book notes: see [LICENSE.md](LICENSE.md). Like this README, the license file is a notice about
+the folder, so `cairnly ingest` skips it and the chat never cites it.

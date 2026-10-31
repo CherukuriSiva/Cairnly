@@ -100,7 +100,8 @@ The app talks to one interface: `stream(system, prompt)` yields text. Two implem
 
 - **Ollama** (`qwen3:8b`, default): free and local. `think: false` skips qwen3's slow
   "thinking" phase, which a grounded Q&A answer does not need.
-- **Claude API** (`claude-opus-5-5`): set `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`.
+- **Claude API** (`claude-opus-5-5`): local development only (ADR 0013). Set
+  `ALLOW_ANTHROPIC=true` and keep your own key in your shell, never in `.env` or a deploy.
   It runs at low effort (grounded answers are a light task) with server-side fallback on.
 
 Tests use a fake provider, so CI never needs a model or an API key.

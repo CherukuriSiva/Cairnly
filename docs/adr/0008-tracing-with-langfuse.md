@@ -1,6 +1,8 @@
 # ADR 0008: Trace every question with Langfuse (optional, self-hostable)
 
-Status: accepted (M2)
+Status: accepted (M2). Amended by [ADR 0015](0015-privacy-safe-tracing.md): traces hold no
+question or answer text by default, and every step (guard, rewrite, retrieve, generate, output
+check) is traced.
 
 ## Context
 

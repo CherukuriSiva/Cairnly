@@ -81,7 +81,8 @@ With the gate and reranker in place, 40 sampled lessons questions:
 
 Caveat worth saying in an interview: the judge here is the same local model that wrote the
 answers (qwen3:8b), and models grade themselves leniently. A stronger, different judge (e.g.
-Claude) is the better setup once an API key is available: `LLM_PROVIDER=anthropic`.
+Claude) is the better setup. Claude is local only: run the judge on your own machine with
+`ALLOW_ANTHROPIC=true` and your own key in your shell, never on a server (ADR 0013).
 
 ## 6. The eval gate in CI (`evals/gates.yaml`)
 
