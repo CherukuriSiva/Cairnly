@@ -2,6 +2,8 @@
 
 Status: accepted (M2)
 
+Note: the lessons gate was re-measured with off-topic questions in ADR 0011.
+
 ## Context
 
 The gate refuses to answer when the best cosine similarity is below a cutoff. M1 used 0.55 as a

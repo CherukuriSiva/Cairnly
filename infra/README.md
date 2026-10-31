@@ -73,5 +73,5 @@ repo already pushed.
 
 ## Not covered yet (later milestones)
 
-Multi-tenancy, auth and per-tenant quotas (M6), Prometheus/Grafana dashboards, SLO alerts and
-load tests (M7). CloudWatch logs and Container Insights are on from day one.
+Multi-tenancy, auth and per-tenant quotas (M7), Prometheus/Grafana dashboards, SLO alerts and
+load tests (M8). CloudWatch logs and Container Insights are on from day one.

@@ -17,4 +17,4 @@ keys and a no-op otherwise. Self-hosted Langfuse v3 for local work
 
 - Spans are passed explicitly because streaming responses can resume on different threads.
 - Traces contain questions and answers, which is user data: production needs a retention
-  policy and, for regulated customers, PII redaction before tracing (M3).
+  policy and, for regulated customers, PII redaction before tracing (M4).

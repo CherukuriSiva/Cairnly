@@ -9,6 +9,10 @@ lessons (.mdx) ─curate─▶ corpus/*.md ─ingest─▶ Postgres ─search─
 
 ## 1. Curation (`curate.py`)
 
+> **Replaced in M3 (2026-10-31).** All content is now public, so there is no curation step and
+> no `corpus/` folder: lessons live in `content/` as MDX, and `mdx.py` converts them while
+> ingesting. See [LEARN-M3](LEARN-M3.md). This section is kept as history.
+
 The source lessons are MDX: markdown plus React components like `<WhyThisMatters>`. A RAG
 system should index what a reader sees, not website code, so curation turns each component
 into a plain markdown heading (`## Why this matters`) and removes wrappers like `<Body>`.
@@ -17,7 +21,7 @@ Three rules keep it honest:
 
 - **Code fences are never touched.** A lesson about Next.js contains `<PageShell>` inside a
   code block; that is content, not a component.
-- **Every file gets a decision and a reason** in [CURATION.md](../CURATION.md): `public`,
+- **Every file gets a decision and a reason** in `CURATION.md` (deleted in M3): `public`,
   `local-only` or `dropped`. Unknown components are flagged, not silently deleted.
 - **Not everything is publishable.** Paid lessons and insights built from other people's posts
   are converted into `corpus/private/` (git-ignored), so the local demo can use them but the
@@ -88,7 +92,7 @@ measure it properly.
 
 When confident, the top chunks are numbered `[1]..[n]` in the prompt and the system prompt
 requires a `[n]` citation for every claim. It also tells the model to treat source text as
-data, the first small defence against prompt injection (M3 does this properly).
+data, the first small defence against prompt injection (M4 does this properly).
 
 ## 7. Providers (`llm.py`)
 

@@ -2,6 +2,8 @@
 
 Status: accepted (M1), pending the author's final call on paid lessons
 
+Superseded on 2026-10-31 by ADR 0009: all content is public.
+
 ## Context
 
 The demo corpus is the author's GradStack lessons: 162 files. 115 are paid lessons

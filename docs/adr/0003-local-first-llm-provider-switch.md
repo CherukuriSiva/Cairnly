@@ -18,4 +18,4 @@ the Claude API, selected by `LLM_PROVIDER` or per request.
 - The demo costs nothing to run; the Claude path needs only an API key.
 - Tests inject a fake LLM, so CI needs neither a model nor a key.
 - Embeddings are not switchable yet: changing the embedding model means re-embedding the
-  corpus, which needs a migration story (M5, versioned indexes).
+  corpus, which needs a migration story (M6, versioned indexes).
