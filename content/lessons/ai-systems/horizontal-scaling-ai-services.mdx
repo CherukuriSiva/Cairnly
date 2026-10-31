@@ -1,0 +1,105 @@
+---
+slug: horizontal-scaling-ai-services
+title: "Horizontally Scaling AI Services"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Distinguish vertical from horizontal scaling for inference
+- Run multiple stateless workers behind a load balancer
+- Pick autoscaling signals that fit AI workloads (queue depth, latency)
+- Avoid the traps: model load time, GPU contention, sticky state
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+One inference process handles a handful of concurrent requests before latency spikes. Real traffic needs many. Knowing how to scale horizontally — and which signals to autoscale on — is what keeps p95 latency flat under load and is a standard production-engineering interview line.
+</WhyThisMatters>
+
+<Body>
+## Vertical first, then horizontal
+
+- **Vertical** — a bigger box / GPU. Simple, but capped and a single point of failure.
+- **Horizontal** — many identical worker replicas behind a load balancer. Near-unlimited and fault-tolerant. This is how you scale serving.
+
+## Make workers stateless
+
+Horizontal scaling only works if any worker can serve any request. Keep per-request state out of the worker: session/memory in Redis or a DB, the model loaded read-only at startup. No sticky local state means the load balancer can route freely and replicas can come and go.
+
+## Autoscale on the right signal
+
+CPU% is a poor proxy for an inference service. Better signals:
+
+- **Request queue depth / concurrency** — the most direct measure of "we need more workers."
+- **p95 latency** — scale out before users feel it.
+- **GPU utilization** — for GPU-bound inference.
+
+## The AI-specific traps
+
+- **Model load time** — a new replica isn't useful until the model loads; warm pools or readiness probes prevent routing to cold workers.
+- **GPU contention** — too many workers per GPU thrash; pin worker-per-GPU ratios.
+- **Thundering herd on cold start** — scale ahead of demand, not reactively at the spike.
+</Body>
+
+<Code>
+```python
+# Multiple Uvicorn workers behind a load balancer; each loads the model once.
+# uvicorn serve:app --workers 4 --host 0.0.0.0 --port 8000
+
+# Kubernetes HPA autoscaling on a custom concurrency metric (sketch):
+# apiVersion: autoscaling/v2
+# kind: HorizontalPodAutoscaler
+# spec:
+#   minReplicas: 2
+#   maxReplicas: 20
+#   metrics:
+#     - type: Pods
+#       pods:
+#         metric: { name: inflight_requests }   # queue depth, not CPU
+#         target: { type: AverageValue, averageValue: "8" }
+
+# Readiness probe so traffic only routes to workers whose model finished loading:
+@app.get("/ready")
+async def ready():
+    return {"ready": model is not None}, (200 if model is not None else 503)
+```
+</Code>
+
+<TryItYourself>
+1. Run the server with `--workers 4` and load-test it (next lesson)
+2. Plot p95 latency as concurrency rises with 1 vs 4 workers
+3. Add a `/ready` probe and confirm a cold worker reports 503
+4. Move any per-session state into Redis so workers are stateless
+5. Define an autoscaling rule on concurrency and reason about min/max replicas
+</TryItYourself>
+
+<CommonMistakes>
+- **Autoscaling on CPU%** — a poor proxy; use concurrency or p95 latency
+- **Stateful workers** — sticky local sessions break free routing
+- **Ignoring model load time** — traffic hits cold workers and times out
+- **Over-packing GPUs** — too many workers per GPU thrashes throughput
+- **Reactive-only scaling** — scale ahead of predictable spikes
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Ran multiple stateless workers behind a balancer
+- [ ] Measured p95 latency vs concurrency at different replica counts
+- [ ] Added a readiness probe for cold workers
+- [ ] Externalized per-session state
+- [ ] Chose an autoscaling signal appropriate for inference
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Which is the best autoscaling signal for an inference service?**
+
+- A) CPU utilization
+- B) Request concurrency / queue depth (or p95 latency) ✅
+- C) Disk usage
+- D) Number of log lines
+</MiniQuiz>
+
+<InterviewExplanation>
+"I scale vertically first for simplicity, but real traffic needs horizontal scaling: many identical stateless workers behind a load balancer, each loading the model once at startup. Stateless is the key — session and memory live in Redis or a DB so any worker can serve any request. I autoscale on concurrency or p95 latency, not CPU%, because CPU is a poor proxy for an inference workload. The AI-specific traps I watch for are model load time, so I use readiness probes and warm pools to avoid routing to cold workers, and GPU contention, so I cap the worker-per-GPU ratio."
+</InterviewExplanation>

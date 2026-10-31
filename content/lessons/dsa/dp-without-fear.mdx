@@ -1,0 +1,251 @@
+---
+slug: dp-without-fear
+title: "DP Without Fear: Top-Down to Bottom-Up"
+track: dsa
+tier: medium
+estimatedMinutes: 35
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Identify overlapping subproblems and optimal substructure
+- Convert brute-force recursion into memoized top-down DP
+- Translate top-down DP into bottom-up tabulation
+- Solve Fibonacci, climbing stairs, coin change, longest common subsequence, and house robber
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Dynamic programming is the most feared interview topic, but it follows a mechanical process: write the brute-force recursion, add memoization, then optionally convert to tabulation. This lesson demystifies that process with concrete walkthroughs so you can approach DP problems with confidence instead of dread.
+</WhyThisMatters>
+
+<Body>
+## The DP recipe
+
+1. **Define the subproblem**: What does `dp(i)` or `dp[i]` represent?
+2. **Write the recurrence**: How does `dp(i)` relate to smaller subproblems?
+3. **Identify base cases**: What are the smallest subproblems you can solve directly?
+4. **Memoize** (top-down) or **tabulate** (bottom-up).
+5. **Optimize space** if the recurrence only depends on a few previous values.
+
+## Step-by-step: Climbing Stairs (LC 70)
+
+You can climb 1 or 2 steps. How many ways to reach step n?
+
+**Step 1 - Subproblem:** `dp(i)` = number of ways to reach step i.
+
+**Step 2 - Recurrence:** `dp(i) = dp(i-1) + dp(i-2)` (you came from one step below or two steps below).
+
+**Step 3 - Base cases:** `dp(0) = 1`, `dp(1) = 1`.
+
+### Top-down (memoization)
+
+```python
+from functools import lru_cache
+
+def climb_stairs_topdown(n):
+    @lru_cache(maxsize=None)
+    def dp(i):
+        if i <= 1:
+            return 1
+        return dp(i - 1) + dp(i - 2)
+    return dp(n)
+```
+
+### Bottom-up (tabulation)
+
+```python
+def climb_stairs_bottomup(n):
+    if n <= 1:
+        return 1
+    dp = [0] * (n + 1)
+    dp[0] = dp[1] = 1
+    for i in range(2, n + 1):
+        dp[i] = dp[i - 1] + dp[i - 2]
+    return dp[n]
+```
+
+### Space-optimized
+
+Since we only need the last two values:
+
+```python
+def climb_stairs_optimized(n):
+    if n <= 1:
+        return 1
+    prev2, prev1 = 1, 1
+    for _ in range(2, n + 1):
+        prev2, prev1 = prev1, prev2 + prev1
+    return prev1
+```
+
+**Time:** O(n). **Space:** O(1).
+
+## Walkthrough: Coin Change (LC 322)
+
+Given coins and an amount, find the minimum number of coins needed.
+
+**Subproblem:** `dp(amount)` = minimum coins to make `amount`.
+**Recurrence:** `dp(a) = 1 + min(dp(a - coin) for coin in coins)`.
+**Base case:** `dp(0) = 0`.
+
+```python
+def coin_change(coins, amount):
+    dp = [float('inf')] * (amount + 1)
+    dp[0] = 0
+    for a in range(1, amount + 1):
+        for coin in coins:
+            if coin <= a:
+                dp[a] = min(dp[a], dp[a - coin] + 1)
+    return dp[amount] if dp[amount] != float('inf') else -1
+
+# coin_change([1, 5, 10, 25], 30) -> 2  (25 + 5)
+```
+
+**Time:** O(amount * len(coins)). **Space:** O(amount).
+
+## Walkthrough: House Robber (LC 198)
+
+Can't rob two adjacent houses. Maximize total loot.
+
+**Subproblem:** `dp(i)` = max money from houses `0..i`.
+**Recurrence:** `dp(i) = max(dp(i-1), dp(i-2) + nums[i])` (skip house i, or rob it).
+
+```python
+def rob(nums):
+    if not nums:
+        return 0
+    if len(nums) <= 2:
+        return max(nums)
+    prev2, prev1 = nums[0], max(nums[0], nums[1])
+    for i in range(2, len(nums)):
+        prev2, prev1 = prev1, max(prev1, prev2 + nums[i])
+    return prev1
+
+# rob([2, 7, 9, 3, 1]) -> 12  (2 + 9 + 1)
+```
+
+## Walkthrough: Longest Common Subsequence (LC 1143)
+
+**Subproblem:** `dp[i][j]` = LCS length of `text1[:i]` and `text2[:j]`.
+**Recurrence:**
+- If `text1[i-1] == text2[j-1]`: `dp[i][j] = dp[i-1][j-1] + 1`
+- Else: `dp[i][j] = max(dp[i-1][j], dp[i][j-1])`
+
+```python
+def longest_common_subsequence(text1, text2):
+    m, n = len(text1), len(text2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if text1[i - 1] == text2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    return dp[m][n]
+```
+
+**Time:** O(m * n). **Space:** O(m * n), reducible to O(min(m, n)).
+
+## The mental model: top-down vs. bottom-up
+
+| | Top-down (memoization) | Bottom-up (tabulation) |
+|---|---|---|
+| **Approach** | Recursive + cache | Iterative + table |
+| **Easier to write?** | Yes (follows the recurrence directly) | Sometimes, once you see the order |
+| **Space optimization** | Harder | Easier (just track needed rows/values) |
+| **Stack overflow risk** | Yes (deep recursion) | No |
+| **When to use** | Start here; convert later if needed | When you need space optimization or large inputs |
+</Body>
+
+<TryItYourself>
+1. **LC 70 - Climbing Stairs**: Implement all three versions (top-down, bottom-up, space-optimized). Verify they give the same answers.
+2. **LC 322 - Coin Change**: Try both top-down and bottom-up. Which is more intuitive to you?
+3. **LC 198 - House Robber**: After solving, try LC 213 (House Robber II) where the houses form a circle.
+4. **LC 1143 - Longest Common Subsequence**: Draw out the 2D table for "abcde" and "ace" by hand.
+5. **LC 300 - Longest Increasing Subsequence**: Classic 1D DP. Can you also solve it in O(n log n) using binary search?
+</TryItYourself>
+
+<Code>
+```python
+from functools import lru_cache
+
+# --- Climbing Stairs (all three approaches) ---
+def climb_top_down(n):
+    @lru_cache(maxsize=None)
+    def dp(i):
+        if i <= 1: return 1
+        return dp(i-1) + dp(i-2)
+    return dp(n)
+
+def climb_bottom_up(n):
+    if n <= 1: return 1
+    table = [0] * (n + 1)
+    table[0] = table[1] = 1
+    for i in range(2, n + 1):
+        table[i] = table[i-1] + table[i-2]
+    return table[n]
+
+def climb_optimized(n):
+    a, b = 1, 1
+    for _ in range(2, n + 1):
+        a, b = b, a + b
+    return b
+
+for n in [5, 10, 20]:
+    print(f"n={n}: {climb_top_down(n)} {climb_bottom_up(n)} {climb_optimized(n)}")
+
+# --- Coin Change ---
+def coin_change(coins, amount):
+    dp = [float('inf')] * (amount + 1)
+    dp[0] = 0
+    for a in range(1, amount + 1):
+        for c in coins:
+            if c <= a and dp[a - c] + 1 < dp[a]:
+                dp[a] = dp[a - c] + 1
+    return dp[amount] if dp[amount] != float('inf') else -1
+
+print("Coin change [1,5,10,25] -> 30:", coin_change([1,5,10,25], 30))  # 2
+print("Coin change [2] -> 3:", coin_change([2], 3))                     # -1
+
+# --- House Robber ---
+def rob(nums):
+    if not nums: return 0
+    if len(nums) <= 2: return max(nums)
+    a, b = nums[0], max(nums[0], nums[1])
+    for i in range(2, len(nums)):
+        a, b = b, max(b, a + nums[i])
+    return b
+
+print("Rob [2,7,9,3,1]:", rob([2,7,9,3,1]))  # 12
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can identify overlapping subproblems in a recursive solution
+- [ ] I can write a top-down memoized solution using `@lru_cache`
+- [ ] I can convert top-down to bottom-up tabulation
+- [ ] I can optimize space when the recurrence only uses a fixed number of previous values
+- [ ] I solved Climbing Stairs, Coin Change, and House Robber
+- [ ] I understand the 2D DP table for Longest Common Subsequence
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Jumping straight to bottom-up**: Start with top-down memoization. It maps directly to the recurrence and is less error-prone. Convert to bottom-up only when you need space optimization or the recursion depth is too large.
+- **Wrong base cases**: The most common DP bug. Always verify: what happens at `dp(0)`? `dp(1)`? Does your recurrence access `dp(-1)` accidentally?
+- **Initializing the table with 0 when you need infinity**: For minimization problems like Coin Change, initialize with `float('inf')` (or `amount + 1`), not 0.
+- **Off-by-one in table dimensions**: If your subproblem is `dp[i]` for `i in 0..n`, you need a table of size `n + 1`.
+- **Not recognizing the subproblem structure**: If you can't define what `dp(i)` means in one sentence, step back and think about the choice at each step.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: You have a working top-down DP solution that uses `@lru_cache`. What is the main reason to convert it to bottom-up?**
+
+- A) Bottom-up is always faster
+- B) To avoid stack overflow on deep recursion and to enable space optimization ✅
+- C) Top-down solutions are always incorrect
+- D) Bottom-up uses less code
+</MiniQuiz>
+
+<InterviewExplanation>
+"I approach DP in four steps. First, I define the subproblem clearly: what does dp(i) represent? Then I write the recurrence relating dp(i) to smaller subproblems. I identify base cases and start with a top-down memoized solution since it maps directly to the recurrence. If the interviewer wants optimization, I convert to bottom-up tabulation and look for opportunities to reduce space, like using two variables instead of a full array when only adjacent states are needed."
+</InterviewExplanation>

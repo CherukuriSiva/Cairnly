@@ -1,0 +1,117 @@
+---
+slug: audit-logging-for-compliance
+title: "Audit Logging for Compliance (SIEM-Ready)"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain what an audit log must capture in a regulated AI system
+- Design an append-only, tamper-evident event schema
+- Log enough to reconstruct a decision without storing raw PII
+- Ship structured events to a SIEM (Datadog, Splunk, CloudTrail)
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+When a regulator, customer, or incident-response team asks "why did the AI return *that* answer to *that* user on *that* day?", application logs full of `print()` statements won't save you. A proper audit trail — who asked what, which documents were retrieved, what was returned, and whether guardrails fired — is a compliance requirement in finance, healthcare, and enterprise SaaS.
+</WhyThisMatters>
+
+<Body>
+## Audit log ≠ debug log
+
+Debug logs help *you* fix bugs and get rotated away. Audit logs prove *what happened* to someone else, months later. They must be **append-only**, **immutable**, and **complete enough to reconstruct a decision**.
+
+## What to capture per request
+
+A useful event schema for an AI interaction:
+
+- `event_id`, `timestamp` (UTC), `user_id`, `tenant_id`
+- `action` (e.g. `rag_query`), query *fingerprint* (hash, not raw text if it may contain PII)
+- `retrieved_doc_ids` and their access decision
+- `guardrails`: which fired (injection blocked? PII redacted? refused?)
+- `model`, `tokens`, `latency_ms`, `cost`
+- `outcome` (answered / refused / error)
+
+Capturing retrieved doc IDs and guardrail outcomes is what lets you answer "why this answer?".
+
+## Tamper-evidence
+
+Append-only is the baseline. For stronger guarantees, chain each event's hash to the previous one (a hash chain), so any deletion or edit breaks the chain and is detectable.
+
+## Don't store PII in the audit log
+
+Ironically, the audit log itself can become a breach. Log a **hash or fingerprint** of sensitive fields, not the raw value — enough to correlate, not enough to leak.
+
+## Ship to a SIEM
+
+Emit one structured JSON event per interaction and forward it to your SIEM (Datadog, Splunk, CloudTrail). Structured events are queryable; free-text logs are not.
+</Body>
+
+<Code>
+```python
+import json, hashlib, time
+
+def audit_event(*, user, action, query, retrieved_ids, guardrails, outcome, usage) -> dict:
+    return {
+        "event_id": new_uuid(),
+        "ts": iso_utc(time.time()),
+        "user_id": user.id,
+        "tenant_id": user.tenant_id,
+        "action": action,
+        "query_fingerprint": hashlib.sha256(query.encode()).hexdigest()[:16],  # not raw PII
+        "retrieved_doc_ids": retrieved_ids,
+        "guardrails": guardrails,          # e.g. {"injection": False, "pii_redacted": True, "refused": False}
+        "model": usage["model"],
+        "tokens": usage["tokens"],
+        "latency_ms": usage["latency_ms"],
+        "outcome": outcome,                # "answered" | "refused" | "error"
+    }
+
+def emit(event: dict, prev_hash: str) -> str:
+    """Append-only + hash chain for tamper-evidence; forward to SIEM."""
+    event["prev_hash"] = prev_hash
+    event["hash"] = hashlib.sha256((prev_hash + json.dumps(event, sort_keys=True)).encode()).hexdigest()
+    siem_sink.write(json.dumps(event))     # Datadog / Splunk / CloudTrail
+    return event["hash"]
+```
+</Code>
+
+<TryItYourself>
+1. Define the audit event schema and emit one per request in your RAG app
+2. Hash the query fingerprint instead of storing raw text; verify you can still correlate
+3. Implement the hash chain and prove that editing an old event breaks it
+4. Add the guardrail outcomes (injection/PII/refusal) to each event
+5. Pipe events to a local file as JSON lines and query them with `jq`
+</TryItYourself>
+
+<CommonMistakes>
+- **Treating debug logs as audit logs** — they get rotated and aren't tamper-evident
+- **Storing raw PII in the audit trail** — the log becomes the breach; hash sensitive fields
+- **Not logging retrieved doc IDs** — you can't reconstruct *why* an answer was given
+- **Free-text logs** — unqueryable; emit structured JSON
+- **No tamper-evidence** — without a hash chain, deletions are invisible
+- **Logging only failures** — you need the full trail, including successful answers
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Defined a structured audit event schema
+- [ ] Captured retrieved doc IDs and guardrail outcomes
+- [ ] Hashed sensitive fields instead of storing raw PII
+- [ ] Implemented an append-only hash chain
+- [ ] Forwarded structured events to a SIEM-style sink
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why log a hash of the user's query instead of the raw text in a compliance audit log?**
+
+- A) Hashes are smaller
+- B) The raw query may contain PII, so the audit log itself would become a breach ✅
+- C) SIEMs can't store text
+- D) It makes the log tamper-evident on its own
+</MiniQuiz>
+
+<InterviewExplanation>
+"An audit log isn't a debug log — it has to prove what happened to a regulator months later, so it's append-only, tamper-evident, and complete enough to reconstruct a decision. Per request I capture who asked, a hash of the query rather than raw text so the log doesn't become a breach, which document IDs were retrieved and the access decision, which guardrails fired, plus model, tokens, latency, and outcome. The retrieved IDs and guardrail outcomes are what let me answer 'why this answer.' I chain each event's hash to the previous one for tamper-evidence and forward structured JSON events to a SIEM so they're queryable."
+</InterviewExplanation>

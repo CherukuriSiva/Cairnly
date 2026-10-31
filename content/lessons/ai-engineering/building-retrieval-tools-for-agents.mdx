@@ -1,0 +1,117 @@
+---
+slug: building-retrieval-tools-for-agents
+title: "Building Retrieval Tools for Agents (Web + Internal KB)"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Implement two concrete agent tools: web search and internal-KB search
+- Write tool descriptions that help the LLM choose the right one
+- Make tools return clean, agent-readable observations (including "nothing found")
+- Decide when an agent should reach for internal vs external knowledge
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+An agent's power is its tools, and the two it almost always needs are "search our private knowledge" and "search the live web." Building these well — with descriptions the model understands and outputs it can act on — is the practical core of a useful agent. This is where the abstract tool registry becomes a working research assistant.
+</WhyThisMatters>
+
+<Body>
+## Two tools, one interface
+
+Both tools implement the same `BaseTool` contract (name, description, run) from the tool-registry lesson. What differs is where they look:
+
+- **`search_internal_kb`** — queries your private vector store for company docs and prior research. Trusted, but bounded to what you've ingested.
+- **`search_web`** — hits a live web-search API (Serper, Tavily) for recent, external information. Broad, but untrusted and slower.
+
+## Descriptions are the routing logic
+
+The LLM picks a tool from its **description**, so write them to disambiguate. "Search the internal knowledge base for company documents and historic research" vs "Search the live internet for recent news and external context" tells the model *when* to use each. Vague descriptions cause wrong-tool calls.
+
+## Return agent-readable observations
+
+A tool's output becomes the agent's next Observation, so make it clean text — and crucially, handle the empty case explicitly. "No relevant internal documents found" lets the agent pivot to web search; a silent empty string strands it.
+
+## Internal-first, then external
+
+A good agent policy: try the internal KB first (trusted, cited, free), and only fall to web search when the KB comes up empty or the question is clearly about current events. You can encode this in the system prompt or let the model reason it out from the descriptions.
+</Body>
+
+<Code>
+```python
+from src.tools.registry import BaseTool
+import time
+
+class InternalRAGTool(BaseTool):
+    @property
+    def name(self) -> str:
+        return "search_internal_kb"
+    @property
+    def description(self) -> str:
+        return ("Search the internal knowledge base for company documents, facts, "
+                "and historic research. Input should be a specific search query.")
+    def run(self, query: str) -> str:
+        hits = vector_store.search(query, top_k=3)
+        if not hits:
+            return "No relevant internal documents found for the given query."  # let agent pivot
+        return "\n".join(f"[{h.doc_id}] {h.text}" for h in hits)
+
+class WebSearchTool(BaseTool):
+    @property
+    def name(self) -> str:
+        return "search_web"
+    @property
+    def description(self) -> str:
+        return ("Search the live internet for recent news, articles, and external "
+                "context. Input should be a search string.")
+    def run(self, query: str) -> str:
+        try:
+            results = web_api.search(query, k=3)        # Serper / Tavily
+        except Exception as e:
+            return f"Web search failed: {e}. Try the internal KB or rephrase."
+        return "\n".join(f"[Web {i+1}] {r.snippet}" for i, r in enumerate(results))
+
+# register both so the agent can discover them
+registry.register(InternalRAGTool())
+registry.register(WebSearchTool())
+```
+</Code>
+
+<TryItYourself>
+1. Implement both tools against your registry from the tool-registry lesson
+2. Register them and print the auto-generated tool descriptions
+3. Run an agent task answerable from the internal KB; confirm it picks `search_internal_kb`
+4. Run a "latest news" task; confirm it picks `search_web`
+5. Make the internal KB return empty and verify the agent pivots to web search
+</TryItYourself>
+
+<CommonMistakes>
+- **Vague tool descriptions** — the model can't route between internal and web
+- **Returning empty strings on no results** — strands the agent; return an explicit "nothing found"
+- **No error handling in the web tool** — a flaky API crashes the loop instead of becoming an observation
+- **Dumping huge raw payloads** — bloats memory; return trimmed, labeled snippets
+- **No internal-first policy** — the agent wastes web calls on questions the KB answers
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented `search_internal_kb` and `search_web` on the `BaseTool` interface
+- [ ] Wrote disambiguating descriptions and registered both
+- [ ] Verified correct tool selection for internal vs web tasks
+- [ ] Handled the empty-result and API-failure cases as observations
+- [ ] Encoded an internal-first retrieval policy
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Your internal-KB tool finds nothing. What should `run` return so the agent behaves well?**
+
+- A) An empty string
+- B) An explicit "No relevant internal documents found" so the agent can pivot to web search ✅
+- C) Raise an exception to stop the loop
+- D) The full corpus as a fallback
+</MiniQuiz>
+
+<InterviewExplanation>
+"The two tools an agent almost always needs are internal-KB search and live web search, both implementing the same BaseTool interface. The descriptions are the routing logic — the model chooses a tool from its description, so I write them to disambiguate trusted internal docs from broad external context. Each tool returns clean, agent-readable text, and I handle the empty case explicitly with 'no relevant documents found' so the agent can pivot instead of being stranded by a silent empty string. My default policy is internal-first — trusted, cited, free — falling to web search only when the KB is empty or the question is about current events. The web tool catches API errors and returns them as observations so a flaky call doesn't crash the loop."
+</InterviewExplanation>

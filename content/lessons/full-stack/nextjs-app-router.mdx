@@ -1,0 +1,173 @@
+---
+slug: nextjs-app-router
+title: "Next.js App Router Mental Model: Server vs Client Components"
+track: full-stack
+tier: medium
+estimatedMinutes: 25
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Distinguish Server Components from Client Components and explain when the code runs
+- Identify the default rendering behavior in the App Router
+- Use the `"use client"` directive correctly
+- Understand the data flow boundary between server and client
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+The App Router is how modern Next.js apps are built. Every full-stack interview in 2026 expects you to explain the server/client split without hesitation. If you confuse where code runs, you'll leak secrets to the browser or break hydration — both are production-killing bugs.
+</WhyThisMatters>
+
+<Body>
+## The mental model
+
+In the App Router, **every component is a Server Component by default**. Server Components run only on the server — they can directly query databases, read environment variables, and access the filesystem. Their JavaScript is never shipped to the browser.
+
+Client Components are opt-in. You add `"use client"` at the top of a file to mark it as a Client Component. These are the components that need browser APIs, event handlers, or React state.
+
+## The rendering boundary
+
+Think of your component tree as having a **boundary line**. Everything above the `"use client"` directive is server territory. Everything at or below it is client territory.
+
+```
+app/
+  layout.tsx          ← Server Component (default)
+  page.tsx            ← Server Component (default)
+  components/
+    ArticleList.tsx   ← Server Component — fetches from DB
+    LikeButton.tsx    ← "use client" — needs onClick
+```
+
+Key rule: **Server Components can import Client Components, but Client Components cannot import Server Components.** Data flows downward across the boundary via props — and those props must be serializable (no functions, no class instances).
+
+## When to use each
+
+| Use Server Component when... | Use Client Component when... |
+|------------------------------|------------------------------|
+| Fetching data from a database | You need `useState` or `useEffect` |
+| Reading env vars or secrets | You need event handlers (`onClick`, `onChange`) |
+| Rendering static or SEO content | You need browser APIs (`localStorage`, `window`) |
+| Keeping bundle size small | You need third-party client libraries (e.g., a date picker) |
+
+## A concrete example
+
+In our layoffs-tracker project, the article listing page is a Server Component. It queries Prisma directly in the component body — no API route, no `useEffect`, no loading spinner needed:
+
+```tsx
+// app/articles/page.tsx — Server Component (no directive needed)
+import { prisma } from "@/lib/prisma";
+
+export default async function ArticlesPage() {
+  const articles = await prisma.article.findMany({
+    orderBy: { publishedAt: "desc" },
+    take: 20,
+  });
+
+  return (
+    <main>
+      <h1>Latest Layoff Reports</h1>
+      {articles.map((a) => (
+        <ArticleCard key={a.id} article={a} />
+      ))}
+    </main>
+  );
+}
+```
+
+But the "Save Article" button needs `onClick`, so it lives in a Client Component:
+
+```tsx
+// components/SaveButton.tsx
+"use client";
+
+import { useState } from "react";
+
+export function SaveButton({ articleId }: { articleId: string }) {
+  const [saved, setSaved] = useState(false);
+
+  return (
+    <button onClick={() => setSaved(!saved)}>
+      {saved ? "Saved" : "Save"}
+    </button>
+  );
+}
+```
+
+## Common confusion: "use client" is not "client-only"
+
+A Client Component still gets server-side rendered on the first request (SSR). The `"use client"` directive means "include this component's JavaScript in the client bundle so it can hydrate." It does NOT mean "skip server rendering entirely."
+</Body>
+
+<Code>
+```tsx
+// This pattern works — Server Component renders Client Component
+// app/articles/[slug]/page.tsx (Server Component)
+import { prisma } from "@/lib/prisma";
+import { ShareButton } from "@/components/ShareButton";
+
+export default async function ArticlePage({ params }: { params: { slug: string } }) {
+  const article = await prisma.article.findUnique({
+    where: { slug: params.slug },
+  });
+
+  if (!article) return notFound();
+
+  return (
+    <article>
+      <h1>{article.title}</h1>
+      <p>{article.body}</p>
+      {/* Passing serializable data across the boundary */}
+      <ShareButton title={article.title} url={`/articles/${article.slug}`} />
+    </article>
+  );
+}
+```
+
+```tsx
+// components/ShareButton.tsx (Client Component)
+"use client";
+
+export function ShareButton({ title, url }: { title: string; url: string }) {
+  const handleShare = () => {
+    navigator.clipboard.writeText(`${window.location.origin}${url}`);
+  };
+
+  return <button onClick={handleShare}>Share: {title}</button>;
+}
+```
+</Code>
+
+<TryItYourself>
+1. Create a new Next.js app: `npx create-next-app@latest my-app --app`
+2. Open `app/page.tsx` — confirm there's no `"use client"` directive (it's a Server Component)
+3. Add a `console.log("Where am I?")` — check your terminal, not the browser console
+4. Create a `components/Counter.tsx` with `"use client"`, `useState`, and a button — the log now appears in the browser console
+5. Try importing `Counter` from `page.tsx` — it works because server can render client components
+6. Try adding `useState` directly in `page.tsx` without `"use client"` — observe the error
+</TryItYourself>
+
+<CommonMistakes>
+- **Adding `"use client"` to every file** — this defeats the purpose of Server Components and bloats your client bundle
+- **Trying to pass functions as props across the boundary** — functions aren't serializable; use Server Actions instead
+- **Using `useEffect` to fetch data that could be fetched on the server** — if the component doesn't need interactivity, keep it as a Server Component and fetch directly
+- **Thinking `"use client"` means "never rendered on the server"** — Client Components are still SSR'd for the initial HTML
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Can explain the default rendering mode in App Router
+- [ ] Created a Server Component that fetches data directly
+- [ ] Created a Client Component with state and event handlers
+- [ ] Understand what can and cannot cross the server/client boundary
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You have a component that reads `process.env.DATABASE_URL` and renders a list of users. Should it be a Server Component or Client Component?**
+
+- A) Client Component — it renders UI
+- B) Server Component — it accesses a secret environment variable and doesn't need interactivity ✅
+- C) Either works — Next.js handles it automatically
+</MiniQuiz>
+
+<InterviewExplanation>
+"In the Next.js App Router, every component is a Server Component by default. Server Components run only on the server — they can query databases directly, access secrets, and their JS never hits the client bundle. When I need interactivity — state, effects, event handlers, browser APIs — I add the 'use client' directive. The key architectural constraint is that data crossing the server-to-client boundary must be serializable, which encourages clean prop interfaces."
+</InterviewExplanation>

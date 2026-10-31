@@ -1,0 +1,255 @@
+---
+slug: graphs-basics
+title: "Graphs Basics: BFS, DFS, When to Pick Which"
+track: dsa
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Represent graphs as adjacency lists and adjacency matrices
+- Implement graph BFS and DFS with visited tracking
+- Solve "number of islands," "clone graph," and "course schedule" (topological sort)
+- Know when BFS gives shortest path and when DFS is more natural
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Graph problems are among the most feared in interviews, but they follow predictable patterns. Most reduce to either BFS, DFS, or topological sort. The real skill is recognizing that a problem is a graph problem in disguise (grids, dependencies, social networks) and picking the right traversal.
+</WhyThisMatters>
+
+<Body>
+## Graph representations
+
+```python
+# Adjacency list (most common in interviews)
+graph = {
+    'A': ['B', 'C'],
+    'B': ['A', 'D'],
+    'C': ['A', 'D'],
+    'D': ['B', 'C'],
+}
+
+# From edge list
+edges = [[0,1], [1,2], [2,0]]
+from collections import defaultdict
+adj = defaultdict(list)
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)  # omit for directed graph
+```
+
+## Graph DFS
+
+```python
+def dfs(graph, start):
+    visited = set()
+    def explore(node):
+        visited.add(node)
+        for neighbor in graph[node]:
+            if neighbor not in visited:
+                explore(neighbor)
+    explore(start)
+    return visited
+```
+
+## Graph BFS
+
+```python
+from collections import deque
+
+def bfs(graph, start):
+    visited = {start}
+    queue = deque([start])
+    while queue:
+        node = queue.popleft()
+        for neighbor in graph[node]:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return visited
+```
+
+**Critical:** Add to `visited` when enqueuing, not when dequeuing. This prevents duplicate entries in the queue.
+
+## Walkthrough: Number of Islands (LC 200)
+
+A grid of '1's (land) and '0's (water). Count connected components.
+
+```python
+def num_islands(grid):
+    if not grid:
+        return 0
+    rows, cols = len(grid), len(grid[0])
+    count = 0
+
+    def dfs(r, c):
+        if r < 0 or r >= rows or c < 0 or c >= cols or grid[r][c] != '1':
+            return
+        grid[r][c] = '0'  # mark visited by sinking the island
+        dfs(r+1, c)
+        dfs(r-1, c)
+        dfs(r, c+1)
+        dfs(r, c-1)
+
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == '1':
+                count += 1
+                dfs(r, c)
+    return count
+```
+
+**Time:** O(rows * cols). **Space:** O(rows * cols) worst case for the call stack.
+
+## Walkthrough: Course Schedule (LC 207) - Topological Sort
+
+Detect if you can finish all courses given prerequisites. This is cycle detection in a directed graph.
+
+```python
+def can_finish(num_courses, prerequisites):
+    graph = defaultdict(list)
+    in_degree = [0] * num_courses
+    for course, prereq in prerequisites:
+        graph[prereq].append(course)
+        in_degree[course] += 1
+
+    # Start with courses that have no prerequisites
+    queue = deque([i for i in range(num_courses) if in_degree[i] == 0])
+    taken = 0
+
+    while queue:
+        course = queue.popleft()
+        taken += 1
+        for next_course in graph[course]:
+            in_degree[next_course] -= 1
+            if in_degree[next_course] == 0:
+                queue.append(next_course)
+
+    return taken == num_courses  # if not, there's a cycle
+```
+
+**Time:** O(V + E). **Space:** O(V + E).
+
+## Walkthrough: Clone Graph (LC 133)
+
+Deep copy a graph. Use a hash map to track already-cloned nodes to handle cycles.
+
+```python
+def clone_graph(node):
+    if not node:
+        return None
+    cloned = {}
+
+    def dfs(n):
+        if n in cloned:
+            return cloned[n]
+        copy = Node(n.val)
+        cloned[n] = copy
+        for neighbor in n.neighbors:
+            copy.neighbors.append(dfs(neighbor))
+        return copy
+
+    return dfs(node)
+```
+
+## BFS vs. DFS for graphs
+
+| Scenario | Best choice | Why |
+|---|---|---|
+| Shortest path (unweighted) | BFS | BFS explores level by level |
+| Connected components | Either | Both visit all reachable nodes |
+| Cycle detection (directed) | Topological sort (BFS) or DFS with coloring | Kahn's algorithm or three-color DFS |
+| Topological ordering | BFS (Kahn's) or DFS (reverse postorder) | Both work; Kahn's is more intuitive |
+| Path existence | DFS | Simpler to implement recursively |
+</Body>
+
+<TryItYourself>
+1. **LC 200 - Number of Islands**: Solve with both DFS and BFS. Which is cleaner for grid problems?
+2. **LC 207 - Course Schedule**: Implement Kahn's algorithm (BFS topological sort). Then try the DFS approach with three-color marking.
+3. **LC 133 - Clone Graph**: Trace through a graph with a cycle to understand why the hash map is essential.
+4. **LC 994 - Rotting Oranges**: A BFS problem on a grid. Process all rotten oranges simultaneously (multi-source BFS).
+</TryItYourself>
+
+<Code>
+```python
+from collections import defaultdict, deque
+
+# --- Number of Islands ---
+def num_islands(grid):
+    if not grid:
+        return 0
+    rows, cols = len(grid), len(grid[0])
+    count = 0
+    def dfs(r, c):
+        if r < 0 or r >= rows or c < 0 or c >= cols or grid[r][c] != '1':
+            return
+        grid[r][c] = '0'
+        for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
+            dfs(r+dr, c+dc)
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == '1':
+                count += 1
+                dfs(r, c)
+    return count
+
+grid = [
+    ['1','1','0','0','0'],
+    ['1','1','0','0','0'],
+    ['0','0','1','0','0'],
+    ['0','0','0','1','1'],
+]
+print("Islands:", num_islands(grid))  # 3
+
+# --- Course Schedule (Topological Sort) ---
+def can_finish(num_courses, prerequisites):
+    graph = defaultdict(list)
+    in_degree = [0] * num_courses
+    for c, p in prerequisites:
+        graph[p].append(c)
+        in_degree[c] += 1
+    queue = deque(i for i in range(num_courses) if in_degree[i] == 0)
+    taken = 0
+    while queue:
+        course = queue.popleft()
+        taken += 1
+        for nc in graph[course]:
+            in_degree[nc] -= 1
+            if in_degree[nc] == 0:
+                queue.append(nc)
+    return taken == num_courses
+
+print("Can finish:", can_finish(4, [[1,0],[2,1],[3,2]]))  # True
+print("Can finish:", can_finish(2, [[0,1],[1,0]]))        # False (cycle)
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can build an adjacency list from an edge list
+- [ ] I can implement graph DFS with a visited set
+- [ ] I can implement graph BFS with a queue and visited set
+- [ ] I solved Number of Islands using grid DFS
+- [ ] I implemented Kahn's algorithm for topological sort
+- [ ] I understand when BFS guarantees shortest path and when DFS doesn't
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Forgetting the visited set**: Without it, you'll loop forever in graphs with cycles. For grid problems, marking cells in-place works as a visited set.
+- **Adding to visited when dequeuing instead of enqueuing**: In BFS, mark a node as visited when you add it to the queue, not when you remove it. Otherwise the same node can be added multiple times.
+- **Treating undirected graphs as directed**: If the problem says "undirected," add edges in both directions when building the adjacency list.
+- **Stack overflow on large grids**: Recursive DFS on a 300x300 grid can exceed Python's recursion limit. Switch to iterative DFS with an explicit stack or use BFS.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: In an unweighted graph, which traversal guarantees the shortest path from source to any reachable node?**
+
+- A) DFS
+- B) BFS ✅
+- C) Preorder DFS
+- D) Postorder DFS
+</MiniQuiz>
+
+<InterviewExplanation>
+"For graph problems I first identify the type: connected components, shortest path, or dependency ordering. For connected components like Number of Islands, I use DFS to flood-fill each component. For shortest path in an unweighted graph, I use BFS since it explores nodes level by level. For dependency problems like Course Schedule, I use Kahn's algorithm: compute in-degrees, start from nodes with in-degree zero, and process the graph layer by layer. If I can process all nodes, there's no cycle."
+</InterviewExplanation>

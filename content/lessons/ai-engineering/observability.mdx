@@ -1,0 +1,324 @@
+---
+slug: observability
+title: "Observability for AI Apps: Logging, Tracing, Replay"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Define observability in the context of AI applications
+- Log structured events at each pipeline stage with the right fields
+- Implement trace IDs that follow a query through the entire pipeline
+- Build a replay system to reproduce and debug failures
+- Know which metrics to alert on in production
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+When your RAG system gives a wrong answer in production, you need to answer "why?" in minutes, not hours. Was the retrieval bad? Was the context good but the LLM hallucinated? Did the safety check misfire? Without observability, you're debugging blind. With it, you can replay any query, see exactly what happened at every stage, and fix the root cause. This is the skill that keeps you from getting paged at 2am and shrugging.
+</WhyThisMatters>
+
+<Body>
+## What observability means for AI apps
+
+Traditional software observability has three pillars: logs, metrics, and traces. AI apps add a fourth: **evaluation data** — the actual inputs, outputs, and quality scores for every query.
+
+| Pillar | What it answers | Example |
+|---|---|---|
+| Logs | What happened? | "Query received", "Retrieval returned 5 docs" |
+| Metrics | How is the system performing overall? | p50 latency, refusal rate, cost per query |
+| Traces | What was the journey of a single request? | Query → embedding (12ms) → retrieval (8ms) → generation (1.2s) |
+| Evaluation data | Was the output correct? | Faithfulness score, user feedback |
+
+## Structured logging at each stage
+
+Don't use print statements. Use structured logs with consistent fields:
+
+```python
+import json
+import time
+import uuid
+from datetime import datetime
+
+class PipelineLogger:
+    def __init__(self):
+        self.events = []
+    
+    def log(self, trace_id: str, stage: str, data: dict):
+        event = {
+            "trace_id": trace_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "stage": stage,
+            **data
+        }
+        self.events.append(event)
+        # In production, send to your logging backend
+        print(json.dumps(event))
+
+logger = PipelineLogger()
+
+def answer_question(query: str, retriever) -> dict:
+    trace_id = str(uuid.uuid4())
+    
+    # Log the incoming query
+    logger.log(trace_id, "query_received", {
+        "query": query,
+        "query_length": len(query),
+    })
+    
+    # Embedding
+    t0 = time.time()
+    query_emb = embed(query)
+    embed_ms = (time.time() - t0) * 1000
+    logger.log(trace_id, "embedding_complete", {
+        "latency_ms": embed_ms,
+        "model": "bge-small-en-v1.5",
+    })
+    
+    # Retrieval
+    t0 = time.time()
+    results = retriever.search(query_emb, k=5)
+    retrieval_ms = (time.time() - t0) * 1000
+    logger.log(trace_id, "retrieval_complete", {
+        "latency_ms": retrieval_ms,
+        "top_score": float(results[0].score),
+        "num_results": len(results),
+        "doc_ids": [r.doc_id for r in results],
+    })
+    
+    # Generation
+    t0 = time.time()
+    context = "\n".join(r.text for r in results)
+    answer = generate(query, context)
+    gen_ms = (time.time() - t0) * 1000
+    logger.log(trace_id, "generation_complete", {
+        "latency_ms": gen_ms,
+        "model": "gpt-4o-mini",
+        "input_tokens": count_tokens(context + query),
+        "output_tokens": count_tokens(answer),
+        "refused": False,
+    })
+    
+    return {"answer": answer, "trace_id": trace_id}
+```
+
+## Trace IDs: Following a query end-to-end
+
+Every query gets a unique trace ID at the entry point. This ID flows through every stage and every service. When something goes wrong, you search by trace ID and get the complete story.
+
+```python
+# Searching logs by trace ID
+def get_trace(trace_id: str, log_store: list[dict]) -> list[dict]:
+    """Reconstruct the full trace for a query."""
+    events = [e for e in log_store if e["trace_id"] == trace_id]
+    return sorted(events, key=lambda e: e["timestamp"])
+
+# Example output:
+# [
+#   {"trace_id": "abc-123", "stage": "query_received", "query": "refund policy?", ...},
+#   {"trace_id": "abc-123", "stage": "embedding_complete", "latency_ms": 15.2, ...},
+#   {"trace_id": "abc-123", "stage": "retrieval_complete", "top_score": 0.87, ...},
+#   {"trace_id": "abc-123", "stage": "generation_complete", "latency_ms": 1102.5, ...},
+# ]
+```
+
+## Building a replay system
+
+The most powerful debugging tool: replay a failed query exactly as it happened.
+
+Save enough data at each stage to reproduce the query without calling external services:
+
+```python
+class ReplayStore:
+    def __init__(self, storage_path: str):
+        self.path = storage_path
+    
+    def save_trace(self, trace_id: str, data: dict):
+        """Save all data needed to replay this query."""
+        record = {
+            "trace_id": trace_id,
+            "query": data["query"],
+            "retrieved_docs": data["retrieved_docs"],
+            "context_sent_to_llm": data["context"],
+            "llm_response": data["answer"],
+            "scores": data["scores"],
+            "timestamp": data["timestamp"],
+        }
+        # Save to file, database, or object store
+        with open(f"{self.path}/{trace_id}.json", "w") as f:
+            json.dump(record, f, indent=2)
+    
+    def replay(self, trace_id: str) -> dict:
+        """Load and replay a saved trace."""
+        with open(f"{self.path}/{trace_id}.json") as f:
+            record = json.load(f)
+        
+        print(f"Query: {record['query']}")
+        print(f"Top doc score: {record['scores'][0]}")
+        print(f"Context sent to LLM ({len(record['context_sent_to_llm'])} chars):")
+        print(record["context_sent_to_llm"][:500])
+        print(f"\nLLM Response:")
+        print(record["llm_response"])
+        return record
+```
+
+With replay, you can:
+1. See exactly what documents were retrieved for a failing query
+2. See the exact context the LLM received
+3. Re-run just the generation step with a different prompt to test fixes
+4. Build regression tests from real failures
+
+## Metrics to track and alert on
+
+### Operational metrics
+
+| Metric | Alert threshold | Why |
+|---|---|---|
+| p50 latency | > 2s | Users are waiting too long |
+| p99 latency | > 10s | Tail latency indicates infrastructure issues |
+| Error rate | > 5% | System is failing |
+| Refusal rate | > 25% | Corpus gaps or over-aggressive gates |
+
+### Quality metrics
+
+| Metric | Alert threshold | Why |
+|---|---|---|
+| Avg retrieval score | Drop > 10% from baseline | Embedding model or index issue |
+| User thumbs-down rate | > 15% | Answer quality declining |
+| Faithfulness (sampled) | < 80% | Hallucination rate increasing |
+
+### Cost metrics
+
+| Metric | Alert threshold | Why |
+|---|---|---|
+| Daily LLM spend | > 2x daily average | Runaway costs |
+| Avg tokens per query | > 2x baseline | Prompt bloat or retrieval returning too much |
+| Cache hit rate | < 10% when expected > 20% | Cache misconfigured |
+
+```python
+def compute_daily_metrics(logs: list[dict]) -> dict:
+    gen_events = [e for e in logs if e["stage"] == "generation_complete"]
+    
+    latencies = [e["latency_ms"] for e in gen_events]
+    refusals = sum(1 for e in gen_events if e.get("refused"))
+    
+    return {
+        "total_queries": len(gen_events),
+        "p50_latency_ms": sorted(latencies)[len(latencies)//2] if latencies else 0,
+        "p99_latency_ms": sorted(latencies)[int(len(latencies)*0.99)] if latencies else 0,
+        "refusal_rate": refusals / len(gen_events) if gen_events else 0,
+        "avg_input_tokens": sum(e.get("input_tokens", 0) for e in gen_events) / len(gen_events) if gen_events else 0,
+    }
+```
+
+## Production tooling
+
+You don't have to build all of this from scratch. These tools are commonly used for AI observability:
+
+- **LangSmith** (from LangChain) — traces, evaluations, datasets
+- **Langfuse** — open-source LLM observability, self-hostable
+- **Phoenix** (from Arize) — open-source traces and evaluations
+- **Weights & Biases** — experiment tracking, if you're also fine-tuning
+- **OpenTelemetry + Jaeger** — general-purpose tracing if you want no vendor lock-in
+
+Start with structured logging and trace IDs. Add a purpose-built tool when you outgrow JSON files.
+</Body>
+
+<Code>
+```python
+import json
+import uuid
+import time
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+
+@dataclass
+class TraceEvent:
+    trace_id: str
+    stage: str
+    timestamp: str = ""
+    latency_ms: float = 0.0
+    metadata: dict = field(default_factory=dict)
+    
+    def __post_init__(self):
+        if not self.timestamp:
+            self.timestamp = datetime.utcnow().isoformat()
+
+class SimpleTracer:
+    def __init__(self):
+        self.traces: dict[str, list[TraceEvent]] = {}
+    
+    def new_trace(self) -> str:
+        trace_id = str(uuid.uuid4())[:8]
+        self.traces[trace_id] = []
+        return trace_id
+    
+    def log(self, trace_id: str, stage: str, latency_ms: float = 0, **kwargs):
+        event = TraceEvent(trace_id, stage, latency_ms=latency_ms, metadata=kwargs)
+        self.traces[trace_id].append(event)
+    
+    def get_trace(self, trace_id: str) -> list[dict]:
+        return [asdict(e) for e in self.traces.get(trace_id, [])]
+    
+    def summary(self, trace_id: str) -> str:
+        events = self.traces.get(trace_id, [])
+        lines = [f"Trace {trace_id}: {len(events)} events"]
+        total_ms = 0
+        for e in events:
+            lines.append(f"  [{e.stage}] {e.latency_ms:.1f}ms")
+            total_ms += e.latency_ms
+        lines.append(f"  Total: {total_ms:.1f}ms")
+        return "\n".join(lines)
+
+# Demo
+tracer = SimpleTracer()
+tid = tracer.new_trace()
+
+tracer.log(tid, "query_received", query="What is the refund policy?")
+tracer.log(tid, "embedding", latency_ms=12.3, model="bge-small")
+tracer.log(tid, "retrieval", latency_ms=4.1, top_score=0.89, num_results=5)
+tracer.log(tid, "generation", latency_ms=1102.5, model="gpt-4o-mini", tokens=2450)
+
+print(tracer.summary(tid))
+print("\nFull trace:")
+print(json.dumps(tracer.get_trace(tid), indent=2))
+```
+</Code>
+
+<TryItYourself>
+1. Add the `SimpleTracer` to your existing RAG pipeline from earlier lessons
+2. Run 5 queries and inspect the trace output
+3. Intentionally trigger a failure (e.g., query that gets refused) and use the trace to identify which stage caused the refusal
+4. Compute p50 and p99 latency across your 5 queries
+5. Save one trace to a JSON file and practice replaying it
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Added structured logging with trace IDs to a RAG pipeline
+- [ ] Can retrieve and read a complete trace for a single query
+- [ ] Computed at least two operational metrics (latency, refusal rate)
+- [ ] Saved a trace to disk and replayed it to debug a query
+- [ ] Know which production tools (LangSmith, Langfuse, Phoenix) exist for AI observability
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Using print statements instead of structured logs** — you can't search or aggregate print statements
+- **Not including trace IDs** — without them, you can't follow a single query through multiple services
+- **Logging too little** — at minimum log: query, retrieval scores, context length, model used, latency, and whether the answer was refused
+- **Logging too much in production** — logging the full LLM response for every query is expensive to store; sample it
+- **No alerting** — metrics without alerts are just dashboards nobody checks
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: A user reports getting a wrong answer yesterday. You have the trace ID. What's the fastest way to diagnose the issue?**
+
+- A) Re-run the query today and see if you get the same result
+- B) Look at the trace to see retrieval scores and the context the LLM received ✅
+- C) Check the overall system metrics dashboard
+- D) Ask the user to rephrase their question
+</MiniQuiz>
+
+<InterviewExplanation>
+"I build AI observability around four pillars: structured logs at each pipeline stage, trace IDs that follow a query end-to-end, metrics dashboards for operational health, and a replay system for debugging. Every event gets a trace ID, stage name, latency, and key metadata like retrieval scores and token counts. The replay system saves enough data to reproduce any query offline — the query, retrieved docs, context, and LLM response. For production alerting, I track p50/p99 latency, refusal rate, and average retrieval scores, with thresholds calibrated to our baseline. Tools like Langfuse or LangSmith can accelerate this, but the core pattern is simple: structured events, trace IDs, and saved replay data."
+</InterviewExplanation>

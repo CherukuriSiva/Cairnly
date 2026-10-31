@@ -1,0 +1,117 @@
+---
+slug: schema-validation-for-ai-data
+title: "Schema Validation & Atomic Writes for AI Datasets"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Define a dataset record with a typed schema (Pydantic)
+- Use JSONL as the standard line-per-record format for AI data
+- Fail fast at the schema gate instead of debugging mid-training
+- Write files atomically so a crashed job never leaves half a dataset
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Bad data fails late and expensively — you discover a malformed record three hours into a fine-tuning run, or worse, after it silently skewed your model. A schema gate plus atomic writes turns "mysterious training crash" into "rejected at ingestion with a clear error." This data hygiene is what separates reproducible pipelines from flaky ones.
+</WhyThisMatters>
+
+<Body>
+## JSONL: one record per line
+
+AI datasets are almost always **JSONL** — one JSON object per line. It streams (you don't load the whole file into memory), it appends cleanly, and a single corrupt line doesn't break the rest.
+
+## The schema gate
+
+Define the exact shape every record must have, and validate at the boundary — when you write and when you read. A typed model gives you free validation and clear errors:
+
+```python
+from pydantic import BaseModel, field_validator
+
+class QARecord(BaseModel):
+    instruction: str
+    input: str
+    output: str
+
+    @field_validator("instruction", "output")
+    @classmethod
+    def non_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must be non-empty")
+        return v
+```
+
+Now an invalid record raises at ingestion with a message like `output: must be non-empty`, instead of poisoning training.
+
+## Atomic writes
+
+If your write job crashes halfway, you must not be left with a truncated dataset that *looks* valid. Write to a temp file, then `os.replace` it into place — `replace` is atomic on the same filesystem, so readers either see the old file or the complete new one, never a half-written mess.
+</Body>
+
+<Code>
+```python
+import json, os, tempfile
+from pathlib import Path
+
+def load_records(path: str) -> list[dict]:
+    """Stream a JSONL file, validating each line against the schema."""
+    records = []
+    with open(path) as f:
+        for lineno, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(QARecord(**json.loads(line)).model_dump())
+            except Exception as e:
+                raise ValueError(f"{path}:{lineno} invalid record: {e}")
+    return records
+
+def write_records_atomic(path: str, records: list[QARecord]) -> None:
+    """Write JSONL atomically: temp file + os.replace."""
+    p = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=p.parent, suffix=".tmp")
+    with os.fdopen(fd, "w") as f:
+        for r in records:
+            f.write(r.model_dump_json() + "\n")
+    os.replace(tmp, p)   # atomic on the same filesystem
+```
+</Code>
+
+<TryItYourself>
+1. Define `QARecord` and load a JSONL file you create by hand
+2. Add a line with an empty `output` and confirm `load_records` raises with the line number
+3. Write 100 records with `write_records_atomic`; kill the process mid-write and verify the original file is intact
+4. Add a new required field and watch old records fail validation (this is a feature)
+5. Measure memory while loading a large file with streaming vs `json.load` of the whole thing
+</TryItYourself>
+
+<CommonMistakes>
+- **Validating only on read, not on write** — garbage gets persisted and bites you later
+- **Loading the whole file into memory** — JSONL is meant to stream line by line
+- **Non-atomic writes** — a crash leaves a truncated file that passes a naive check
+- **Swallowing validation errors** — log and re-raise with the line number, don't `continue` silently
+- **Schema drift** — changing fields without versioning makes old runs irreproducible
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Defined a Pydantic record schema with at least one validator
+- [ ] Loaded JSONL with per-line validation and clear error messages
+- [ ] Implemented an atomic write and tested a mid-write crash
+- [ ] Can explain why JSONL + schema gate beats a giant JSON array
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why write a dataset to a temp file and then `os.replace` it, instead of writing directly to the final path?**
+
+- A) It's faster
+- B) `os.replace` is atomic, so a crash never leaves a half-written file that looks valid ✅
+- C) It compresses the file
+- D) It avoids needing a schema
+</MiniQuiz>
+
+<InterviewExplanation>
+"AI datasets are JSONL — one record per line — so they stream and a single bad line doesn't break the file. I put a schema gate at both read and write: a typed model like Pydantic validates each record and raises with the line number, so bad data is rejected at ingestion instead of crashing a training run hours in. And I write atomically — temp file plus os.replace — so a crashed job never leaves a truncated dataset that passes a naive check. That combination is what makes the pipeline reproducible."
+</InterviewExplanation>

@@ -1,0 +1,89 @@
+---
+slug: from-llm-to-agent
+title: "From LLM to Agent: What Actually Changes"
+summary: "An LLM predicts text; an agent perceives, plans, calls tools, and remembers. Here is the real boundary and why it matters."
+category: ai-engineering
+tags: ["agents", "agentic-ai", "fundamentals"]
+audience: ["cs-students", "beginners"]
+depth: medium
+priority: P0
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1775140883677.jpeg
+  - references/linkedin/1776336289762.gif
+  - references/linkedin/1778438207447.jpeg
+  - references/linkedin/1776057600105.jpeg
+relatedLessons:
+  - ai-engineering/what-is-rag
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+A plain LLM answers from its weights. An agent wraps that LLM in a loop — perceive, reason, act with tools, observe, remember — so it can pursue a goal across multiple steps.
+</InsightSummary>
+
+<Body>
+## The boundary: what an LLM actually is
+
+Strip away the marketing and an LLM is one thing: a next-token predictor. You give it a sequence of tokens, and it returns a probability distribution over what token comes next. It is smart but frozen — its knowledge stops at its training cutoff, it has no memory of your last conversation, no hands to act in the world, and no way to check whether its answer was right. On its own, an LLM does exactly one step: read the prompt, emit a response, stop.
+
+An **agent** is what you get when you wrap that frozen reasoning core in machinery that lets it perceive, act, remember, and keep going until a goal is met. The LLM is still the brain. The agent is the brain plus a body and a workspace.
+
+## The four additions
+
+Turning an LLM into an agent means adding four capabilities around it:
+
+1. **Tools (the ability to act).** The model can call functions, APIs, code runners, databases, file systems, or external services. Instead of guessing today's weather, it calls a weather API. Instead of inventing a stock price, it queries a real source. Tools are what let the model *do* things rather than only *say* things.
+
+2. **Memory (state across steps).** Two layers matter here. Short-term memory is the working context of the current task — what has happened so far, intermediate results. Long-term memory lives outside the context window in a vector store or database, so the system can recall preferences, past sessions, and learned patterns on demand.
+
+3. **Planning (goal decomposition).** Given a broad objective, the system breaks it into ordered sub-tasks rather than trying to answer in one shot. "Research these competitors and draft a report" becomes a queue of smaller, checkable steps.
+
+4. **The control loop (iteration until done).** This is the piece that turns the other three into autonomy. The agent runs a cycle — perceive the input and current state, reason about the next action, act with a tool, observe the result — and repeats. After each pass it asks a simple question: *is the goal achieved?* If yes, it returns the answer. If no, it loops again. A plain LLM call runs this loop exactly once; an agent runs it as many times as the task needs.
+
+You can picture the whole thing as a single repeating cycle: **perceive → reason → act → observe → (check goal) → repeat**, with memory feeding context in and out at every turn, and guardrails (permissions, rate limits, human-in-the-loop checkpoints) wrapping the loop so it stays safe.
+
+## "Agentic" describes behavior, not a product
+
+It is tempting to treat "agent" as a category of product you can buy. It is not. *Agentic* is an adjective for **behavior** — specifically, the degree of autonomy a system shows. A workflow that follows a fixed, pre-programmed script is not agentic even if it calls an LLM. A system that decides for itself what to do next, adapts when something fails, and pursues a goal across many steps is agentic, regardless of which framework built it.
+
+This is why the same underlying model can power a one-shot chatbot reply *and* a multi-step autonomous workflow. The model didn't change; the loop and tooling around it did. Autonomy is a spectrum, not a switch: most real systems sit somewhere between "answers one prompt" and "runs unsupervised for an hour."
+
+## Where RAG fits
+
+Here is the part that surprises most students: **the majority of "AI apps" in production are not agents at all.** They are Retrieval-Augmented Generation — RAG — with a thin tool layer on top.
+
+RAG adds one capability to the LLM: before answering, it retrieves relevant documents from your own data and stuffs them into the prompt. That fixes the "frozen and ignorant of your data" problem without requiring planning, multi-step loops, or autonomous decision-making. A RAG app typically runs the loop once: retrieve, augment, generate, done.
+
+So the honest hierarchy looks like this:
+
+- **LLM** — predicts the next token. Smart, frozen, no hands, no memory.
+- **LLM + RAG** — same model, but grounded in fresh, private facts. This is most "AI apps."
+- **LLM + RAG + tools + memory + loop** — now it is an agent. Far rarer in production, and harder to make reliable.
+
+If you join a team and they say they are "building agents," it is worth asking what the loop actually does. Often the real system is RAG plus a couple of tool calls — which is a perfectly good design, just not a multi-agent one.
+
+## A mental model for students
+
+Hold onto this picture:
+
+> **LLM = the reasoning core. Agent = LLM + tools + memory + planning + a loop. Agentic = how autonomously the loop behaves.**
+
+When you read a job description or a tutorial, mentally locate it on the ladder. Is this just calling a model once? That's an LLM call. Is it grounding answers in retrieved documents? That's RAG. Does it decide its own next steps, call tools, remember, and iterate until a goal is met? Only then is it a true agent. Knowing exactly which rung you are on is what separates engineers who can reason about these systems from those who just repeat buzzwords.
+</Body>
+
+<KeyTakeaways>
+- LLM = reasoning core; agent = LLM + tools + memory + loop.
+- "Agentic" describes behavior (autonomy), not a specific product.
+- Most production "AI apps" are still RAG + a thin tool layer, not full multi-agent systems.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Read the lesson [What is RAG](/ai-engineering/what-is-rag) to see the most common non-agentic pattern.
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

@@ -1,0 +1,93 @@
+---
+slug: explain-mlops-and-drift
+title: "How to Explain MLOps & Drift in an Interview"
+track: ai-systems
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Define MLOps and drift crisply under pressure
+- Walk the lifecycle as a confident narrative
+- Answer "how do you know your model is still good in production?"
+- Avoid the junior tell of stopping at "I trained a model"
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+The fastest way to signal you've only done coursework is to describe training and stop. Production ML is monitoring, drift, and retraining. A clean answer on MLOps and drift tells the interviewer you understand that shipping a model is the start of the work, not the end.
+</WhyThisMatters>
+
+<Body>
+## The two definitions, tight
+
+- **MLOps** — "Getting models from notebook to production and keeping them healthy: reproducible training, experiment tracking, a model registry, reliable serving, monitoring, and retraining. It's DevOps plus the fact that data shifts and quality silently decays."
+- **Drift** — "When production data moves away from training data. *Data drift* is the inputs changing distribution; *concept drift* is the input→output relationship changing. Both degrade accuracy with no code error."
+
+## The lifecycle narrative
+
+Train → track (MLflow) → register (versioned model) → serve (load once, behind an API) → monitor (latency, errors, drift) → retrain when warranted. Say it as a loop, not a list.
+
+## The money question
+
+*"How do you know your model is still good after deployment?"*
+
+"I monitor it. Operationally — latency, error rate, throughput. Statistically — drift on inputs with KS/PSI, and on outputs or proxy metrics for concept drift. When drift crosses a threshold I investigate and, if warranted, retrain. I never assume a deployed model stays good."
+
+## Connect to detection mechanics
+
+Be ready to name KS test (continuous), PSI with the 0.1/0.25 thresholds, chi-squared (categorical), and embedding-distribution monitoring for LLM apps.
+</Body>
+
+<Code>
+```text
+30-SECOND MLOPS ANSWER:
+
+"MLOps is getting models to production and keeping them healthy —
+reproducible training, experiment tracking, a registry, serving,
+monitoring, and retraining. The reason it's not just DevOps is that
+data drifts and model quality decays even when the code is frozen.
+
+I detect that with drift monitoring: data drift via KS test or PSI on
+inputs, concept drift via proxy metrics or fresh labels. A drift alert
+triggers investigation and, if warranted, retraining. So I'd never say a
+model is 'done' at deployment — that's where the operational work begins."
+```
+</Code>
+
+<TryItYourself>
+1. Deliver the 30-second MLOps answer from memory
+2. Define data vs concept drift in one sentence each, no notes
+3. Answer "how do you know it's still good?" in under 30 seconds
+4. Name a detection method for continuous, categorical, and LLM inputs
+5. Map the answer onto a real (or eval-set) project you can discuss
+</TryItYourself>
+
+<CommonMistakes>
+- **Stopping at "I trained a model"** — the junior tell
+- **Conflating data and concept drift** — keep the definitions distinct
+- **No detection mechanics** — be ready to name KS, PSI, chi-squared
+- **Treating drift as auto-retrain** — it's a signal a human acts on
+- **Forgetting LLM apps drift too** — mention embedding-distribution monitoring
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Can define MLOps and drift in one sentence each
+- [ ] Can deliver the lifecycle as a loop narrative
+- [ ] Have a tight answer to "how do you know it's still good?"
+- [ ] Can name detection methods by data type
+- [ ] Mapped it to a concrete project
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: "How do you know your model is still good after deployment?" — strongest answer?**
+
+- A) "I tested it well before shipping"
+- B) "I monitor operational metrics and drift (KS/PSI), and retrain when drift crosses a threshold" ✅
+- C) "Models don't degrade if the code doesn't change"
+- D) "I retrain it every night regardless"
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd define MLOps as getting models to production and keeping them healthy — reproducible training, tracking, a registry, serving, monitoring, retraining — and stress that it's DevOps plus the fact that data drifts and quality silently decays. Drift is when production data moves from training data: data drift is the inputs changing distribution, concept drift is the input-to-output relationship changing. For 'how do you know it's still good?' I say I monitor operationally and statistically — KS or PSI on inputs, proxy metrics for concept drift — and a drift alert triggers investigation and retraining if warranted. The key is never treating deployment as the finish line."
+</InterviewExplanation>

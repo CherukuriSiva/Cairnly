@@ -1,0 +1,105 @@
+---
+slug: experiment-tracking-with-mlflow
+title: "Experiment Tracking with MLflow"
+track: ai-systems
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why "which run produced this model?" is a question you must be able to answer
+- Log params, metrics, and artifacts with MLflow
+- Register a chosen run's model into the MLflow Model Registry with a version
+- Compare runs to make a defensible "ship this one" decision
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Without experiment tracking, ML work is unreproducible folklore: "I think the good model was the one with 64 hidden units... or was it 128?" MLflow turns every training run into a logged, comparable, retrievable record. It's the backbone of any serious training pipeline and a near-guaranteed MLOps interview topic.
+</WhyThisMatters>
+
+<Body>
+## Track everything, every run
+
+A training run has inputs (hyperparameters), outputs (metrics), and artifacts (the model file). MLflow logs all three under a run ID so you can later answer "what produced this model, and how good was it?"
+
+- `log_params` — the knobs you set (learning rate, hidden dim, epochs).
+- `log_metrics` — what came out (loss, accuracy), optionally per step so you get curves.
+- `log_model` — the serialized model as an artifact.
+
+## The registry: from run to deployable version
+
+A run is an experiment record; the **Model Registry** is the promotion path. `registered_model_name` takes a run's model and gives it a named, versioned slot ("infra-demo-model" v3) that serving can pull by name — decoupling "what I trained" from "what's in production."
+
+## Compare, then decide
+
+The payoff is comparison: sort runs by val accuracy, check that the winner's other metrics aren't pathological, and promote it. The decision is now data-backed and reproducible, not a memory.
+</Body>
+
+<Code>
+```python
+import mlflow, mlflow.pytorch
+
+mlflow.set_tracking_uri("sqlite:///mlflow.db")   # a server URI in production
+mlflow.set_experiment("infra-demo-classification")
+
+with mlflow.start_run() as run:
+    mlflow.log_params({"hidden_dim": 64, "lr": 0.01, "epochs": 50, "optimizer": "Adam"})
+
+    for epoch in range(epochs):
+        train_loss = train_one_epoch(model)
+        if (epoch + 1) % 10 == 0:
+            val_loss, val_acc = evaluate(model)
+            mlflow.log_metrics(
+                {"train_loss": train_loss, "val_loss": val_loss, "val_accuracy": val_acc},
+                step=epoch,
+            )
+
+    # promote this run's model into the registry with a version
+    signature = mlflow.models.signature.infer_signature(X_train, model(X_train))
+    mlflow.pytorch.log_model(
+        pytorch_model=model,
+        artifact_path="model",
+        signature=signature,
+        registered_model_name="infra-demo-model",
+    )
+    print("Logged run:", run.info.run_id)
+```
+</Code>
+
+<TryItYourself>
+1. Wrap any training loop in `mlflow.start_run()` and log params + metrics
+2. Open the MLflow UI (`mlflow ui`) and view your run's metric curves
+3. Run three times with different `hidden_dim`; compare in the UI
+4. Register the best run's model with `registered_model_name`
+5. Load it back by name (`models:/infra-demo-model/latest`) and run inference
+</TryItYourself>
+
+<CommonMistakes>
+- **Logging only the final metric** — log per step so you can see overfitting in the curve
+- **Not logging a model signature** — serving can't validate inputs without it
+- **Treating runs as the deployable** — promote to the registry; serve by name/version
+- **Local-only tracking in a team** — point the tracking URI at a shared server
+- **Forgetting to log the data version** — params + code aren't enough for true reproducibility
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Logged params, per-step metrics, and a model artifact
+- [ ] Viewed and compared runs in the MLflow UI
+- [ ] Registered a model version in the registry
+- [ ] Loaded the registered model back by name
+- [ ] Can explain run vs registered model
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: What's the difference between an MLflow *run* and a *registered model*?**
+
+- A) Nothing — they're the same
+- B) A run records one experiment; the registry promotes a chosen run's model to a named, versioned slot for serving ✅
+- C) A run is for inference; the registry is for training
+- D) The registry stores metrics; runs store models
+</MiniQuiz>
+
+<InterviewExplanation>
+"Experiment tracking answers 'what produced this model and how good was it.' With MLflow I wrap each training run and log three things: params like learning rate and hidden dim, metrics per step so I get curves and can spot overfitting, and the model artifact with a signature. A run is just an experiment record — the Model Registry is the promotion path, giving a chosen run's model a named, versioned slot that serving pulls by name. That decouples what I trained from what's in production, and it makes 'ship this one' a data-backed, reproducible decision instead of a memory."
+</InterviewExplanation>

@@ -1,0 +1,115 @@
+---
+slug: hallucination-detection-llm-judge
+title: "Hallucination Detection & Citation Verification"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Verify that an answer's claims are supported by the retrieved sources
+- Build a cheap citation check before reaching for an LLM judge
+- Use an LLM judge to grade groundedness when heuristics aren't enough
+- Decide the action on a failed check: append a disclaimer, rewrite, or refuse
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Grounding the model with RAG reduces hallucination but doesn't eliminate it — the model can still state things your sources never said. A post-generation verification step is the safety net that catches the confident, ungrounded answer before a user trusts it. It's also the concrete answer to "how do you *know* your RAG app isn't hallucinating?"
+</WhyThisMatters>
+
+<Body>
+## Verification is a separate stage
+
+Generation produces a draft; verification asks "is this actually supported by the sources I provided?" Run it *after* generation, with access to both the answer and the retrieved passages.
+
+## Start cheap: a citation heuristic
+
+Before spending an LLM call, a fast structural check catches the obvious failure — an answer that makes claims but references no source:
+
+```python
+def validate_citations(response: str, sources: list[str]) -> tuple[bool, str]:
+    if not response.strip():
+        return False, "Response is empty."
+    if sources and "Source" not in response and not any(s in response for s in sources):
+        return False, "Response does not cite the provided sources."
+    return True, "Valid"
+```
+
+## Escalate: the LLM judge
+
+Heuristics can't tell whether a *specific claim* is supported. An LLM judge can. Give it the answer and the sources and ask it to grade each claim as SUPPORTED or UNSUPPORTED, returning the unsupported ones. Use a cheap, fast model — this is classification, not generation.
+
+## Pick the action
+
+On failure you have three escalating responses:
+
+1. **Append a disclaimer** — "couldn't fully verify against sources" (lowest friction).
+2. **Rewrite** — strip unsupported claims (the reflection pattern).
+3. **Refuse** — return your safe fallback for high-stakes domains.
+
+Match the action to the stakes.
+</Body>
+
+<Code>
+```python
+JUDGE = """You are grading an answer for groundedness.
+Using ONLY the Sources, list any claims in the Answer that are NOT supported.
+Return JSON: {"grounded": bool, "unsupported": [str]}.
+
+Sources:
+{sources}
+
+Answer:
+{answer}"""
+
+def verify_answer(answer: str, sources: list[str], llm, refusal_msg: str) -> dict:
+    ok, reason = validate_citations(answer, sources)   # cheap gate first
+    if not ok:
+        return {"action": "disclaimer", "text": f"{answer}\n\n[Note: {reason}]"}
+
+    verdict = parse_json(llm(JUDGE.format(sources="\n".join(sources), answer=answer)))
+    if verdict["grounded"]:
+        return {"action": "accept", "text": answer}
+    if len(verdict["unsupported"]) > 2:                 # high stakes → refuse
+        return {"action": "refuse", "text": refusal_msg}
+    return {"action": "rewrite", "unsupported": verdict["unsupported"]}
+```
+</Code>
+
+<TryItYourself>
+1. Implement `validate_citations` and confirm it flags an uncited answer
+2. Build the LLM judge prompt and run it on a grounded vs an ungrounded answer
+3. Wire the action ladder: accept → disclaimer → rewrite → refuse
+4. Measure how often the cheap gate catches issues before the LLM judge runs
+5. Track judge cost per query and decide a threshold for when to skip it
+</TryItYourself>
+
+<CommonMistakes>
+- **Skipping the cheap gate** — you pay for an LLM judge on every query unnecessarily
+- **Judging against world knowledge** — the judge must check against your sources only
+- **Using an expensive model as the judge** — a cheap model is fine for classification
+- **One-size response** — disclaimer for a chatbot, refusal for a medical app
+- **No logging of failures** — you can't improve retrieval if you don't track ungrounded answers
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented a cheap citation check
+- [ ] Built an LLM judge that returns unsupported claims
+- [ ] Implemented the accept/disclaimer/rewrite/refuse ladder
+- [ ] Measured cheap-gate catch rate and judge cost
+- [ ] Can explain why verification runs after generation
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why run a cheap citation heuristic before the LLM judge?**
+
+- A) The heuristic is more accurate
+- B) It catches obvious failures for free, so you only pay for the LLM judge on the hard cases ✅
+- C) LLM judges can't see sources
+- D) It replaces the need for retrieval
+</MiniQuiz>
+
+<InterviewExplanation>
+"Grounding with RAG reduces hallucination but doesn't kill it, so I add a verification stage after generation that sees both the answer and the retrieved sources. I start cheap with a citation heuristic — does the answer cite any source at all — to catch the obvious failures for free. For nuanced cases I escalate to a cheap LLM judge that grades each claim as supported or unsupported against the sources only, not world knowledge. Then I match the action to the stakes: append a disclaimer for a chatbot, rewrite to strip unsupported claims, or refuse outright for a high-stakes domain."
+</InterviewExplanation>

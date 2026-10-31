@@ -1,0 +1,77 @@
+---
+slug: vector-databases-explained
+title: "Vector Databases Explained: 15 Options and How to Choose"
+summary: "Pinecone, Weaviate, Milvus, Qdrant, Chroma, FAISS, pgvector — the landscape is wide. Here is what each is optimized for and how to pick for your use case."
+category: ai-engineering
+tags: ["vector-databases", "rag", "embeddings", "infrastructure"]
+audience: ["cs-students", "working-pros"]
+depth: short
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1777899936313.gif
+relatedLessons:
+  - ai-engineering/vector-databases-beyond-faiss
+  - ai-engineering/faiss-basics
+  - ai-engineering/embedding-model-selection
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+A vector database stores embeddings and finds the nearest ones to a query — the retrieval engine behind RAG. The market is crowded (fifteen-plus credible options), but they fall into a few clear categories: in-process libraries, Postgres extensions, self-hosted open-source engines, and fully managed cloud services. You do not need to evaluate all fifteen. Pick by where you are — a student prototyping, a team already on Postgres, or a production service at scale — and then benchmark the two or three candidates on the things that actually matter for your workload.
+</InsightSummary>
+
+<Body>
+## What vector databases do
+
+Embeddings turn text, images, or other data into high-dimensional vectors where "similar things are close together." A vector database stores those vectors and answers one core question fast: *which stored vectors are nearest to this query vector?* Because exact nearest-neighbor search is too slow at scale, these systems use approximate nearest-neighbor (ANN) indexes to trade a sliver of accuracy for large speedups. This similarity search is what powers retrieval in a RAG pipeline.
+
+## The categories
+
+The wide field organizes into a handful of types:
+
+- **In-process library — FAISS.** A similarity-search library (not a server) optimized for dense vectors and nearest-neighbor search. Runs inside your app, zero infrastructure, free. Ideal for prototypes and learning.
+- **Postgres extension — pgvector.** Adds vector similarity search directly to PostgreSQL. No new service to operate if you already run Postgres.
+- **Self-hosted open-source engines — Milvus, Qdrant, Weaviate, Chroma.** Milvus targets billion-scale workloads; Qdrant focuses on filtering, payloads, and efficient retrieval; Weaviate adds hybrid search, modules, and scalable semantic indexing; Chroma is a lightweight embedding DB popular for local prototypes and RAG experiments.
+- **Managed cloud services — Pinecone, and managed tiers of the above.** Pinecone is a fully managed vector DB built for fast similarity search and production retrieval. You trade some control for someone else operating it.
+- **Vector features bolted onto existing systems — Redis, Elasticsearch/OpenSearch, MongoDB Atlas, and others.** If you already run one of these, its vector capability may be "good enough" without adding a new dependency.
+
+## A selection guide
+
+- **Student or prototype:** FAISS or Chroma — zero infra, free, fast to start.
+- **Already on Postgres:** pgvector — keep your data in one place, no new service to run.
+- **Self-hosted production:** Milvus or Weaviate (or Qdrant) — open-source engines built to scale.
+- **Production on the cloud, minimal ops:** Pinecone or a managed Qdrant tier — managed and scalable.
+
+The cleanest decision rule: start from your existing stack and operational appetite, not from a benchmark leaderboard.
+
+## What to actually benchmark
+
+Once you have two or three candidates, measure the things that decide real-world fit:
+
+- **Query latency at your scale** — performance on a toy dataset tells you nothing about millions of vectors.
+- **Filtering support** — can it filter by metadata (tenant, date, category) efficiently alongside the vector search?
+- **Hybrid search** — does it combine keyword and semantic search, which often beats either alone?
+- **Cost** — total cost of ownership, including operations for self-hosted options, not just sticker price.
+
+Pick the simplest option that clears your bar on those four, and resist switching until a concrete limit forces you to.
+</Body>
+
+<KeyTakeaways>
+- A vector database stores embeddings and runs approximate nearest-neighbor (ANN) search — the retrieval engine behind RAG.
+- The field sorts into categories: in-process library (FAISS), Postgres extension (pgvector), self-hosted engines (Milvus, Qdrant, Weaviate, Chroma), and managed cloud (Pinecone).
+- Choose by your situation: FAISS/Chroma for prototypes, pgvector if you are on Postgres, Milvus/Weaviate for self-hosted scale, Pinecone for managed cloud.
+- Benchmark what matters — query latency at your real scale, metadata filtering, hybrid search, and total cost — not leaderboard numbers.
+- Start from your existing stack and ops appetite; pick the simplest option that clears your bar and switch only when forced.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Compare engines in depth with [Vector databases beyond FAISS](/ai-engineering/vector-databases-beyond-faiss).
+- Start hands-on with [FAISS basics](/ai-engineering/faiss-basics).
+- Make sure your retrieval quality starts at the source with [Embedding model selection](/ai-engineering/embedding-model-selection).
+</WhatToDoNext>
+
+<SourceNote />

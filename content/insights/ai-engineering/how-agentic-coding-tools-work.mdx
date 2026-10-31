@@ -1,0 +1,87 @@
+---
+slug: how-agentic-coding-tools-work
+title: "How Agentic Coding Tools Actually Work"
+summary: "Claude Code, Cursor, Copilot — these tools are more than AI autocomplete. They are agent harnesses: structured scaffolding that wraps a model with memory, tools, skills, and a control loop. Here is the architecture."
+category: ai-engineering
+tags: ["agentic-coding", "tooling", "context-engineering", "agents"]
+audience: ["working-pros", "cs-students"]
+depth: deep
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1772885186788.jpeg
+  - references/linkedin/1774214802040.jpeg
+  - references/linkedin/1776350023352.gif
+  - references/linkedin/1779501505003.jpeg
+  - references/linkedin/1779313269476.jpeg
+  - references/linkedin/1778039085669.jpeg
+relatedLessons:
+  - ai-engineering/what-is-an-agent
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+A coding model on its own is just a text predictor. What turns it into an agent that can read your repo, run tests, fix CI, and edit dozens of files is the harness around it — a structured layer of context management, memory, tools, skills, guardrails, and a control loop. Modern agentic coding tools (Claude Code, Cursor, Copilot, and others) are all variations on this same harness architecture. Once you see the pattern, the specific config files stop mattering: what's durable is the architecture and the judgment it amplifies.
+</InsightSummary>
+
+<Body>
+## The harness concept
+
+A large language model, by itself, predicts the next token. It cannot open a file, run a command, remember yesterday, or take more than one step. An **agent harness** is the scaffolding that closes those gaps — it manages what context the model sees, gives it tools to act, holds memory across steps and sessions, and runs a loop so the model can perceive, act, observe, and repeat until a task is done.
+
+The mental shift is from *assistant* to *operating layer*. An old-style autocomplete suggests the next line. An agentic tool runs in a loop with access to your file system, shell, and tools — it is less like a chatbot you copy-paste from and more like a junior engineer you delegate a whole task to. The harness is what makes that possible, and a recurring theme across the field is blunt: **the harness matters as much as the model.**
+
+## A codebase now has three parts
+
+A useful framing: your repository used to have two parts you cared about — **code** and **tests**. There is now a third: the **AI layer** — the configuration and tooling you build around the model so an agent is productive in *your* specific codebase. Code and tests are familiar; the AI layer is the new artifact, and getting it right is what separates an agent that flails from one that ships.
+
+## The five layers of the harness
+
+Across these tools the architecture decomposes into roughly five layers:
+
+**1. Memory and instructions.** Persistent project context the agent loads every session — the "this is how we work here" file (e.g. a `CLAUDE.md`-style document). In a large codebase this is a *hierarchy*: a lean root file plus one file per service or package, loaded additively, alongside a codebase map and scoped commands. This is the agent's long-term, durable knowledge of your project.
+
+**2. Skills and knowledge.** Modular, reusable instruction packages loaded *on demand* rather than crammed into every prompt. The emerging open standard here is `SKILL.md` — a small markdown file with a name and a trigger description plus a body of detailed instructions (and optional scripts and references). The key idea is **progressive disclosure**: at first the agent sees only the skill's name and one-line description (tens of tokens); it loads the full body only when a task matches, and scripts/references only when needed. The payoff is hundreds of available skills with near-zero context bloat. The format is becoming vendor-neutral — the same skill works across multiple coding tools, only the install path differs.
+
+**3. Hooks and guardrails.** Automated checks wired into the agent's lifecycle — events that run logic at set points (session start, before/after a tool call, on stop). Hooks orient the agent at the start of a session and can enforce rules, run scoped tests, or even drive a self-improvement loop where the agent reflects on a session and proposes updates to its own instruction files.
+
+**4. Tool access.** The actions the agent can take: read/write the file system, run shell commands, search the web, call APIs, and run tests. A typed tool registry with one handler per tool keeps this controlled. Tool access is gated by a **permission layer** — deny / allow / approve — so the agent only does what it is allowed to, with humans in the loop for risky actions.
+
+**5. Orchestration and subagents.** For larger work, the harness spawns **subagents** with isolated context to handle research, exploration, or parallel analysis, then reports back to the main loop. This keeps the main context window clean (one focused task per subagent), lets you throw more compute at hard problems, and coordinates multi-step workflows. Surrounding it all is an **observability layer** that watches everything the agent does.
+
+## Context engineering: the real lever
+
+Underneath all five layers is one discipline: **context engineering** — deciding what goes into the model's limited context window, what gets evicted, and how to keep what remains high-quality. Context quality determines output quality, full stop. The classic failure is **context window decay**: important instructions get pushed out as the window fills, and the agent starts drifting and contradicting itself.
+
+The harness fights this on several fronts: progressive disclosure (load skills only when needed), subagents (offload exploration so the main context stays focused), context compression (summarize and re-anchor when nearing limits), and disciplined memory files (durable instructions that survive the session). Good context engineering is less about clever prompts and more about *what the model should and shouldn't be looking at right now*.
+
+## MCP: the tool connectivity layer
+
+How does the agent discover and call tools beyond its built-ins? Increasingly through **MCP** (the Model Context Protocol) — an open standard for connecting an agent to external tools and data, often described as "USB-C for AI." The harness runs an MCP client that auto-discovers MCP servers (file system, version control, databases, SaaS tools, web) and exposes their capabilities to the model through a uniform interface. This is what lets one agent plug into hundreds of tools without a bespoke integration for each.
+
+## What's durable vs. what's product-specific
+
+It is easy to over-index on a particular tool's config files and slash commands. Resist that. **The harness architecture generalizes; the specific files don't.** The five layers — memory/instructions, on-demand skills, hooks/guardrails, gated tools, orchestration/subagents — plus context engineering and MCP connectivity describe *every* serious agentic coding tool. The exact filenames, paths, and commands are product details that will keep changing. Learn the architecture and you can pick up any of these tools (and the next one) in an afternoon. And keep the layer alive: an AI layer is not set-and-forget — review it after major model releases and delete rules written for an old model's limits.
+
+## The honest take
+
+These tools are genuine force multipliers, but they multiply *judgment*, not replace it. An agent will confidently produce plausible-but-wrong code; the harness's guardrails, tests, and human approvals exist precisely because the model's confidence is not the same as correctness. The durable skills are the ones that don't live in any config file: reading code critically, designing systems, writing good tests, and reviewing output with a staff-engineer's eye. The engineers who win with agentic tools are not the ones who memorize the most commands — they're the ones who reason well and delegate well. Learn the harness, but invest most in learning to think.
+</Body>
+
+<KeyTakeaways>
+- A model alone is a text predictor; an agent harness adds context management, memory, tools, a control loop, and guardrails to turn it into something that can read a repo, run tests, and edit code.
+- A codebase now has three parts — code, tests, and the AI layer (the config and tooling around the model) — and the AI layer is what makes an agent productive in your specific repo.
+- The harness has five layers: memory/instructions (a `CLAUDE.md`-style hierarchy), on-demand skills (`SKILL.md` with progressive disclosure), hooks/guardrails, permission-gated tool access, and orchestration/subagents.
+- Context engineering — what enters the window, what gets evicted, how to keep it clean — is the real lever; MCP is the standard layer for discovering and calling tools.
+- The architecture is durable; the specific files and commands are not. These tools amplify judgment rather than replace it, so invest most in reasoning, design, and review.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Ground the harness concept in [What is an agent](/ai-engineering/what-is-an-agent).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) to build the underlying agent skills the harness amplifies.
+</WhatToDoNext>
+
+<SourceNote />

@@ -1,0 +1,110 @@
+---
+slug: ingesting-public-corpora
+title: "Ingesting Public Corpora (SQuAD → Your Schema)"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Parse a nested public dataset (SQuAD) into your own flat record schema
+- Extract unique passages and link Q&A pairs to them by ID
+- Deduplicate context paragraphs within and across source files
+- Auto-categorize records and skip unanswerable/empty items
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+You rarely start from clean data — you start from a public corpus in *someone else's* format. Turning SQuAD-style JSON into your normalized schema, with deduped passages and stable IDs, is the unglamorous first mile of almost every RAG dataset. Doing it cleanly (and idempotently) is what keeps the downstream pipeline honest.
+</WhyThisMatters>
+
+<Body>
+## Map their shape to yours
+
+SQuAD nests data as `articles → paragraphs → qas → answers`. Your training schema is flat: `{instruction, input, output, category, passage_id, ...}`. Ingestion walks the nested structure and emits flat records — one per usable Q&A pair — plus a separate list of unique passages.
+
+## Passages once, referenced by ID
+
+A single context paragraph backs many questions. Store each unique passage **once** with a stable `passage_id`, and have Q&A records reference that ID rather than duplicating the text. Dedup contexts both within a file and **across** files via a global context→id map, so the same paragraph in two sources collapses to one passage.
+
+## Skip the unusable
+
+Real corpora are messy. Skip `is_impossible` questions, empty answers, and empty questions. When SQuAD offers multiple answer spans, pick the longest (most complete). Defensive extraction keeps junk out before it reaches your filters.
+
+## Auto-categorize from the title
+
+Tagging records with a category (diagnosis, behavior, education, ...) costs nothing at ingestion if you infer it from the article title with a keyword rule table, and it pays off later for stratified splits and per-category eval.
+</Body>
+
+<Code>
+```python
+def extract_passages(squad_data, slug, offset=0):
+    passages, ctx_to_id = [], {}
+    gid = offset
+    for art_idx, article in enumerate(squad_data.get("data", [])):
+        for para in article.get("paragraphs", []):
+            ctx = para.get("context", "").strip()
+            if not ctx or ctx in ctx_to_id:        # dedup within file
+                continue
+            pid = f"passage-{gid:06d}"; gid += 1
+            ctx_to_id[ctx] = pid
+            passages.append({"id": pid, "text": ctx,
+                             "source_title": article.get("title", ""),
+                             "article_id": f"{slug}-{art_idx:04d}"})
+    return passages, ctx_to_id
+
+def extract_qa(squad_data, slug, ctx_to_id):
+    out = []
+    for article in squad_data.get("data", []):
+        cat = infer_category(article.get("title", ""))
+        for para in article.get("paragraphs", []):
+            pid = ctx_to_id.get(para.get("context", "").strip(), "")
+            for qa in para.get("qas", []):
+                if qa.get("is_impossible") or not qa.get("answers"):
+                    continue                       # skip unusable
+                ans = max(qa["answers"], key=lambda a: len(a.get("text", "")))["text"].strip()
+                q = qa.get("question", "").strip()
+                if not ans or not q:
+                    continue
+                out.append({"id": None, "instruction": q, "input": para["context"],
+                            "output": ans, "category": cat, "passage_id": pid, "kind": "qa"})
+    return out
+```
+</Code>
+
+<TryItYourself>
+1. Download a small SQuAD-format JSON and parse it with `extract_passages`/`extract_qa`
+2. Confirm a paragraph shared by 5 questions yields 1 passage + 5 QA records
+3. Add a second source file and verify cross-file passage dedup via a global map
+4. Skip `is_impossible` and empty answers; count how many you drop
+5. Build a keyword category rule and check the distribution of categories
+</TryItYourself>
+
+<CommonMistakes>
+- **Duplicating passage text per Q&A** — store once, reference by ID
+- **No cross-file dedup** — the same paragraph in two sources becomes two passages
+- **Keeping unanswerable/empty items** — they pollute downstream filters
+- **Taking the first answer span** — the longest is usually the most complete
+- **Forgetting stable IDs** — re-ingestion must be idempotent
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Parsed nested SQuAD into a flat record schema
+- [ ] Extracted unique passages with stable IDs
+- [ ] Deduped contexts within and across files
+- [ ] Skipped unanswerable/empty Q&A items
+- [ ] Auto-categorized records from the title
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: A context paragraph is shared by 8 questions. How should ingestion handle it?**
+
+- A) Store the paragraph text on all 8 Q&A records
+- B) Store the passage once with an ID and reference it from the 8 records ✅
+- C) Drop 7 of the questions
+- D) Merge the 8 questions into one
+</MiniQuiz>
+
+<InterviewExplanation>
+"Ingestion maps a public corpus's shape onto mine. SQuAD nests articles, paragraphs, questions, and answers; my schema is flat, so I walk the structure and emit one record per usable Q&A pair plus a separate list of unique passages. A paragraph backs many questions, so I store each passage once with a stable ID and reference it, deduping contexts both within a file and across files with a global context-to-id map. I skip the unusable — is_impossible questions, empty answers — and pick the longest answer span when there are several. And I auto-categorize from the article title with a keyword table, which costs nothing now and powers stratified splits and per-category eval later."
+</InterviewExplanation>

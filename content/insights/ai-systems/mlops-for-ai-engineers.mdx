@@ -1,0 +1,99 @@
+---
+slug: mlops-for-ai-engineers
+title: "MLOps for AI Engineers: What You Actually Need to Know"
+summary: "AIOps, LLMOps, MLOps — the naming is confusing, but the core ideas are not. Here is the minimum viable MLOps knowledge for an AI engineer building with LLMs."
+category: ai-systems
+tags: ["mlops", "llmops", "deployment", "cicd", "monitoring"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1779612044762.gif
+  - references/linkedin/1779677680809.jpeg
+  - references/linkedin/1779677681316.jpeg
+  - references/linkedin/1780655433753.jpeg
+relatedLessons:
+  - ai-systems/what-is-mlops
+  - ai-systems/experiment-tracking-with-mlflow
+  - ai-systems/drift-detection-basics
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+The "Ops" landscape is a jargon minefield — AIOps, MLOps, LLMOps — but the underlying ideas are simple and mostly shared. They all describe the discipline of taking something from "works on my laptop" to "runs reliably in production and keeps running." For an AI engineer building with LLMs, you do not need the full data-science MLOps curriculum. You need the LLM-specific slice: prompt management, evaluation, deployment, monitoring, and drift detection — plus a working mental model of CI/CD and the failure modes that silently kill agents in production.
+</InsightSummary>
+
+<Body>
+## AIOps vs MLOps vs LLMOps
+
+The three terms are related but aimed at different things:
+
+- **AIOps** uses AI to streamline *IT operations* — detecting anomalies, doing root-cause analysis, and improving system performance. Its lifecycle: define scope → collect data (logs, metrics) → preprocess → build models → anomaly detection / root-cause analysis → automate actions → deploy and monitor → optimize continuously. This is the "AI for ops" branch, and it is mostly adjacent to AI-engineering work.
+- **MLOps** is the *ML model lifecycle*: identify problem → collect data (structured/unstructured) → process (cleaning, feature engineering) → select model → train and optimize (hyperparameter tuning, cross-validation) → deploy → monitor and retrain → scale and automate. This is the classic data-science deployment discipline.
+- **LLMOps** is MLOps specialized for *large language models*: define task → select an LLM (commercial or open source) → prepare data (fine-tuning and/or prompt engineering) → integrate tools → test outputs (accuracy, bias checks) → deploy → monitor performance → iterate and improve.
+
+For most AI engineers building applications on top of existing models, **LLMOps is the slice that matters** — you rarely train a model from scratch, but you constantly manage prompts, evaluate outputs, deploy, and monitor.
+
+## The LLMOps lifecycle in practice
+
+What the LLMOps loop looks like day to day:
+
+- **Prompt management.** Treat prompts like code: version them, review changes, and avoid letting them silently drift.
+- **Evaluation.** Test outputs before and after every change — accuracy on a representative set, plus bias and safety checks.
+- **Deployment.** Ship the app behind an API, typically containerized.
+- **Monitoring.** Watch quality, latency, cost, and user feedback in production.
+- **Drift detection.** Notice when inputs or output quality shift over time and trigger a response (re-prompt, re-tune, or retrain a component).
+
+## CI/CD for ML
+
+CI/CD is the automation that makes the above repeatable. The pattern mirrors normal software CI/CD with ML-specific steps:
+
+- A developer pushes code → a CI trigger fires (GitHub Actions, Jenkins, GitLab CI) → automated checks run (linting, unit tests, **data validation**, model tests) → if it includes training, the model is trained and its **metrics are tracked** (e.g. with MLflow) → the best model is saved → a container image is built → it is pushed to a registry → deployed (often to Kubernetes) → exposed via an API (FastAPI is common) → monitored for accuracy, drift, latency, and errors, with automated retraining as needed.
+
+You do not need every tool, but recognize the categories: **CI/CD** (GitHub Actions, Jenkins, GitLab, cloud-native pipelines), **experiment tracking** (MLflow), **orchestration/scheduling** (Airflow), **packaging** (Docker), **scaling** (Kubernetes), and **data/dataset versioning** (DVC). A beginner combination is as simple as GitHub + GitHub Actions + Docker; advanced setups add Kubernetes, MLflow, and Airflow.
+
+## The 9 silent killers of AI agents in production
+
+Most production failures are not loud crashes — they are quiet degradations. Watch for these nine, each with its fix:
+
+1. **Tool definition bloat.** Too many tools dilute the agent's selection quality and burn tokens. *Fix:* curate ruthlessly; keep high-signal tools.
+2. **Context window decay.** Important instructions get pushed out, causing drift and inconsistency. *Fix:* re-anchor key context; use memory and retrieval to keep it fresh.
+3. **Eval blindness.** Evaluating only the easy cases hides real-world failures and edge cases. *Fix:* build deep, scenario-based evals; test adversarially; monitor against ground truth.
+4. **Observability gaps.** You cannot improve what you cannot see. *Fix:* trace end to end; log inputs, tool calls, and outputs; build actionable dashboards.
+5. **Prompt rot.** Outdated prompts accumulate contradictions and assumptions that degrade performance. *Fix:* version and refactor prompts regularly; remove what is no longer true.
+6. **Unbounded autonomy.** Agents without guardrails can take risky, irreversible, or expensive actions. *Fix:* enforce approvals, rate limits, budgets, and scoped permissions.
+7. **Data quality drift.** Stale or inconsistent data silently poisons results — garbage in, garbage out. *Fix:* monitor data quality; validate at ingest; set freshness SLAs.
+8. **Cost leaks.** Token, tool, and infra costs creep up and eat margins. *Fix:* track unit economics; set budgets and alerts; optimize prompts, models, and tool usage.
+9. **Silent failure modes.** The agent is confident but wrong, eroding trust and causing real damage. *Fix:* calibrate confidence; add self-checks and fact validation; keep humans in the loop for high-risk actions.
+
+## What "monitoring" means for LLM apps
+
+For LLM applications, monitoring is broader than uptime. Track:
+
+- **Quality:** hallucination/error rate against ground truth where possible.
+- **Latency:** time-to-first-token and total response time.
+- **Cost:** tokens and dollars per request.
+- **User feedback:** thumbs up/down and explicit signals to feed error analysis.
+
+The throughline of all three "Ops" disciplines is the same: ship deliberately, measure continuously, and treat the gap between "demo" and "reliable in production" as the real engineering work.
+</Body>
+
+<KeyTakeaways>
+- AIOps (AI for IT ops), MLOps (the ML model lifecycle), and LLMOps (LLM-specific deployment) share the same goal — reliable production — but aim at different problems; for app builders, LLMOps is the slice that matters.
+- The LLMOps loop is prompt management, evaluation, deployment, monitoring, and drift detection — manage prompts like code and test outputs on every change.
+- CI/CD for ML mirrors software CI/CD with extra steps: data validation, model tests, experiment tracking (MLflow), containerization, and automated retraining.
+- The nine silent killers — tool bloat, context decay, eval blindness, observability gaps, prompt rot, unbounded autonomy, data drift, cost leaks, and silent failures — each have a concrete fix; most production failures are quiet, not loud.
+- Monitoring an LLM app means tracking quality (hallucination rate), latency, cost, and user feedback — not just uptime.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Start with the foundations in [What is MLOps](/ai-systems/what-is-mlops).
+- Add reproducibility with [Experiment tracking with MLflow](/ai-systems/experiment-tracking-with-mlflow).
+- Learn to catch quiet degradation with [Drift detection basics](/ai-systems/drift-detection-basics), then follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

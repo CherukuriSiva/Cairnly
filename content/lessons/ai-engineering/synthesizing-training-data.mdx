@@ -1,0 +1,103 @@
+---
+slug: synthesizing-training-data
+title: "Synthesizing Training Data: Refusals & Multi-Turn"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain when synthetic data is the right call (and when it isn't)
+- Generate refusal examples so your model learns to say "I don't know"
+- Synthesize multi-turn conversations from single-turn seeds
+- Keep a synthesis schema so generated records are trainable, not garbage
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Most real datasets are missing the exact behaviors you most need: refusing out-of-scope questions, handling follow-ups, staying grounded. You can't always collect those from users, but you can synthesize them. Teams that know how to generate clean refusal and multi-turn data ship safer assistants without waiting months for labeled examples.
+</WhyThisMatters>
+
+<Body>
+## Why synthesize at all
+
+A factuality dataset teaches the model to answer. It does **not** teach the model to *refuse* — because nobody writes down the questions a system should decline. Synthetic data fills these gaps: refusals, multi-turn follow-ups, and edge cases that are rare in the wild.
+
+## Refusal synthesis
+
+You want examples where the correct output is a polite, consistent refusal. Take off-topic or unsafe seed questions and pair them with a fixed refusal message. The model learns the *shape* of "this is out of scope" rather than hallucinating an answer.
+
+## Multi-turn synthesis
+
+Real conversations have follow-ups ("what about for adults?"). Generate these by taking a single-turn QA pair and asking a strong model to extend it into a 2–3 turn exchange, preserving grounding in the same context.
+
+## Schema discipline
+
+Synthetic ≠ sloppy. Every generated record must validate against the same schema as your real data — same fields (`instruction`, `input`, `output`), same types. A record that doesn't validate gets dropped, not trained on.
+</Body>
+
+<Code>
+```python
+from dataclasses import dataclass
+
+REFUSAL_MESSAGE = "I can only answer questions about the provided documents."
+
+@dataclass
+class Record:
+    instruction: str
+    input: str   # retrieved context (empty for refusals)
+    output: str
+
+def synthesize_refusals(off_topic_questions: list[str]) -> list[Record]:
+    """Pair out-of-scope questions with a consistent refusal output."""
+    return [
+        Record(instruction=q, input="", output=REFUSAL_MESSAGE)
+        for q in off_topic_questions
+    ]
+
+def synthesize_multiturn(seed: Record, generate) -> list[dict]:
+    """Extend a single-turn QA pair into a short grounded conversation."""
+    prompt = (
+        "Extend this Q&A into a 2-turn conversation. The follow-up must be "
+        "answerable from the SAME context. Return JSON list of {role, content}.\n\n"
+        f"Q: {seed.instruction}\nContext: {seed.input}\nA: {seed.output}"
+    )
+    return parse_json(generate(prompt))  # validate before keeping
+```
+</Code>
+
+<TryItYourself>
+1. Collect 20 off-topic questions and run `synthesize_refusals` over them
+2. Pick 5 single-turn pairs and synthesize a follow-up turn for each
+3. Validate every synthetic record against your schema; count how many you drop
+4. Mix 10% refusals into a tiny training set and eyeball whether the model refuses correctly
+5. Add a dedup pass (next lesson) so near-identical synthetic questions don't dominate
+</TryItYourself>
+
+<CommonMistakes>
+- **Using one refusal phrasing for everything** — the model overfits to the exact string; vary the surface form a little
+- **Not validating synthetic records** — a malformed JSON record poisons training silently
+- **Over-synthesizing** — too much synthetic data drowns out real signal; treat it as seasoning, not the meal
+- **Generating multi-turn that breaks grounding** — the follow-up must stay answerable from the original context
+- **Skipping dedup** — a strong model emits near-duplicate questions; they bias the dataset
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Generated a batch of refusal records with a consistent output
+- [ ] Synthesized at least 5 multi-turn examples that stay grounded
+- [ ] Validated all synthetic records against the schema and dropped failures
+- [ ] Can explain why refusal data must be synthesized rather than collected
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why do you usually have to *synthesize* refusal examples instead of collecting them from real logs?**
+
+- A) Real logs are too expensive to store
+- B) Users rarely ask the exact out-of-scope questions you need, labeled as "should refuse" ✅
+- C) Refusals can't be expressed in the training schema
+- D) Synthetic data is always higher quality
+</MiniQuiz>
+
+<InterviewExplanation>
+"Datasets teach a model to answer, but not to refuse, because nobody collects 'questions the system should decline.' So I synthesize: I pair off-topic or unsafe seeds with a consistent refusal output, and I extend single-turn QA pairs into short multi-turn conversations that stay grounded in the same context. The discipline that makes this work is schema validation — every synthetic record has to validate exactly like real data, and anything malformed gets dropped before training. I keep synthetic data a minority of the set so it doesn't drown real signal."
+</InterviewExplanation>

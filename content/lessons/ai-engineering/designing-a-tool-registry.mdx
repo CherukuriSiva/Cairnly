@@ -1,0 +1,114 @@
+---
+slug: designing-a-tool-registry
+title: "Designing a Tool Registry for Agents"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Define a `BaseTool` interface every tool must implement
+- Build a registry that the agent uses to discover and execute tools
+- Auto-generate the tool descriptions injected into the system prompt
+- Make the registry the safety barrier between the LLM and your business logic
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+An agent is only as good as the tools it can reach — and only as safe as the layer between the model and those tools. A tool registry is that layer. It lets you add capabilities without touching the agent loop, and it's where you enforce that the LLM can only ever call vetted, named functions. Get this abstraction right and your agent stays clean as it grows.
+</WhyThisMatters>
+
+<Body>
+## One interface to rule them all
+
+Every tool implements the same contract: a `name` (what the LLM calls), a `description` (so the LLM knows when to use it), and a `run(input)` method. An abstract base class enforces this so you can't register a half-built tool.
+
+## The registry: discover + execute
+
+The registry holds tools by name and does two jobs:
+
+1. **Describe** — produce the bulleted tool list for the system prompt, so the model knows its options.
+2. **Execute** — look up a tool by name, run it, and return the result *as a string the agent can read as an observation*. Unknown tool name? Return a helpful error listing valid tools — don't throw.
+
+## The registry is your safety barrier
+
+This is the key insight: the LLM never calls your functions directly. It emits a tool name and input; the registry decides whether that tool exists and runs it inside a `try/except`. A tool that crashes returns an error observation instead of taking down the agent. This is exactly where you'd add permission checks, rate limits, or logging.
+</Body>
+
+<Code>
+```python
+from abc import ABC, abstractmethod
+
+class BaseTool(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+    @property
+    @abstractmethod
+    def description(self) -> str: ...
+    @abstractmethod
+    def run(self, input_str: str) -> str: ...
+
+class ToolRegistry:
+    def __init__(self):
+        self._tools: dict[str, BaseTool] = {}
+
+    def register(self, tool: BaseTool) -> None:
+        self._tools[tool.name] = tool
+
+    def execute(self, name: str, input_str: str) -> str:
+        tool = self._tools.get(name)
+        if not tool:
+            return f"Error: tool '{name}' not found. Available: {', '.join(self._tools)}"
+        try:
+            return tool.run(input_str)            # safety barrier
+        except Exception as e:
+            return f"Error executing {name}: {e}"  # becomes an observation, not a crash
+
+    def get_tools_prompt_description(self) -> str:
+        return "\n".join(f"- {n}: {t.description}" for n, t in self._tools.items())
+
+class CalculatorTool(BaseTool):
+    name = "calculator"
+    description = "Evaluate a basic arithmetic expression. Input: '2 + 2 * 3'."
+    def run(self, input_str: str) -> str:
+        return str(eval(input_str, {"__builtins__": {}}))  # sandboxed builtins
+```
+</Code>
+
+<TryItYourself>
+1. Implement `BaseTool` and `ToolRegistry`
+2. Add `CalculatorTool` and a `SearchTool` (it can return a canned string for now)
+3. Register both and print `get_tools_prompt_description()`
+4. Call `execute("calculator", "6 * 7")` and `execute("unknown", "x")`; confirm the second returns a friendly error
+5. Make a tool raise inside `run` and verify the agent still gets an observation
+</TryItYourself>
+
+<CommonMistakes>
+- **Letting `execute` raise on unknown tools** — return an observation listing valid tools instead
+- **No `try/except` around `run`** — one buggy tool crashes the whole agent
+- **Forgetting to feed tool descriptions into the prompt** — the model can't use tools it doesn't know about
+- **Vague descriptions** — "does search" tells the model nothing about *when* to use it
+- **Skipping the abstraction and hardcoding tools in the loop** — adding a tool then means editing the agent
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Defined a `BaseTool` interface with name/description/run
+- [ ] Built a registry that describes and executes tools
+- [ ] Returned friendly errors for unknown tools and tool failures
+- [ ] Generated the system-prompt tool list from the registry
+- [ ] Can explain why the registry is the safety barrier
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: The LLM emits `Action: delete_database: all`. Where should the decision to allow or block that live?**
+
+- A) Inside the LLM's reasoning
+- B) In the registry's execute path, where you enforce existence and permissions ✅
+- C) In the user's prompt
+- D) Nowhere — trust the model
+</MiniQuiz>
+
+<InterviewExplanation>
+"A tool registry is the abstraction barrier between the model and my business logic. Every tool implements one interface — name, description, run — and the registry does two things: it generates the tool list for the system prompt so the model knows its options, and it executes tools by name inside a try/except so a crash becomes an observation, not an outage. The model never calls my functions directly; it requests a named tool and the registry decides whether it exists and runs it. That's exactly where I'd add permission checks, rate limits, and logging."
+</InterviewExplanation>

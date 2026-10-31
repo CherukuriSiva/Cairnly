@@ -1,0 +1,116 @@
+---
+slug: async-and-parallel-pipelines
+title: "Async & Parallel Pipelines: Hiding Latency"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Identify the independent stages of a RAG request that can run concurrently
+- Run input guardrails and retrieval in parallel with `asyncio.gather`
+- Understand why async matters most for I/O-bound LLM/RAG work
+- Avoid the traps: blocking calls, unbounded concurrency, error fan-out
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A RAG request is a chain of network calls — embed, retrieve, guardrail-check, generate — and done sequentially the latencies add up. Many of those stages are *independent* and can overlap. Restructuring the pipeline to run independent work concurrently is one of the cleanest latency wins available, and async fluency is expected of any production AI engineer.
+</WhyThisMatters>
+
+<Body>
+## Why async, specifically
+
+LLM/RAG work is **I/O-bound** — most of the wall-clock time is spent *waiting* on a network response (the embedding API, the vector DB, the LLM). While one call waits, the CPU is idle. Async lets you fire off independent waits at once and collect them together, so total latency approaches the *slowest* call instead of the *sum*.
+
+## Find the independent stages
+
+In a typical request:
+
+- Embedding the query and running the **input guardrail** (injection/PII check) don't depend on each other → run them together.
+- After retrieval, an output-side step and a logging/telemetry write can overlap.
+- A multi-source agent can query the internal KB and the web **in parallel**.
+
+Anything with no data dependency is a parallelization candidate.
+
+## Run them with `asyncio.gather`
+
+`asyncio.gather` launches coroutines concurrently and waits for all. The "guardrail + retrieval in parallel" pattern is the canonical RAG win — both are independent network calls, so overlapping them shaves the smaller one off the critical path.
+
+## The traps
+
+- **A blocking call in an async function** stalls the whole event loop — use async clients, or offload sync work to a thread pool.
+- **Unbounded concurrency** (gathering 10,000 tasks) exhausts connections — bound it with a semaphore.
+- **Error fan-out** — one failed task in `gather` can cancel the rest unless you handle exceptions (`return_exceptions=True`).
+</Body>
+
+<Code>
+```python
+import asyncio
+
+async def answer(query: str, user) -> dict:
+    # input guardrail and embedding are independent → overlap them
+    safe, qvec = await asyncio.gather(
+        check_injection_async(query),
+        embed_async(query),
+    )
+    if not safe:
+        return {"refused": True, "reason": "blocked at input guardrail"}
+
+    passages = await retrieve_async(qvec, user)          # depends on qvec
+    answer = await generate_async(query, passages)        # depends on passages
+
+    # response is ready; log + output-scan can run concurrently, not on the hot path
+    asyncio.create_task(log_interaction_async(user, query, answer))
+    return {"answer": answer, "sources": passages}
+
+async def agent_multi_source(query: str) -> list[str]:
+    sem = asyncio.Semaphore(8)                            # bound concurrency
+    async def guarded(coro):
+        async with sem:
+            return await coro
+    results = await asyncio.gather(
+        guarded(search_internal_async(query)),
+        guarded(search_web_async(query)),
+        return_exceptions=True,                           # one failure doesn't cancel all
+    )
+    return [r for r in results if not isinstance(r, Exception)]
+```
+</Code>
+
+<TryItYourself>
+1. Time a sequential embed→guardrail→retrieve chain
+2. Overlap the independent embed + guardrail with `asyncio.gather`; measure the delta
+3. Move logging off the hot path with `create_task` and confirm response latency drops
+4. Run an internal+web agent fan-out concurrently and compare to sequential
+5. Add a blocking `time.sleep` inside a coroutine and observe the event loop stall
+</TryItYourself>
+
+<CommonMistakes>
+- **Blocking calls in async code** — `time.sleep` or a sync HTTP client freezes the loop
+- **Parallelizing dependent stages** — you can't retrieve before you embed
+- **Unbounded `gather`** — exhausts connection pools; use a semaphore
+- **Ignoring partial failures** — without `return_exceptions`, one error cancels siblings
+- **Awaiting fire-and-forget work** — logging/telemetry shouldn't block the response
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Identified independent vs dependent pipeline stages
+- [ ] Overlapped guardrail + embedding with `asyncio.gather`
+- [ ] Moved telemetry off the critical path
+- [ ] Bounded a parallel fan-out with a semaphore
+- [ ] Handled partial failures with `return_exceptions`
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why does async give such a big win for RAG pipelines specifically?**
+
+- A) It uses more CPU cores for math
+- B) RAG is I/O-bound — most time is spent waiting on network calls, which async overlaps ✅
+- C) It makes the LLM smaller
+- D) It removes the need for retrieval
+</MiniQuiz>
+
+<InterviewExplanation>
+"A RAG request is a chain of network calls, and it's I/O-bound — most of the time is spent waiting, with the CPU idle. So I restructure around the independent stages: embedding the query and running the input guardrail don't depend on each other, so I overlap them with asyncio.gather, and total latency approaches the slowest call instead of the sum. I push logging and telemetry off the hot path with create_task, and for a multi-source agent I fan out internal and web search concurrently. The traps I watch for are blocking calls that stall the event loop, unbounded concurrency that exhausts connections — so I use a semaphore — and partial failures, which I handle with return_exceptions so one bad task doesn't cancel the rest."
+</InterviewExplanation>

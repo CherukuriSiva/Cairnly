@@ -1,0 +1,232 @@
+---
+slug: intervals
+title: "Intervals: Merge, Overlap, Meeting Rooms"
+track: dsa
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Master the "sort by start time" preprocessing step common to all interval problems
+- Solve merge intervals, insert interval, meeting rooms, and non-overlapping intervals
+- Understand the sweep-line technique for counting concurrent events
+- Recognize interval problems disguised as scheduling, booking, or resource allocation
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Interval problems appear across coding interviews and real-world scheduling systems (calendar apps, resource allocation, network packet analysis). They all share a common DNA: sort by start time, then scan. Once you recognize the pattern, the implementation is straightforward. Companies like Google and Amazon ask these frequently.
+</WhyThisMatters>
+
+<Body>
+## The universal first step: sort by start time
+
+Almost every interval problem begins with sorting intervals by their start time. This lets you process them left to right and compare each interval only with its immediate predecessor.
+
+## Merge Intervals (LC 56)
+
+Given a list of intervals, merge all overlapping intervals.
+
+```python
+def merge(intervals):
+    intervals.sort(key=lambda x: x[0])
+    merged = [intervals[0]]
+    for start, end in intervals[1:]:
+        if start <= merged[-1][1]:          # overlaps with last merged
+            merged[-1][1] = max(merged[-1][1], end)  # extend
+        else:
+            merged.append([start, end])     # no overlap, new interval
+    return merged
+
+# merge([[1,3],[2,6],[8,10],[15,18]]) -> [[1,6],[8,10],[15,18]]
+```
+
+**Time:** O(n log n) for sorting. **Space:** O(n) for the result.
+
+## Insert Interval (LC 57)
+
+Insert a new interval into a sorted list and merge if necessary.
+
+```python
+def insert(intervals, new):
+    result = []
+    for i, (start, end) in enumerate(intervals):
+        if end < new[0]:
+            result.append([start, end])         # entirely before new
+        elif start > new[1]:
+            result.append(new)                  # new goes before this one
+            return result + intervals[i:]
+        else:
+            new = [min(start, new[0]), max(end, new[1])]  # merge
+    result.append(new)
+    return result
+
+# insert([[1,3],[6,9]], [2,5]) -> [[1,5],[6,9]]
+```
+
+**Time:** O(n). No sorting needed since input is already sorted.
+
+## Meeting Rooms II (LC 253): Minimum rooms needed
+
+How many rooms do you need to schedule all meetings without conflicts? This is the "maximum concurrent events" problem.
+
+### Approach 1: Min-heap
+
+```python
+import heapq
+
+def min_meeting_rooms(intervals):
+    if not intervals:
+        return 0
+    intervals.sort(key=lambda x: x[0])
+    heap = []  # tracks end times of active meetings
+    for start, end in intervals:
+        if heap and heap[0] <= start:
+            heapq.heappop(heap)    # reuse the room that freed up
+        heapq.heappush(heap, end)
+    return len(heap)
+
+# min_meeting_rooms([[0,30],[5,10],[15,20]]) -> 2
+```
+
+### Approach 2: Sweep line (event-based)
+
+```python
+def min_meeting_rooms_sweep(intervals):
+    events = []
+    for start, end in intervals:
+        events.append((start, 1))   # meeting starts
+        events.append((end, -1))    # meeting ends
+    events.sort()
+    max_rooms = current = 0
+    for _, delta in events:
+        current += delta
+        max_rooms = max(max_rooms, current)
+    return max_rooms
+```
+
+**Time:** O(n log n) for both approaches.
+
+## Non-Overlapping Intervals (LC 435)
+
+Find the minimum number of intervals to remove so that the rest don't overlap. Greedy: sort by end time, always keep the interval that ends earliest.
+
+```python
+def erase_overlap_intervals(intervals):
+    intervals.sort(key=lambda x: x[1])  # sort by END time
+    removals = 0
+    prev_end = float('-inf')
+    for start, end in intervals:
+        if start < prev_end:
+            removals += 1       # overlaps, remove this one
+        else:
+            prev_end = end      # no overlap, keep it
+    return removals
+
+# erase_overlap_intervals([[1,2],[2,3],[3,4],[1,3]]) -> 1
+```
+
+## Interval problem recognition guide
+
+| Problem description | Technique |
+|---|---|
+| "Merge overlapping intervals" | Sort by start, merge adjacent |
+| "Insert interval into sorted list" | Linear scan with three phases |
+| "Minimum rooms / resources needed" | Sort + heap, or sweep line |
+| "Maximum non-overlapping intervals" | Greedy: sort by end time |
+| "Find free time / gaps" | Merge, then look at spaces between merged intervals |
+</Body>
+
+<TryItYourself>
+1. **LC 56 - Merge Intervals**: Implement and trace through `[[1,4],[0,4]]` to verify your merge logic handles contained intervals.
+2. **LC 253 - Meeting Rooms II**: Implement both the heap and sweep-line approaches. Which do you find more intuitive?
+3. **LC 435 - Non-Overlapping Intervals**: Why must we sort by end time and not start time for the greedy to work?
+4. **LC 986 - Interval List Intersections**: Given two sorted interval lists, find all intersections. This is a two-pointer variant.
+</TryItYourself>
+
+<Code>
+```python
+import heapq
+
+# --- Merge Intervals ---
+def merge(intervals):
+    intervals.sort(key=lambda x: x[0])
+    merged = [intervals[0]]
+    for s, e in intervals[1:]:
+        if s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    return merged
+
+print("Merge:", merge([[1,3],[2,6],[8,10],[15,18]]))  # [[1,6],[8,10],[15,18]]
+
+# --- Meeting Rooms II (heap) ---
+def min_rooms(intervals):
+    intervals.sort()
+    heap = []
+    for s, e in intervals:
+        if heap and heap[0] <= s:
+            heapq.heappop(heap)
+        heapq.heappush(heap, e)
+    return len(heap)
+
+print("Min rooms:", min_rooms([[0,30],[5,10],[15,20]]))  # 2
+
+# --- Meeting Rooms II (sweep line) ---
+def min_rooms_sweep(intervals):
+    events = []
+    for s, e in intervals:
+        events.append((s, 1))
+        events.append((e, -1))
+    events.sort()
+    best = curr = 0
+    for _, d in events:
+        curr += d
+        best = max(best, curr)
+    return best
+
+print("Min rooms (sweep):", min_rooms_sweep([[0,30],[5,10],[15,20]]))  # 2
+
+# --- Non-Overlapping Intervals ---
+def erase_overlap(intervals):
+    intervals.sort(key=lambda x: x[1])
+    removals, prev_end = 0, float('-inf')
+    for s, e in intervals:
+        if s < prev_end:
+            removals += 1
+        else:
+            prev_end = e
+    return removals
+
+print("Remove to avoid overlap:", erase_overlap([[1,2],[2,3],[3,4],[1,3]]))  # 1
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can merge overlapping intervals after sorting by start time
+- [ ] I can insert an interval into a sorted list with proper merging
+- [ ] I implemented Meeting Rooms II with both heap and sweep-line approaches
+- [ ] I understand why Non-Overlapping Intervals uses sort-by-end greedy
+- [ ] I can recognize interval problems in disguise (scheduling, booking, resource allocation)
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Forgetting to sort**: The merge algorithm only works after sorting by start time. Without sorting, intervals out of order will be missed.
+- **Comparing start with start instead of start with previous end**: Overlap means `current.start <= previous.end`, not `current.start <= previous.start`.
+- **Sorting by start for Non-Overlapping Intervals**: The greedy approach requires sorting by end time. Sorting by start time leads to incorrect results because you might keep a long interval that blocks many short ones.
+- **Off-by-one with touching intervals**: `[1,2]` and `[2,3]` touch but don't overlap. Make sure your overlap check uses `<` vs. `<=` correctly based on the problem definition.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: When solving "minimum meeting rooms needed," what does the size of the min-heap represent at any point during the scan?**
+
+- A) Total number of meetings
+- B) Number of meetings currently in progress (rooms in use) ✅
+- C) Number of meetings that have ended
+- D) Maximum overlap so far
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd sort meetings by start time. Then I use a min-heap tracking end times of active meetings. For each new meeting, if its start time is after the earliest ending meeting, I pop that room and reuse it. Otherwise I need a new room. The heap size at the end is the answer. Alternatively, I use a sweep-line approach: create +1 events for starts and -1 events for ends, sort them, and scan to find the peak concurrency. Both are O(n log n)."
+</InterviewExplanation>

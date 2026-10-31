@@ -1,0 +1,111 @@
+---
+slug: mlflow-model-stage-promotion
+title: "MLflow Model-Stage Promotion: Staging → Production"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why serving should pull by *stage*, not by run ID
+- Promote a registered model version through stages (None → Staging → Production)
+- Decouple "what's deployed" from "what I just trained"
+- Roll back instantly by re-pointing the Production stage
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Hardcoding a model run ID in your serving code means every model change is a code deploy — slow and risky. The MLflow Model Registry's *stages* let you promote a version to Production and have serving pick it up with zero code change, and roll back just as fast. This promotion discipline is the backbone of safe model deployment.
+</WhyThisMatters>
+
+<Body>
+## Serve by stage, not by run
+
+Your inference server should load `models:/my-model/Production`, not a specific run ID. The **stage** is a moving pointer: promoting a new version to Production changes what serving loads on its next start — no code edit, no redeploy of the app.
+
+## The promotion path
+
+A registered model has versions (v1, v2, ...). Each version sits in a stage:
+
+- **None** — just registered, untested.
+- **Staging** — under evaluation; your eval harness runs against it here.
+- **Production** — what real traffic hits.
+- **Archived** — retired.
+
+Promotion is a transition: train → register (None) → evaluate in Staging → promote winner to Production.
+
+## Gate promotion on evaluation
+
+Never auto-promote. Run your eval harness against the Staging version and promote to Production only if it beats the incumbent within your tolerance. This is where MLOps meets the eval-harness lesson.
+
+## Rollback is a re-point
+
+Because Production is just a pointer, rolling back is instant: transition the bad version out and the previous good version back into Production. No rebuild, no scramble — restart serving (or hot-reload) and you're back.
+</Body>
+
+<Code>
+```python
+from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+def promote_if_better(model_name: str, candidate_version: str, harness, tolerance: float = 0.0):
+    """Promote a Staging version to Production only if it beats the incumbent."""
+    cand = client.get_model_version(model_name, candidate_version)
+    cand_score = harness.score(load(f"models:/{model_name}/{candidate_version}"))
+
+    prod = [v for v in client.search_model_versions(f"name='{model_name}'")
+            if v.current_stage == "Production"]
+    incumbent = harness.score(load(f"models:/{model_name}/Production")) if prod else -1.0
+
+    if cand_score >= incumbent - tolerance:
+        client.transition_model_version_stage(
+            name=model_name, version=candidate_version,
+            stage="Production", archive_existing_versions=True,  # auto-archive old prod
+        )
+        return f"Promoted v{candidate_version} (score {cand_score:.3f} ≥ {incumbent:.3f})"
+    return f"Kept incumbent (cand {cand_score:.3f} < {incumbent:.3f})"
+
+def rollback(model_name: str, good_version: str):
+    """Instant rollback: re-point Production to a known-good version."""
+    client.transition_model_version_stage(model_name, good_version, "Production",
+                                           archive_existing_versions=True)
+```
+</Code>
+
+<TryItYourself>
+1. Register two versions of a model (from the MLflow tracking lesson)
+2. Transition v1 to Production, v2 to Staging
+3. Run your eval harness against the Staging version
+4. Use `promote_if_better` and watch the old Production version auto-archive
+5. Call `rollback` to re-point Production to v1 and confirm serving picks it up
+</TryItYourself>
+
+<CommonMistakes>
+- **Serving a hardcoded run ID** — every model change becomes a code deploy
+- **Auto-promoting without an eval gate** — you can ship a regression
+- **Not archiving the old Production version** — ambiguous which version is live
+- **Forgetting serving caches the model** — restart or hot-reload after promotion
+- **No rollback plan** — re-pointing Production should be a one-liner you've tested
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Served a model by stage (`models:/name/Production`), not run ID
+- [ ] Transitioned versions through Staging → Production
+- [ ] Gated promotion on an eval-harness comparison
+- [ ] Auto-archived the previous Production version
+- [ ] Performed and verified an instant rollback
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why should your inference server load `models:/my-model/Production` instead of a specific run ID?**
+
+- A) Run IDs are slower to load
+- B) The Production stage is a movable pointer, so promotion/rollback needs no code change ✅
+- C) Run IDs aren't supported by MLflow
+- D) It encrypts the model
+</MiniQuiz>
+
+<InterviewExplanation>
+"I serve models by stage, not by run ID — the server loads models:/my-model/Production, which is a movable pointer. A registered model has versions, and each version sits in a stage: None, Staging, Production, Archived. My flow is train, register, evaluate in Staging with the eval harness, and promote to Production only if the candidate beats the incumbent within tolerance — I never auto-promote, because that can ship a regression. Promoting auto-archives the old Production version so there's no ambiguity about what's live. And rollback is instant: because Production is just a pointer, I re-point it to the last known-good version and restart serving — no rebuild."
+</InterviewExplanation>

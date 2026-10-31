@@ -1,0 +1,216 @@
+---
+slug: evaluating-an-ai-app
+title: "Evaluating an AI App: Why Looks Good Isn't Enough"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 20
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why "it looks right" is not a valid evaluation strategy
+- Define and compute retrieval metrics: precision@k, recall@k, MRR
+- Define and compute generation metrics: faithfulness and answer relevancy
+- Build a simple evaluation harness with labeled test cases
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Without evaluation metrics, you're flying blind. You can't tell if a new embedding model actually improves retrieval. You can't tell if a prompt change introduces regressions. You can't tell a hiring manager "my system achieves 87% faithfulness" — you can only say "it seemed pretty good when I tried it." Evaluation is the difference between a demo and a product.
+</WhyThisMatters>
+
+<Body>
+## The "vibes-based evaluation" trap
+
+Every AI engineer falls into this trap early: you ask your RAG system five questions, the answers look reasonable, and you declare it working. Then your manager asks a different question and gets a hallucinated answer. The problem is that you tested anecdotally, not systematically.
+
+Production AI systems need two types of evaluation: **retrieval evaluation** (did you find the right documents?) and **generation evaluation** (did the LLM produce a correct, grounded answer?).
+
+## Retrieval metrics
+
+These measure whether your vector search returns the right documents.
+
+### Precision@k
+
+Of the k documents you retrieved, how many were actually relevant?
+
+```
+precision@5 = (relevant docs in top 5) / 5
+```
+
+If you retrieve 5 documents and 3 are relevant, precision@5 = 0.6.
+
+### Recall@k
+
+Of all the relevant documents in your corpus, how many did you retrieve in the top k?
+
+```
+recall@5 = (relevant docs in top 5) / (total relevant docs)
+```
+
+If there are 4 relevant documents total and you retrieved 3 of them, recall@5 = 0.75.
+
+### Mean Reciprocal Rank (MRR)
+
+Where does the *first* relevant document appear in the ranked list?
+
+```
+MRR = 1 / rank_of_first_relevant_result
+```
+
+If the first relevant document is at position 1, MRR = 1.0. If it's at position 3, MRR = 0.33. Averaged across all queries, this tells you how often you're putting the best result at the top.
+
+## Generation metrics
+
+These measure whether the LLM's answer is correct and grounded.
+
+### Faithfulness
+
+Does the answer only contain information that is supported by the retrieved context? An answer is unfaithful if it adds facts not present in the context (hallucination).
+
+To measure faithfulness, you can:
+1. Break the answer into individual claims
+2. Check whether each claim is supported by the retrieved passages
+3. Faithfulness = (supported claims) / (total claims)
+
+### Answer relevancy
+
+Does the answer actually address the user's question? An answer can be faithful (everything it says is in the context) but irrelevant (it talks about the wrong topic).
+
+### Practical measurement
+
+You can measure these automatically using an LLM-as-judge pattern:
+
+```python
+def evaluate_faithfulness(answer: str, context: str) -> float:
+    """Use an LLM to check if every claim in the answer is supported by context."""
+    prompt = f"""Given this context and answer, list every factual claim in the answer.
+For each claim, say whether it is SUPPORTED or NOT SUPPORTED by the context.
+
+Context: {context}
+Answer: {answer}
+
+Output a JSON list of {{"claim": "...", "supported": true/false}}"""
+    
+    result = call_llm(prompt)
+    claims = json.loads(result)
+    supported = sum(1 for c in claims if c["supported"])
+    return supported / len(claims) if claims else 0.0
+```
+
+## Building an evaluation harness
+
+A minimal evaluation harness has three components:
+
+### 1. A test dataset
+
+Create a JSON file with at least 20 question-answer-context triples:
+
+```json
+[
+  {
+    "question": "What is the refund policy for annual plans?",
+    "expected_answer": "Annual plans can be refunded within 30 days.",
+    "relevant_doc_ids": ["doc_047", "doc_048"]
+  }
+]
+```
+
+### 2. A runner that computes metrics
+
+```python
+def evaluate(test_cases, retriever, generator):
+    results = []
+    for case in test_cases:
+        retrieved = retriever.search(case["question"], k=5)
+        retrieved_ids = [r.doc_id for r in retrieved]
+        answer = generator.generate(case["question"], retrieved)
+        
+        p_at_5 = precision_at_k(retrieved_ids, case["relevant_doc_ids"], k=5)
+        r_at_5 = recall_at_k(retrieved_ids, case["relevant_doc_ids"], k=5)
+        faith = evaluate_faithfulness(answer, retrieved)
+        
+        results.append({"p@5": p_at_5, "r@5": r_at_5, "faithfulness": faith})
+    return aggregate(results)
+```
+
+### 3. A baseline to compare against
+
+Always run your evaluation twice: once with the current system (baseline) and once with the change you're testing. Report the delta. A 2% improvement in precision@5 might not justify switching to a more expensive embedding model.
+
+## How many test cases do you need?
+
+- **Minimum viable**: 20 hand-labeled cases to catch obvious regressions
+- **Solid**: 50-100 cases covering different query types and edge cases
+- **Production-grade**: 200+ cases, refreshed quarterly, with inter-annotator agreement checks
+
+The investment in building a good test set pays for itself every time you make a change. Without it, every change is a gamble.
+</Body>
+
+<Code>
+```python
+from dataclasses import dataclass
+
+@dataclass
+class EvalCase:
+    question: str
+    relevant_doc_ids: list[str]
+
+def precision_at_k(retrieved_ids: list[str], relevant_ids: list[str], k: int) -> float:
+    top_k = retrieved_ids[:k]
+    relevant_in_top_k = len(set(top_k) & set(relevant_ids))
+    return relevant_in_top_k / k
+
+def recall_at_k(retrieved_ids: list[str], relevant_ids: list[str], k: int) -> float:
+    top_k = retrieved_ids[:k]
+    relevant_in_top_k = len(set(top_k) & set(relevant_ids))
+    return relevant_in_top_k / len(relevant_ids) if relevant_ids else 0.0
+
+def mrr(retrieved_ids: list[str], relevant_ids: list[str]) -> float:
+    for rank, doc_id in enumerate(retrieved_ids, start=1):
+        if doc_id in relevant_ids:
+            return 1.0 / rank
+    return 0.0
+
+# Example usage
+retrieved = ["doc_3", "doc_1", "doc_7", "doc_2", "doc_9"]
+relevant = ["doc_1", "doc_2"]
+
+print(f"P@5: {precision_at_k(retrieved, relevant, 5)}")   # 0.4
+print(f"R@5: {recall_at_k(retrieved, relevant, 5)}")       # 1.0
+print(f"MRR: {mrr(retrieved, relevant)}")                   # 0.5
+```
+</Code>
+
+<TryItYourself>
+1. Create a small test dataset with 5 question/relevant-doc-id pairs
+2. Implement `precision_at_k`, `recall_at_k`, and `mrr` using the code above
+3. Simulate retrieval results (you can use random IDs) and compute all three metrics
+4. Change the retrieval results to be worse and confirm the metrics decrease
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Can define precision@k, recall@k, and MRR without looking them up
+- [ ] Implemented the three retrieval metrics in Python
+- [ ] Understand the difference between faithfulness and answer relevancy
+- [ ] Know why you need a labeled test set, not just manual spot-checking
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Evaluating with too few test cases** — 5 queries tells you almost nothing; aim for 20+ minimum
+- **Only measuring generation quality, ignoring retrieval** — if retrieval is broken, no amount of prompt engineering fixes the answers
+- **Using the same LLM to generate and judge** — the model will be biased toward its own outputs; use a stronger model as judge or use human labels
+- **Not establishing a baseline before making changes** — without a before/after comparison, you can't know if your change helped
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: Your RAG system has precision@5 of 0.8 and faithfulness of 0.5. Where should you focus improvement efforts?**
+
+- A) Retrieval — precision is too low
+- B) Generation — faithfulness is the bottleneck ✅
+- C) Both equally
+- D) Neither — these numbers are fine
+</MiniQuiz>
+
+<InterviewExplanation>
+"I evaluate RAG systems on two axes: retrieval quality and generation quality. For retrieval, I measure precision@k, recall@k, and MRR against a labeled test set of at least 20 queries. For generation, I measure faithfulness — whether every claim in the answer is supported by retrieved context — and answer relevancy. I use an LLM-as-judge to automate faithfulness scoring. The critical practice is always measuring before and after any change so you can quantify the impact rather than relying on vibes."
+</InterviewExplanation>

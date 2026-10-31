@@ -1,0 +1,108 @@
+---
+slug: ai-concepts-glossary
+title: "The AI Concepts Glossary: 20 Terms Every CS Student Needs"
+summary: "One tight definition for each of the 20 AI terms that come up in every interview, project discussion, and job description."
+category: ai-engineering
+tags: ["glossary", "fundamentals", "definitions"]
+audience: ["beginners", "cs-students"]
+depth: medium
+priority: P0
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1776171204021.jpeg
+  - references/linkedin/1776598322526.jpeg
+  - references/linkedin/1778211884965.jpeg
+  - references/linkedin/1775946901220.jpeg
+  - references/linkedin/1777866503356.jpeg
+relatedLessons:
+  - ai-engineering/what-is-rag
+  - ai-engineering/what-is-an-agent
+  - ai-engineering/embeddings-explained
+  - ai-engineering/tokenization-and-context-windows
+relatedRoadmaps:
+  - ai-engineer-technical-path
+  - ai-era-beginner-readiness
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Twenty terms cover most of what you need to follow any AI conversation — from interviews to project standups to job descriptions. Each gets one tight definition, ordered so the ideas build on each other: model fundamentals first, then how models are adapted, then agents and the production concerns around them.
+</InsightSummary>
+
+<Body>
+Read these top to bottom once; the order is the lesson. Earlier terms set up later ones — you need *token* before *context window*, and *agent* before *agentic AI*.
+
+### Model fundamentals
+
+**1. Token** — The basic unit of text a model reads and writes. A token is a word or a piece of a word (plus punctuation), each mapped to an integer ID. Token count, not word count, determines cost, speed, and how much fits in context.
+
+**2. Embedding** — A numerical vector that represents the meaning of a piece of text (or an image). Similar meanings land close together in vector space, which is what lets a model compare and retrieve by meaning rather than exact wording.
+
+**3. Transformer** — The neural-network architecture behind modern LLMs. Its key innovation, self-attention, lets the model weigh how much each token relates to every other token, capturing context and nuance across a sequence.
+
+**4. Context window** — The maximum number of tokens a model can consider at once — its working memory for a single interaction. Everything outside the window is invisible to the model unless retrieved back in.
+
+**5. Prompt engineering** — The craft of writing inputs (instructions, context, examples, constraints) that steer a model toward the output you want. The cheapest, fastest lever for improving results — no retraining required.
+
+### Adapting and grounding models
+
+**6. RAG (Retrieval-Augmented Generation)** — Fetching relevant information from your own data and adding it to the prompt before the model answers, so responses are grounded in current, private facts instead of only training data.
+
+**7. Vector database** — A store that holds embeddings and finds the most similar ones to a query vector quickly. It is the retrieval engine behind RAG and semantic search.
+
+**8. Fine-tuning** — Further training a pretrained model on a smaller, task-specific dataset so it specializes — learning a tone, format, or domain it didn't have out of the box.
+
+**9. RLHF (Reinforcement Learning from Human Feedback)** — A training technique that aligns model behavior with human preferences by using human rankings of outputs to shape what the model considers a good response.
+
+**10. LoRA / QLoRA** — Lightweight fine-tuning methods that train small adapter layers while keeping the base model's weights frozen, drastically cutting the compute and memory cost. QLoRA adds quantization to make it cheaper still.
+
+### Agents and tool use
+
+**11. Agent** — An LLM wrapped in a loop so it can pursue a goal across multiple steps: it perceives input, plans, calls tools, observes results, and iterates until done — rather than answering in a single shot.
+
+**12. Tool use** — A model's ability to call external functions — APIs, code runners, databases, search — to act on the real world instead of only generating text. It's what turns "saying" into "doing."
+
+**13. MCP (Model Context Protocol)** — An open standard for connecting AI applications to external tools and data sources through a single, unified interface. Think "USB-C for AI": any compatible app can plug into any compatible tool without custom integrations.
+
+**14. Memory (agent memory)** — How an agent retains and recalls information. Short-term memory lives in the context window (the current task); long-term memory lives in an external store and is retrieved on demand across sessions.
+
+### Production concerns
+
+**15. Guardrails** — Rules and constraints that keep a model's inputs and outputs safe and in-scope — blocking harmful, unauthorized, or out-of-bounds actions before they cause harm.
+
+**16. Evaluation (evals)** — Systematically measuring model and pipeline quality against a curated test set, so you can tell whether a change helped or hurt. You can't improve what you don't measure.
+
+**17. Hallucination** — When a model confidently generates information that is incorrect or entirely made up. Detecting and controlling it is one of the central reliability challenges in production.
+
+**18. Chain-of-thought (CoT)** — Prompting a model to reason step by step before answering, which improves accuracy on complex, multi-step problems by making intermediate reasoning explicit.
+
+**19. Quantization** — Compressing a model by storing its weights at lower numerical precision (e.g., 16-bit down to 4-bit). It shrinks memory and speeds inference at a small, usually acceptable, accuracy cost.
+
+**20. Agentic AI** — A descriptor for *behavior*, not a product: a system that operates with high autonomy — setting its own sub-goals, adapting to changes, self-correcting, and acting across many steps with minimal hand-holding. The opposite end of the spectrum from a single prompt-and-response.
+</Body>
+
+<MiniQuiz>
+**Q: A teammate says "we'll just increase the context window so the model remembers the whole conversation." Which term best describes the cheaper alternative of recalling earlier facts from an external store on demand?**
+
+- A) Quantization
+- B) Long-term agent memory ✅
+- C) Fine-tuning
+- D) Chain-of-thought
+</MiniQuiz>
+
+<KeyTakeaways>
+- The fundamentals stack: tokens become embeddings, the transformer processes them, and the context window bounds how much it can see at once.
+- You adapt models in layers of increasing cost — prompt engineering, then RAG, then fine-tuning (LoRA/QLoRA, RLHF).
+- An agent is an LLM plus a loop, tools, and memory; MCP is the standard way to connect it to those tools.
+- "Agentic AI" describes how autonomously a system behaves, not a specific product you buy.
+- Production hinges on guardrails, evaluation, and hallucination control — the difference between a demo and a system.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Turn definitions into understanding with [What is RAG](/ai-engineering/what-is-rag) and [What is an agent](/ai-engineering/what-is-an-agent).
+- Go deeper on the building blocks: [Embeddings explained](/ai-engineering/embeddings-explained) and [Tokenization and context windows](/ai-engineering/tokenization-and-context-windows).
+- Use the [AI-era beginner readiness](/roadmap/ai-era-beginner-readiness) roadmap to sequence your learning, then the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

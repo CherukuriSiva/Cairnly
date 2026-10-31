@@ -1,0 +1,199 @@
+---
+slug: deploying-to-vercel
+title: "Deploying to Vercel: Env Vars, Database, Preview Branches"
+track: full-stack
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Deploy a Next.js app to Vercel from a GitHub repository
+- Configure environment variables for production, preview, and development
+- Set up a production database and run Prisma migrations on deploy
+- Use preview deployments for pull request reviews
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A project that only runs on localhost is invisible. Deploying to Vercel is how you turn your code into a URL you can put on your resume, share with recruiters, and show in interviews. Understanding deployment — not just clicking a button, but managing environments, databases, and secrets — separates hobbyists from employable developers.
+</WhyThisMatters>
+
+<Body>
+## Why Vercel for Next.js
+
+Vercel is built by the same team that builds Next.js. It gives you:
+- **Zero-config deployments** — push to GitHub, Vercel builds and deploys automatically
+- **Preview deployments** — every pull request gets its own URL
+- **Edge Functions and Serverless** — Server Components and API Routes run on Vercel's infrastructure
+- **Built-in analytics** — Web Vitals monitoring out of the box
+
+## Step 1: Connect your GitHub repository
+
+1. Go to [vercel.com](https://vercel.com) and sign in with GitHub
+2. Click "New Project" and import your repository
+3. Vercel detects it's a Next.js project and sets the build command automatically
+4. Click "Deploy"
+
+That's the happy path. The real work is configuring everything else.
+
+## Step 2: Environment variables
+
+Your app needs secrets (database URL, Stripe keys, OAuth credentials) that must NOT be in your code. Vercel has three environments:
+
+| Environment | When it runs | Example URL |
+|-------------|-------------|-------------|
+| **Production** | Merges to `main` | `yourapp.vercel.app` |
+| **Preview** | Pull requests | `yourapp-git-feature-x.vercel.app` |
+| **Development** | Local `next dev` | `localhost:3000` |
+
+In Vercel Dashboard → Settings → Environment Variables, add:
+
+```
+DATABASE_URL          → Production, Preview
+STRIPE_SECRET_KEY     → Production only
+STRIPE_WEBHOOK_SECRET → Production only
+NEXTAUTH_SECRET       → Production, Preview
+NEXTAUTH_URL          → Production only (set to your domain)
+GITHUB_CLIENT_ID      → Production, Preview
+GITHUB_CLIENT_SECRET  → Production, Preview
+```
+
+**Security rule:** Never expose secret keys to preview deployments unless absolutely necessary. Preview URLs are public — anyone with the URL can access them.
+
+## Step 3: Set up the production database
+
+You need a PostgreSQL database accessible from Vercel's servers. Options:
+
+1. **Vercel Postgres** — built-in, zero-config, but limited free tier
+2. **Neon** — serverless PostgreSQL, generous free tier, recommended for learning
+3. **Supabase** — PostgreSQL with extras (auth, storage), good free tier
+4. **Railway** — simple, but no free tier
+
+For any provider, you'll get a connection string like:
+
+```
+postgresql://user:password@host:5432/dbname?sslmode=require
+```
+
+Set this as `DATABASE_URL` in Vercel's environment variables.
+
+## Step 4: Run migrations on deploy
+
+Add a build command that runs Prisma migrations before building:
+
+```json
+// package.json
+{
+  "scripts": {
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "postinstall": "prisma generate"
+  }
+}
+```
+
+`prisma migrate deploy` applies pending migrations to the production database. It only runs migrations that haven't been applied yet — safe for repeated deployments.
+
+**Important:** Use `migrate deploy` in production, not `migrate dev`. The `dev` command is interactive and creates new migrations — `deploy` only applies existing ones.
+
+## Step 5: Preview deployments
+
+Every time you push a branch or open a pull request, Vercel creates a preview deployment:
+
+```
+https://yourapp-git-feature-seo-improvements-yourname.vercel.app
+```
+
+This is incredibly useful for code review — the reviewer can click the link and see the changes running live. Preview deployments use the "Preview" environment variables.
+
+**Preview database strategy:** Either use the same database as production (risky — preview code could corrupt data) or set up a separate preview database. For learning projects, sharing the production database is fine. For real products, use a separate one.
+
+## Step 6: Custom domain
+
+In Vercel Dashboard → Settings → Domains:
+1. Add your domain (e.g., `layoffs-tracker.com`)
+2. Update your DNS records to point to Vercel (they provide the records)
+3. Vercel automatically provisions an SSL certificate
+
+Update `NEXTAUTH_URL` to your custom domain after adding it.
+</Body>
+
+<Code>
+```json
+// package.json — Build scripts for Vercel deployment
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "start": "next start",
+    "postinstall": "prisma generate",
+    "lint": "next lint"
+  }
+}
+```
+
+```tsx
+// middleware.ts — Redirect HTTP to HTTPS in production (Vercel handles this,
+// but this pattern is useful for other hosts)
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export function middleware(request: NextRequest) {
+  // Example: protect all /dashboard routes
+  const session = request.cookies.get("next-auth.session-token");
+  if (request.nextUrl.pathname.startsWith("/dashboard") && !session) {
+    return NextResponse.redirect(new URL("/api/auth/signin", request.url));
+  }
+}
+
+export const config = {
+  matcher: ["/dashboard/:path*"],
+};
+```
+
+```bash
+# Vercel CLI — deploy from terminal (alternative to GitHub integration)
+npm i -g vercel
+vercel login
+vercel          # Deploy to preview
+vercel --prod   # Deploy to production
+```
+</Code>
+
+<TryItYourself>
+1. Push your project to a GitHub repository
+2. Import the repo on [vercel.com](https://vercel.com)
+3. Set up a free PostgreSQL database on [neon.tech](https://neon.tech)
+4. Add all environment variables in Vercel Dashboard
+5. Deploy and verify the site loads at the Vercel URL
+6. Create a branch, push a change, and verify Vercel creates a preview deployment
+7. Add a custom domain if you have one
+</TryItYourself>
+
+<CommonMistakes>
+- **Committing `.env` to git** — add `.env` to `.gitignore`; set secrets only in Vercel Dashboard
+- **Using `prisma migrate dev` in the build command** — it's interactive and creates new migrations; use `prisma migrate deploy` in production
+- **Forgetting `prisma generate` in the build** — without it, the Prisma client isn't generated on Vercel's build server
+- **Setting `NEXTAUTH_URL` to localhost in production** — OAuth callbacks will redirect to localhost instead of your deployed URL
+- **Not setting `sslmode=require` in the database URL** — Vercel's servers connect over the internet; SSL is mandatory
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] App deployed to Vercel and accessible via URL
+- [ ] All environment variables configured in Vercel Dashboard
+- [ ] Production database connected and migrations applied
+- [ ] Preview deployments working for pull requests
+- [ ] Site URL added to your GitHub repo description and resume
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Your Next.js app works locally but crashes on Vercel with "PrismaClientInitializationError." What's the most likely cause?**
+
+- A) Vercel doesn't support Prisma
+- B) The `DATABASE_URL` environment variable is missing or wrong in Vercel's settings ✅
+- C) You need to upgrade to Vercel Pro
+- D) Prisma only works with SQLite
+</MiniQuiz>
+
+<InterviewExplanation>
+"I deploy Next.js apps to Vercel by connecting the GitHub repo. Environment variables are set per environment — production, preview, and development — so secrets stay out of code. For the database, I use a managed PostgreSQL provider and run `prisma migrate deploy` in the build step to apply pending migrations. Every pull request gets a preview deployment with its own URL, which makes code review much more effective. The key operational detail is separating `migrate dev` (for local development) from `migrate deploy` (for production) — the latter only applies existing migrations and never creates new ones."
+</InterviewExplanation>

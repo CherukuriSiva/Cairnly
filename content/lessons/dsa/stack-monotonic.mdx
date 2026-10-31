@@ -1,0 +1,191 @@
+---
+slug: stack-monotonic
+title: "Stack and Monotonic Stack Patterns"
+track: dsa
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Use stacks for matching problems (parentheses, tags, expressions)
+- Understand the monotonic stack and why it provides O(n) "next greater element" queries
+- Solve valid parentheses, daily temperatures, next greater element, and largest rectangle in histogram
+- Recognize the "process when you pop" pattern
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Stacks appear in two distinct categories of interview questions. The first is intuitive: matching brackets, evaluating expressions. The second, monotonic stacks, is a pattern many candidates miss entirely. Once you see that a monotonic stack answers "next greater/smaller element" in O(n), a whole family of hard problems becomes approachable.
+</WhyThisMatters>
+
+<Body>
+## Stack basics: Valid Parentheses (LC 20)
+
+```python
+def is_valid(s):
+    stack = []
+    pairs = {')': '(', ']': '[', '}': '{'}
+    for char in s:
+        if char in pairs:
+            if not stack or stack[-1] != pairs[char]:
+                return False
+            stack.pop()
+        else:
+            stack.append(char)
+    return len(stack) == 0
+
+# is_valid("({[]})") -> True
+# is_valid("([)]")   -> False
+```
+
+## The monotonic stack pattern
+
+A monotonic stack maintains elements in sorted order (increasing or decreasing). When a new element violates the order, pop elements until the invariant is restored. The popped elements just found their "answer."
+
+### Next Greater Element
+
+For each element, find the next element to its right that is larger.
+
+```python
+def next_greater_element(nums):
+    n = len(nums)
+    result = [-1] * n
+    stack = []  # stores indices; values at these indices are in decreasing order
+    for i in range(n):
+        while stack and nums[i] > nums[stack[-1]]:
+            idx = stack.pop()
+            result[idx] = nums[i]  # nums[i] is the next greater element for nums[idx]
+        stack.append(i)
+    return result
+
+# next_greater_element([2, 1, 2, 4, 3]) -> [4, 2, 4, -1, -1]
+```
+
+**Time:** O(n) &mdash; each element is pushed and popped at most once.
+
+## Walkthrough: Daily Temperatures (LC 739)
+
+Given daily temperatures, for each day find how many days you wait for a warmer temperature.
+
+```python
+def daily_temperatures(temperatures):
+    n = len(temperatures)
+    result = [0] * n
+    stack = []  # indices of days waiting for a warmer day
+    for i in range(n):
+        while stack and temperatures[i] > temperatures[stack[-1]]:
+            prev = stack.pop()
+            result[prev] = i - prev
+        stack.append(i)
+    return result
+
+# daily_temperatures([73, 74, 75, 71, 69, 72, 76, 73])
+# -> [1, 1, 4, 2, 1, 1, 0, 0]
+```
+
+Same pattern as Next Greater Element, but the result stores the distance instead of the value.
+
+## Walkthrough: Largest Rectangle in Histogram (LC 84)
+
+This is the classic hard monotonic stack problem. For each bar, find how far left and right it can extend.
+
+```python
+def largest_rectangle_area(heights):
+    stack = []  # stores indices; heights at these indices are in increasing order
+    max_area = 0
+    heights.append(0)  # sentinel to flush remaining bars
+    for i, h in enumerate(heights):
+        while stack and heights[stack[-1]] > h:
+            height = heights[stack.pop()]
+            width = i if not stack else i - stack[-1] - 1
+            max_area = max(max_area, height * width)
+        stack.append(i)
+    heights.pop()  # clean up sentinel
+    return max_area
+
+# largest_rectangle_area([2, 1, 5, 6, 2, 3]) -> 10  (5*2 from bars 5,6)
+```
+
+**Key insight:** When we pop a bar, the current index `i` is the right boundary (first shorter bar to the right), and the new top of the stack is the left boundary (first shorter bar to the left). Width = right - left - 1.
+
+**Time:** O(n). **Space:** O(n).
+
+## Monotonic stack decision guide
+
+| Need | Stack type | When to pop |
+|---|---|---|
+| Next greater element | Decreasing stack | New element is greater than top |
+| Next smaller element | Increasing stack | New element is smaller than top |
+| Previous greater element | Decreasing stack (iterate left to right, answer is stack top) | Same |
+| Largest rectangle | Increasing stack | New bar is shorter than top |
+</Body>
+
+<TryItYourself>
+1. **LC 20 - Valid Parentheses**: A warm-up. Make sure you handle edge cases like empty string and unmatched openers.
+2. **LC 739 - Daily Temperatures**: Implement from scratch using the monotonic stack pattern.
+3. **LC 496 - Next Greater Element I**: The simpler version. Use a hash map to store next-greater results.
+4. **LC 84 - Largest Rectangle in Histogram**: Draw out the stack state step-by-step for `[2, 1, 5, 6, 2, 3]`.
+</TryItYourself>
+
+<Code>
+```python
+# --- Daily Temperatures ---
+def daily_temperatures(temps):
+    n = len(temps)
+    result = [0] * n
+    stack = []
+    for i in range(n):
+        while stack and temps[i] > temps[stack[-1]]:
+            prev = stack.pop()
+            result[prev] = i - prev
+        stack.append(i)
+    return result
+
+print("Daily temps:", daily_temperatures([73, 74, 75, 71, 69, 72, 76, 73]))
+# [1, 1, 4, 2, 1, 1, 0, 0]
+
+# --- Largest Rectangle in Histogram ---
+def largest_rectangle(heights):
+    stack = []
+    max_area = 0
+    heights.append(0)
+    for i, h in enumerate(heights):
+        while stack and heights[stack[-1]] > h:
+            height = heights[stack.pop()]
+            width = i if not stack else i - stack[-1] - 1
+            max_area = max(max_area, height * width)
+        stack.append(i)
+    heights.pop()
+    return max_area
+
+print("Largest rectangle:", largest_rectangle([2, 1, 5, 6, 2, 3]))  # 10
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can solve matching-bracket problems with a stack
+- [ ] I understand why a monotonic stack gives O(n) performance
+- [ ] I implemented Daily Temperatures from scratch
+- [ ] I can trace through the Largest Rectangle in Histogram algorithm step by step
+- [ ] I know when to use a decreasing vs. increasing monotonic stack
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Storing values instead of indices**: Almost always store indices on the stack. You can look up the value from the index, but not vice versa. You need the index for distance calculations.
+- **Forgetting the sentinel value in histogram**: Without appending a 0-height bar at the end, bars remaining on the stack never get processed. The sentinel forces them all to pop.
+- **Mixing up increasing vs. decreasing**: A "monotonic decreasing stack" means elements decrease from bottom to top. When a larger element arrives, nothing is popped. When a smaller element arrives, larger elements pop. Think about what triggers a pop.
+- **Not recognizing monotonic stack problems**: If you see "next greater," "next smaller," or "for each element, find the nearest X," think monotonic stack.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: In the Daily Temperatures problem, why is the time complexity O(n) even though there's a while loop inside the for loop?**
+
+- A) The while loop runs at most log(n) times
+- B) Each element is pushed and popped at most once, so total operations across all iterations is O(n) ✅
+- C) The while loop only runs for the last element
+- D) Python optimizes nested loops automatically
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd use a monotonic decreasing stack of indices. I iterate through the temperatures, and for each day, I pop all stack entries with a lower temperature than today's. Each popped entry just found its answer: the current day. The distance is the index difference. Since each element is pushed and popped at most once across the entire iteration, the total time is O(n) despite the nested while loop."
+</InterviewExplanation>

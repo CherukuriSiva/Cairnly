@@ -3,6 +3,7 @@
 Two tables. `documents` holds one row per source file with a content hash, so re-ingesting
 skips unchanged files. `chunks` holds the searchable sections with both search indexes:
 a generated `tsv` column for full-text search and an `embedding` column for vector search.
+Each chunk also stores the `anchor` (heading id) of its section on the rendered page.
 """
 
 import psycopg
@@ -34,8 +35,11 @@ CREATE TABLE IF NOT EXISTS chunks (
     text        text NOT NULL,
     tsv         tsvector GENERATED ALWAYS AS (
                     to_tsvector('english', trail || ' ' || text)) STORED,
-    embedding   vector({dim}) NOT NULL
+    embedding   vector({dim}) NOT NULL,
+    anchor      text NOT NULL DEFAULT ''    -- heading id on the page, e.g. "why-this-matters"
 );
+-- Databases created before the anchor column existed get it here (safe to re-run).
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS anchor text NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING gin (tsv);
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
@@ -45,6 +49,10 @@ CREATE INDEX IF NOT EXISTS chunks_document_idx ON chunks (document_id);
 
 def connect(url: str | None = None) -> psycopg.Connection:
     conn = psycopg.connect(url or get_settings().database_url, autocommit=False)
+    # With a WHERE filter (one knowledge base), a plain HNSW scan can return fewer rows than
+    # LIMIT; iterative scan keeps walking the index until enough rows match.
+    conn.execute("SET hnsw.iterative_scan = relaxed_order")
+    conn.commit()
     try:
         register_vector(conn)
     except psycopg.ProgrammingError:

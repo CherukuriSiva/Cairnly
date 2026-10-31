@@ -1,0 +1,64 @@
+---
+slug: vector-databases-beyond-faiss
+title: "Vector Databases Beyond FAISS: Metadata Filtering at Scale"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Know when an in-memory FAISS index stops being enough
+- Explain metadata filtering and why it's the feature that matters most
+- Compare managed vector DBs (Pinecone, Milvus, pgvector) at a high level
+- Combine a similarity search with a metadata filter (hybrid query)
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+FAISS is perfect for a laptop demo and a single corpus. The moment you have multiple tenants, per-document access rules, or "only search docs from this team after this date," a raw FAISS index falls over. Knowing when and why to graduate to a real vector database is a common system-design interview question.
+</WhyThisMatters>
+
+<Body>
+## What FAISS gives you — and what it doesn't
+
+FAISS is a blazing-fast similarity search library. It does one thing: given a query vector, find the nearest stored vectors. It does **not** give you persistence, multi-tenancy, access control, or filtering by attributes out of the box.
+
+## Metadata filtering is the real feature
+
+In production you rarely want "the nearest vectors" — you want "the nearest vectors **that this user is allowed to see**, from **this project**, written **after this date**." That's a metadata filter applied alongside the similarity search:
+
+```python
+results = index.query(
+    vector=embed(query),
+    top_k=5,
+    filter={
+        "tenant_id": user.tenant_id,
+        "allowed_roles": {"$in": user.roles},
+        "created_at": {"$gte": "2026-01-01"},
+    },
+)
+```
+
+This single capability is why teams move off raw FAISS.
+
+## Picking a vector store
+
+- **pgvector** — you already run Postgres; you want vectors next to your relational data with one fewer system to operate.
+- **Pinecone** — fully managed, you don't want to run infrastructure, metadata filtering built in.
+- **Milvus / Qdrant / Weaviate** — open-source, self-hosted, high scale and tunable indexes.
+
+The right answer is "the one your team can operate." Don't adopt a distributed vector DB to serve 10K documents.
+</Body>
+
+<MiniQuiz>
+**Q: Your app serves three customer companies from one index, and Company A must never see Company B's documents. What's the minimum capability you need?**
+
+- A) A bigger embedding model
+- B) Per-vector metadata + filtered queries (tenant isolation) ✅
+- C) A faster GPU
+- D) More `top_k` results
+</MiniQuiz>
+
+<InterviewExplanation>
+"FAISS is great for a single corpus on one machine, but it's just nearest-neighbor search — no persistence, no multi-tenancy, no filtering. In production I usually need metadata filtering: 'nearest vectors that this user is allowed to see, from this project, after this date.' That's when I reach for a vector database — pgvector if I'm already on Postgres, Pinecone if I want fully managed, Milvus or Qdrant if I'm self-hosting at scale. I pick based on what the team can actually operate, not on benchmarks."
+</InterviewExplanation>

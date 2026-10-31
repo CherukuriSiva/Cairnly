@@ -1,0 +1,56 @@
+# Defaults run the whole stack inside the cluster (good for kind). For production, point
+# database.host at a managed Postgres (RDS) and set postgres.enabled=false.
+
+image:
+  api: cairnly-api:local
+  web: cairnly-web:local
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 1
+  llmProvider: ollama            # "anthropic" in production (key in secrets.anthropicApiKey)
+  anthropicModel: claude-opus-5-5
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 1Gi }
+
+web:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+
+ollama:
+  enabled: true                  # in-cluster embeddings (CPU is enough for nomic-embed-text)
+  image: ollama/ollama:0.11.2
+  models: [nomic-embed-text]     # pulled at start; add qwen3:8b for local chat (5 GB, slow on CPU)
+  externalUrl: ""                # used instead when enabled=false
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { memory: 3Gi }
+
+database:
+  host: ""                       # empty = the in-cluster postgres below
+  port: 5432
+  name: cairnly
+  user: cairnly
+  sslmode: disable               # "require" for RDS
+  existingSecret: ""             # secret with key "password"; otherwise secrets.dbPassword
+
+postgres:
+  enabled: true
+  image: pgvector/pgvector:pg17
+  storage: 5Gi
+
+secrets:
+  dbPassword: cairnly-local      # local default only; use existingSecret in real clusters
+  anthropicApiKey: ""
+
+ingest:
+  enabled: true                  # migrate + ingest the lessons after every install/upgrade
+  kb: lessons
+
+ingress:
+  enabled: false
+  className: ""
+  host: cairnly.local

@@ -1,0 +1,207 @@
+# The single source of lesson order for the site and the chat.
+# Tracks appear in this order; each module lists lesson slugs in reading order.
+# Every file under content/lessons/<track>/ must be listed exactly once here.
+tracks:
+  - id: ml-foundations
+    title: ML Foundations
+    tagline: The classical machine learning you need before working with LLMs.
+    modules:
+      - title: Classical ML
+        lessons:
+          - ml-workflow-train-test-split
+          - linear-and-logistic-regression
+          - decision-trees-and-random-forests
+          - svm-and-kernels
+          - gradient-boosting-xgboost
+          - clustering-kmeans-dbscan
+      - title: Practice
+        lessons:
+          - feature-engineering
+          - model-evaluation-and-metrics
+          - sklearn-ml-pipeline
+
+  - id: ai-engineering
+    title: AI Engineering
+    tagline: Build apps on top of LLMs, from prompts and RAG to agents and evals.
+    modules:
+      - title: LLM basics
+        lessons:
+          - ai-app-mental-model
+          - tokenization-and-context-windows
+          - prompt-engineering-patterns
+          - understanding-hallucinations
+      - title: Retrieval & RAG
+        lessons:
+          - what-is-rag
+          - embeddings-explained
+          - faiss-basics
+          - vector-databases-beyond-faiss
+          - embedding-model-selection
+          - chunking-strategies
+          - hybrid-search-bm25-vector
+          - reranking-with-cross-encoders
+          - build-a-rag-pipeline
+          - confidence-gates
+      - title: Evaluation
+        lessons:
+          - evaluating-an-ai-app
+          - building-an-eval-harness
+          - hallucination-detection-llm-judge
+      - title: Agents
+        lessons:
+          - what-is-an-agent
+          - the-react-loop
+          - designing-a-tool-registry
+          - mcp-tool-use
+          - agent-memory
+          - reflection-and-self-correction
+          - error-handling-in-agents
+          - building-retrieval-tools-for-agents
+      - title: Safety & security
+        lessons:
+          - safety-guardrails
+          - prompt-injection-defense
+          - pii-redaction-and-sanitization
+          - rbac-for-rag
+          - audit-logging-for-compliance
+      - title: Data & fine-tuning
+        lessons:
+          - building-a-rag-dataset-pipeline
+          - ingesting-public-corpora
+          - relevance-filtering-corpus
+          - deduplicating-datasets
+          - quality-filtering-datasets
+          - schema-validation-for-ai-data
+          - train-val-test-splitting
+          - synthesizing-training-data
+          - formatting-data-for-sft
+          - lora-fine-tuning
+          - publishing-models-to-hub
+      - title: Production
+        lessons:
+          - cost-and-latency
+          - observability
+          - capstone-ship-rag
+      - title: Interview prep
+        lessons:
+          - explain-rag-in-interview
+          - interviewer-questions-ai
+          - defend-eval-metrics
+          - resume-bullets-ai
+          - explain-an-agent-architecture
+          - interviewer-questions-on-agents
+          - system-design-enterprise-rag
+          - resume-bullets-agentic-projects
+
+  - id: ai-systems
+    title: AI Systems & MLOps
+    tagline: Serve, scale and operate models and AI services in production.
+    modules:
+      - title: MLOps foundations
+        lessons:
+          - what-is-mlops
+          - drift-detection-basics
+          - experiment-tracking-with-mlflow
+          - mlflow-model-stage-promotion
+      - title: Serving & APIs
+        lessons:
+          - serving-models-with-fastapi
+          - fastapi-architecture-for-ai
+          - designing-ai-api-contracts
+          - streaming-responses-sse
+          - session-memory-stores
+      - title: Performance & scale
+        lessons:
+          - semantic-caching
+          - model-quantization
+          - async-and-parallel-pipelines
+          - horizontal-scaling-ai-services
+          - load-testing-ai-services
+      - title: Reliability & operations
+        lessons:
+          - model-fallback-and-circuit-breakers
+          - structured-logging-middleware
+          - cost-tracking-and-telemetry
+          - document-ingestion-pipelines
+          - async-job-tracking
+      - title: Interview prep
+        lessons:
+          - explain-mlops-and-drift
+          - system-design-scalable-inference
+
+  - id: dsa
+    title: DSA & Problem Solving
+    tagline: Core data structures and algorithm patterns for coding interviews.
+    modules:
+      - title: Foundations
+        lessons:
+          - arrays-and-frequency-maps
+          - two-pointers
+          - sliding-window
+          - binary-search
+          - recursion-backtracking
+          - hashing-and-sets
+      - title: Projects
+        lessons:
+          - trees-dfs-bfs
+          - graphs-basics
+          - dp-without-fear
+          - stack-monotonic
+          - heap-priority-queue
+          - design-lru-cache
+          - tries-autocomplete
+          - intervals
+          - design-rate-limiter
+      - title: Interview prep
+        lessons:
+          - pattern-recognition
+          - talking-through-code
+          - dsa-on-resume
+
+  - id: full-stack
+    title: Full-Stack Development
+    tagline: Ship a real web app with Next.js, a database, auth and deployment.
+    modules:
+      - title: Foundations
+        lessons:
+          - nextjs-app-router
+          - prisma-schema-basics
+          - server-actions-vs-api-routes
+          - guided-tour-layoffs
+      - title: Projects
+        lessons:
+          - designing-content-schema
+          - seo-dynamic-pages
+          - reusable-components
+          - auth-nextauth
+          - stripe-payment-gating
+          - deploying-to-vercel
+          - capstone-content-site
+      - title: Interview prep
+        lessons:
+          - explain-nextjs-interview
+          - interviewer-questions-fullstack
+          - resume-bullets-fullstack
+
+  - id: career
+    title: Career & Portfolio Kit
+    tagline: Resumes, portfolios and interview habits for your first engineering job.
+    modules:
+      - title: Foundations
+        lessons:
+          - ai-era-resume
+          - github-profile-checklist
+          - linkedin-for-engineers
+          - tell-me-about-yourself
+      - title: Projects
+        lessons:
+          - resume-bullets-ai-projects
+          - resume-bullets-fullstack-projects
+          - three-project-portfolio
+          - capstone-candidate-package
+          - cold-email-templates
+      - title: Interview prep
+        lessons:
+          - behavioral-interviews
+          - salary-negotiation
+          - job-search-routine

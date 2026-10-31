@@ -1,0 +1,60 @@
+---
+slug: fullstack-dev-to-ai-engineer
+title: "Full-Stack Dev to AI Engineer: The 6-Month Transition"
+summary: "You already know how to build software. Here is how to add the AI engineering skills that translate your experience into a new role — without restarting from scratch."
+audience: fullstack-to-ai
+timeHorizon: 6-months
+tracks: ["ai-engineering", "full-stack", "ai-systems"]
+tags: ["transition", "ai-engineering", "full-stack", "career-change"]
+priority: P0
+relatedInsights:
+  - from-llm-to-agent
+  - rag-architectures-landscape
+  - the-2026-ai-app-stack
+  - fastapi-for-ai-backends
+relatedLessons:
+  - ai-engineering/what-is-rag
+  - ai-engineering/what-is-an-agent
+  - full-stack/server-actions-vs-api-routes
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<Body>
+Full-stack developers have a massive advantage in AI engineering: you can already build real products, understand databases, and know how to deploy code. The gap is narrow. You need: LLM APIs + RAG + evaluation + one shipped AI feature.
+</Body>
+
+<RoadmapPhase title="Month 1: LLM API Fluency" duration="4 weeks">
+- Pick an LLM provider (Anthropic or OpenAI) and commit to it for now.
+- Build a basic chatbot and a summarizer — small, working, end-to-end.
+- Understand tokens, context windows, streaming responses, and cost per call.
+- Integrate the model into a project you already own, so you're learning on familiar ground.
+</RoadmapPhase>
+
+<RoadmapPhase title="Month 2–3: RAG End-to-End" duration="8 weeks">
+- Add RAG to your existing project, or build a document-question-answering system from scratch.
+- Embedding: turn your documents into vectors.
+- Vector store: start with Qdrant or pgvector — you already know Postgres, so lean into it.
+- Retrieval: top-k, metadata filtering, and handling "no good match."
+- Evaluation: a small golden set to measure whether answers are actually grounded.
+</RoadmapPhase>
+
+<RoadmapPhase title="Month 4: Agents + FastAPI" duration="4 weeks">
+- Build a simple agent with tool use: file search and a web call are enough to learn the loop.
+- Replace your Express/Next.js API with a FastAPI Python backend for the AI layer.
+- Understand streaming for LLM responses so the UX feels live, not frozen.
+</RoadmapPhase>
+
+<RoadmapPhase title="Month 5–6: Ship + Showcase" duration="8 weeks">
+- Ship a full project combining your web skills with AI features.
+- Write it up: the problem, the architecture, and the trade-offs you made.
+- Update your resume with AI projects framed in outcomes, not buzzwords.
+- Apply to AI engineering roles — your shipping track record is the differentiator.
+</RoadmapPhase>
+
+<SkillPriorityMatrix
+  now={["LLM API usage (Anthropic/OpenAI)", "RAG with a real document corpus", "Evaluation basics", "FastAPI for Python services"]}
+  soon={["Agents with tool use", "MLOps and deployment", "Observability and cost tracking"]}
+  later={["Fine-tuning", "Multi-agent systems", "Custom embedding models"]}
+  ignore={["Relearning web fundamentals you already know", "Deep ML theory (that's Type 2 engineering)", "Framework-hopping", "Rebuilding your entire stack from scratch"]}
+/>

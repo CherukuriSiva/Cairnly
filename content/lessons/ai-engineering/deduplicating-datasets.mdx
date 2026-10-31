@@ -1,0 +1,103 @@
+---
+slug: deduplicating-datasets
+title: "Deduplicating Datasets with MinHash"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why near-duplicates hurt both training and evaluation
+- Use shingling + MinHash to estimate Jaccard similarity cheaply
+- Run MinHash LSH to find near-duplicates without O(n²) comparisons
+- Apply a first-seen keep policy so your best sources survive dedup
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Duplicate and near-duplicate records quietly wreck AI datasets: they inflate eval scores (the model "memorized" a test item it also saw in training), and they bias training toward whatever topic happens to be over-represented. MinHash deduplication is the standard, scalable way to clean a corpus — and explaining it is a frequent data-engineering interview question.
+</WhyThisMatters>
+
+<Body>
+## Why exact-match dedup isn't enough
+
+`set(records)` only catches byte-identical duplicates. But "What is a refund?" and "what's the refund policy?" are *near*-duplicates — different strings, same meaning. You need a similarity measure, not equality.
+
+## Shingling → MinHash → Jaccard
+
+1. **Shingle** each text into overlapping character k-grams (e.g. 3-grams). Two similar texts share most shingles.
+2. **MinHash** turns each shingle set into a small fixed-size signature. Comparing signatures *approximates* the Jaccard similarity of the original sets — but far cheaper.
+3. **Threshold** — if estimated Jaccard ≥ `threshold` (say 0.8), treat as a duplicate.
+
+## LSH avoids the O(n²) trap
+
+Comparing every pair is quadratic and dies on large corpora. **MinHash LSH** buckets similar signatures so you only compare likely matches. You query the LSH for each record; if something similar already exists, drop it.
+
+## First-seen wins — so order matters
+
+The kept record is the *first* one seen. Order your input so high-quality sources (curated data) come **before** noisier ones (scraped data). Then dedup keeps the good copy and drops the noisy near-duplicate.
+</Body>
+
+<Code>
+```python
+import re, string
+
+_PUNCT = re.compile("[" + re.escape(string.punctuation) + "]")
+_WS = re.compile(r"\s+")
+
+def shingles(text: str, k: int = 3) -> set[str]:
+    norm = _WS.sub(" ", _PUNCT.sub("", text.lower())).strip()
+    return {norm[i:i + k] for i in range(len(norm) - k + 1)} if len(norm) >= k else {norm}
+
+def dedupe_records(records: list[dict], threshold: float = 0.8, num_perm: int = 128):
+    from datasketch import MinHash, MinHashLSH
+    lsh = MinHashLSH(threshold=threshold, num_perm=num_perm)
+    kept, n_dupes = [], 0
+    for i, rec in enumerate(records):
+        m = MinHash(num_perm=num_perm)
+        for sh in shingles(rec.get("instruction", "")):
+            m.update(sh.encode("utf-8"))
+        if lsh.query(m):          # something similar already kept
+            n_dupes += 1
+            continue
+        lsh.insert(f"rec-{i}", m)  # first-seen wins
+        kept.append(rec)
+    return kept, n_dupes
+```
+</Code>
+
+<TryItYourself>
+1. Build a list with 5 obvious near-duplicate questions and 5 distinct ones
+2. Run `dedupe_records` and confirm it removes ~5 and keeps ~5
+3. Lower the threshold to 0.5 and watch over-aggressive merging
+4. Reorder the input so a curated record comes first, and verify it's the survivor
+5. Time it on 10K records vs a naive O(n²) loop to feel the LSH win
+</TryItYourself>
+
+<CommonMistakes>
+- **Skipping normalization** — case, punctuation, and whitespace differences defeat shingling
+- **Threshold too low** — you merge genuinely different items and lose data
+- **Ignoring order** — random order means dedup might keep your noisy copy and drop the clean one
+- **Using exact-match dedup only** — misses the near-duplicates that actually cause leakage
+- **Deduping after the train/test split** — dedup the *whole* corpus first, or test items leak into train
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented shingling with normalization
+- [ ] Ran MinHash LSH dedup and reported duplicates removed
+- [ ] Verified first-seen keep policy with deliberate ordering
+- [ ] Can explain why near-duplicates cause eval leakage
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why use MinHash LSH instead of comparing every pair of records directly?**
+
+- A) LSH is more accurate than exact Jaccard
+- B) Pairwise comparison is O(n²) and doesn't scale; LSH only compares likely matches ✅
+- C) LSH removes the need for normalization
+- D) MinHash works only on images
+</MiniQuiz>
+
+<InterviewExplanation>
+"Exact dedup only catches identical strings, but near-duplicates — same question, different wording — cause real harm: eval leakage and topic bias. I shingle each text into character k-grams, compute a MinHash signature that approximates Jaccard similarity cheaply, and use MinHash LSH so I'm not doing an O(n²) comparison. I keep the first-seen record, and I order the input so curated sources come before noisy ones — that way dedup keeps the good copy. And I always dedup the full corpus before splitting train and test, or test items leak into training."
+</InterviewExplanation>

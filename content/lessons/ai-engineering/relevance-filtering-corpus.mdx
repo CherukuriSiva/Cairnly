@@ -1,0 +1,105 @@
+---
+slug: relevance-filtering-corpus
+title: "Relevance Filtering: Keeping Your Corpus On-Topic"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why off-topic documents poison retrieval
+- Build a fast keyword relevance filter as a first pass
+- Upgrade to embedding-based relevance when keywords aren't enough
+- Monitor the pass rate so a broken filter doesn't pass silently
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A domain assistant is only as focused as its corpus. Let off-topic documents in and retrieval will confidently surface irrelevant passages, dragging your answers off course. A relevance filter at ingestion keeps the index clean — and a monitored pass rate turns "the filter quietly broke and let everything through" into an alert.
+</WhyThisMatters>
+
+<Body>
+## Off-topic in, off-topic out
+
+If your customer-support assistant ingests generic web text, retrieval will sometimes pull those generic passages for a domain question, and the LLM will dutifully ground its answer in them. Garbage in the index becomes garbage in the answer. Filtering relevance at ingestion is cheaper and safer than trying to fix it at query time.
+
+## Stage 1: a keyword filter
+
+Start simple. A curated keyword set plus a check over the document's title, a context snippet, and the question catches the obvious off-topic material for free:
+
+```python
+SUPPORT_KEYWORDS = frozenset({"order", "refund", "invoice", "billing",
+                              "shipping", "account", "password", "subscription", ...})
+
+def is_on_topic(record: dict) -> bool:
+    text = f"{record.get('source_article','')} {record.get('input','')[:200]} {record.get('instruction','')}".lower()
+    return any(kw in text for kw in SUPPORT_KEYWORDS)
+```
+
+## Stage 2: embedding-based relevance
+
+Keywords miss paraphrases and synonyms. The upgrade: embed each candidate and keep it only if its similarity to a set of *topic anchor* embeddings clears a threshold. Same idea, semantic instead of lexical.
+
+## Monitor the pass rate
+
+The dangerous failure is a filter that silently passes everything (a bug, an empty keyword set). Track the pass rate and **alert when it leaves the expected band** — e.g. warn if it drops below 90% on pre-curated sources, since that signals either bad data or a broken filter.
+</Body>
+
+<Code>
+```python
+import logging
+logger = logging.getLogger(__name__)
+
+def filter_on_topic(records: list[dict]) -> tuple[list[dict], list[dict]]:
+    on_topic, rejected = [], []
+    for r in records:
+        (on_topic if is_on_topic(r) else rejected).append(r)
+
+    total = len(records)
+    pass_rate = len(on_topic) / total if total else 1.0
+    if pass_rate < 0.90:                       # broken filter / bad source
+        logger.warning("On-topic pass rate %.1f%% (%d/%d) — below 90%% threshold",
+                       pass_rate * 100, len(on_topic), total)
+    else:
+        logger.info("On-topic: %d/%d passed (%.1f%%), %d rejected",
+                    len(on_topic), total, pass_rate * 100, len(rejected))
+    return on_topic, rejected
+```
+</Code>
+
+<TryItYourself>
+1. Build a keyword set for your domain and implement `is_on_topic`
+2. Run `filter_on_topic` over a mix of on- and off-topic records
+3. Empty the keyword set and confirm the pass-rate warning fires
+4. Replace the keyword check with an embedding-similarity threshold
+5. Plot pass rate over several ingestion runs to spot drift in source quality
+</TryItYourself>
+
+<CommonMistakes>
+- **No relevance filter** — off-topic docs surface in retrieval and mislead the LLM
+- **Keyword set too narrow** — rejects valid on-topic docs (low pass rate for the wrong reason)
+- **No pass-rate monitoring** — a broken filter passes everything silently
+- **Filtering at query time only** — cheaper and cleaner to filter at ingestion
+- **Keyword-only forever** — upgrade to embeddings to catch paraphrases
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented a keyword relevance filter
+- [ ] Partitioned records into on-topic and rejected
+- [ ] Added pass-rate monitoring with a threshold alert
+- [ ] Prototyped an embedding-based relevance check
+- [ ] Can explain why filtering happens at ingestion
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why monitor the *pass rate* of a relevance filter, not just run it?**
+
+- A) To make ingestion slower
+- B) A silently broken filter (e.g. empty keyword set) would pass everything; the pass rate catches it ✅
+- C) The model requires it
+- D) To count tokens
+</MiniQuiz>
+
+<InterviewExplanation>
+"A domain assistant is only as focused as its corpus, so I filter relevance at ingestion — off-topic docs otherwise surface in retrieval and the LLM grounds its answer in them. I start with a cheap keyword filter over the title, a context snippet, and the question, then upgrade to embedding-based relevance against topic anchors to catch paraphrases. The part people forget is monitoring the pass rate: a filter with an empty keyword set or a bug will silently pass everything, so I alert when the pass rate leaves its expected band — like dropping below 90% on pre-curated sources, which means either bad data or a broken filter."
+</InterviewExplanation>

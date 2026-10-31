@@ -1,0 +1,60 @@
+---
+slug: understanding-hallucinations
+title: "Why LLMs Hallucinate and How to Catch It"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Explain why LLMs hallucinate in one sentence
+- Distinguish intrinsic (made-up) from extrinsic (unsupported) hallucinations
+- Name the three main defenses: grounding, refusal, and verification
+- Sketch a citation check that flags ungrounded claims
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A hallucinated answer that *sounds* confident is more dangerous than an obvious error, because users believe it. In medical, legal, and financial apps, one fabricated citation can be a lawsuit. Every AI engineering interview probes whether you understand *why* hallucinations happen and what you actually do about them.
+</WhyThisMatters>
+
+<Body>
+## Why it happens
+
+An LLM is trained to produce the **most plausible next token**, not the most *true* one. When it lacks the fact, it doesn't stop — it generates something that looks like the answer. Fluency is the model's job; truth is your job to enforce.
+
+## Two flavors
+
+- **Intrinsic** — the model contradicts itself or invents an entity (a fake citation, a wrong date).
+- **Extrinsic** — the claim might be true in general, but it isn't supported by the context you provided. In a RAG app, extrinsic hallucinations are the ones you must catch.
+
+## Three defenses
+
+1. **Grounding** — give the model the facts (RAG) so it doesn't have to invent them.
+2. **Refusal** — let the system say "I don't know" when retrieval comes back weak (a confidence gate).
+3. **Verification** — after generation, check that every claim traces back to a source.
+
+A simple verification heuristic: if the response makes factual claims but cites none of the provided sources, flag it.
+
+```python
+def validate_citations(response: str, sources: list[str]) -> tuple[bool, str]:
+    if not response.strip():
+        return False, "Response is empty."
+    if sources and "Source" not in response and not any(s in response for s in sources):
+        return False, "Response does not cite the provided sources."
+    return True, "Valid"
+```
+</Body>
+
+<MiniQuiz>
+**Q: Your RAG bot answers a question with a fact that's true in the world but absent from the retrieved passages. What is this?**
+
+- A) An intrinsic hallucination
+- B) An extrinsic hallucination — true but ungrounded ✅
+- C) Not a hallucination, since it's true
+- D) A retrieval failure only
+</MiniQuiz>
+
+<InterviewExplanation>
+"LLMs hallucinate because they're trained to produce the most plausible next token, not the most true one — when they lack a fact, they generate something that looks right anyway. I split them into intrinsic, where the model invents or contradicts, and extrinsic, where a claim isn't supported by the provided context. My three defenses are grounding the model with retrieval, letting it refuse when retrieval is weak, and verifying after generation that claims trace back to cited sources."
+</InterviewExplanation>

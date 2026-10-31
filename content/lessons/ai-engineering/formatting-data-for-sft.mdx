@@ -1,0 +1,108 @@
+---
+slug: formatting-data-for-sft
+title: "Formatting Data for Supervised Fine-Tuning"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Turn a structured record into the model's exact chat-template string
+- Keep training and inference templates byte-identical
+- Load and format a single split into the `{"text": ...}` shape trainers expect
+- Avoid the silent template bugs that wreck a fine-tune
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Fine-tuning quality collapses on formatting mistakes that produce no error message. If your training text doesn't match the model's chat template — or differs from how you'll prompt at inference — the model learns the wrong distribution and you won't know until eval. Getting the formatting layer right is the difference between a fine-tune that helps and one that quietly hurts.
+</WhyThisMatters>
+
+<Body>
+## One function, used everywhere
+
+Define a single `format_record` that renders a record into the model's full chat-template string — system, user (instruction + context), assistant (the target output) — with the model's exact special tokens. Both training and inference call it, so they can't drift apart.
+
+```python
+def format_record(record: dict) -> str:
+    return (
+        f"{_BOS}"
+        f"{_SYS_OPEN}{SYSTEM_PROMPT}{_EOT}"
+        f"{_USR_OPEN}{record['instruction']}\n\nContext:\n{record['input']}{_EOT}"
+        f"{_AST_OPEN}{record['output']}{_EOT}"
+    )
+```
+
+## Training vs inference: the parity rule
+
+At **training** you include the assistant turn (the target). At **inference** you stop right before it so the model generates. Everything *up to* the assistant turn must be byte-identical between the two — same tokens, same newlines. Build the inference prompt from the *same* helper, just omitting the final output. A stray space here silently degrades the model.
+
+## The shape trainers expect
+
+SFT libraries (e.g. TRL) consume a dataset with a single text field. So the formatting step maps each record to `{"text": format_record(r)}`. Load just the split you want, format it, hand it to the trainer.
+
+## Format only what you train on
+
+Load the `train` split for training and `validation` for eval — formatting the wrong split (or all of them) wastes work and risks training on data you meant to hold out.
+</Body>
+
+<Code>
+```python
+from support_qa.prompting import format_record
+from support_qa.data_io import load_records
+
+def load_split(split: str, path: str) -> list[dict]:
+    return [r for r in load_records(path) if r.get("split") == split]
+
+def format_records_for_training(records: list[dict]) -> list[dict]:
+    """Map each record to the {'text': <chat-template string>} shape TRL expects."""
+    return [{"text": format_record(r)} for r in records]
+
+# inference prompt uses the SAME template, minus the assistant output:
+def build_inference_prompt(query: str, context: str) -> str:
+    return (
+        f"{_BOS}{_SYS_OPEN}{SYSTEM_PROMPT}{_EOT}"
+        f"{_USR_OPEN}{query}\n\nContext:\n{context}{_EOT}"
+        f"{_AST_OPEN}"        # stop here — model generates the answer
+    )
+
+train = format_records_for_training(load_split("train", TRAINING_FILE))
+```
+</Code>
+
+<TryItYourself>
+1. Implement `format_record` for your model's chat template
+2. Format one record and print it; eyeball the special tokens and newlines
+3. Build the inference prompt and diff it against the training string up to the assistant turn — they must match
+4. Map a split to `{"text": ...}` and confirm the shape your trainer wants
+5. Introduce a one-space difference between train/inference templates and reason about the impact
+</TryItYourself>
+
+<CommonMistakes>
+- **Different templates for train vs inference** — pushes the model off-distribution silently
+- **Hand-building the inference prompt separately** — reuse the same helper, omit the output
+- **Wrong `{"text": ...}` shape** — the trainer can't find the field
+- **Formatting all splits** — you risk training on held-out data
+- **Forgetting special tokens / EOT** — the model never learns where turns end
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Wrote a single `format_record` for the model's chat template
+- [ ] Built the inference prompt from the same helper, minus the target
+- [ ] Verified byte-identical training/inference prefixes
+- [ ] Produced the `{"text": ...}` dataset shape for the trainer
+- [ ] Formatted only the intended split
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why build the inference prompt from the *same* `format_record` helper used in training?**
+
+- A) To save lines of code
+- B) So the training and inference templates stay byte-identical and the model isn't pushed off-distribution ✅
+- C) Because trainers require it
+- D) To make inference slower but safer
+</MiniQuiz>
+
+<InterviewExplanation>
+"SFT quality dies on silent formatting bugs. I define one format_record that renders a record into the model's exact chat template — system, user with instruction and context, assistant with the target — using the model's special tokens. Training includes the assistant turn; inference stops right before it so the model generates, and I build the inference prompt from the same helper so the prefixes are byte-identical. Drift a single newline and the model is off-distribution with no error. For the trainer I map each record to a {\"text\": ...} field and format only the split I'm training on, so I never accidentally train on held-out data."
+</InterviewExplanation>

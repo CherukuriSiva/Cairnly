@@ -1,0 +1,94 @@
+---
+slug: interviewer-questions-on-agents
+title: "Common Interviewer Questions on Agents & Tool Use"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Field the most common agent interview questions with crisp answers
+- Explain tool-calling, memory, and loop termination under pressure
+- Handle the trap questions ("when would an agent be the wrong choice?")
+- Connect each answer to a concrete decision you made
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Agent questions separate candidates who read a blog post from those who built one. Interviewers ask the same handful of questions; having tight, decision-backed answers ready lets you spend your energy on the conversation rather than scrambling for words.
+</WhyThisMatters>
+
+<Body>
+## The question bank
+
+**"Walk me through the agent loop."**
+ReAct: Thought → Action → PAUSE → Observation, repeating until Answer. The controller executes tools, not the model.
+
+**"How does the agent call a tool?"**
+It emits a structured `Action: <tool>: <input>`. My controller parses it, looks the tool up in a registry, executes it inside a try/except, and feeds the result back as an Observation.
+
+**"How do you stop it looping forever?"**
+A hard max-iterations cap that raises a clear error. I also track cost per run as a second backstop.
+
+**"How does it remember earlier steps?"**
+Short-term memory is the message history of thoughts, actions, and observations. I keep it in budget with a rolling window that pins the original task, or summarize older turns.
+
+**"How do you reduce hallucination in an agent?"**
+A reflection pass that validates the final answer against the observations the agent actually collected — grounded in gathered facts, not world knowledge.
+
+**"When is an agent the WRONG choice?"** *(the trap)*
+When a single prompt or a fixed pipeline would do. Agents add latency, cost, and failure modes; I only use one when the task needs tools or genuinely dependent multi-step reasoning.
+
+**"How do you make tool use safe?"**
+The registry is the barrier: the model can only call vetted, named tools; I apply least privilege and never expose a dangerous tool "just in case."
+</Body>
+
+<Code>
+```text
+ANSWER TEMPLATE — claim → mechanism → decision:
+
+Q: "How do you stop the agent looping forever?"
+A: "I cap iterations [claim]. The loop raises MaxIterationsReached past the
+   limit, and I track per-run cost as a backstop [mechanism]. In my project
+   I set the cap to 8 after seeing most tasks finish in 3-4 steps [decision]."
+
+Use this shape for every answer: a one-line claim, the mechanism that backs
+it, and a concrete number or choice from something you actually built.
+```
+</Code>
+
+<TryItYourself>
+1. Write a two-sentence answer for each of the seven questions above
+2. End every answer with a concrete number or decision from a real project
+3. Have a friend ask them out of order; answer without notes
+4. Rehearse the "when is an agent wrong?" trap until you don't over-justify agents
+5. Record one mock round and cut any answer over 30 seconds
+</TryItYourself>
+
+<CommonMistakes>
+- **Over-selling agents** — failing the "when is it wrong?" trap signals inexperience
+- **Vague loop descriptions** — name Thought/Action/Observation explicitly
+- **No concrete numbers** — "I capped iterations" is weaker than "I capped at 8 after profiling"
+- **Confusing short-term and long-term memory** — keep them distinct
+- **Forgetting safety** — tool registry as barrier + least privilege should come up unprompted
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Have a two-sentence answer ready for all seven questions
+- [ ] Each answer ends with a real decision or number
+- [ ] Can pass the "when is an agent wrong?" trap
+- [ ] Delivered a mock round with answers under 30 seconds each
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: An interviewer asks "when is an agent the wrong choice?" What's the strongest answer?**
+
+- A) "Agents are always the right choice for AI tasks"
+- B) "When a single prompt or fixed pipeline suffices — agents add latency, cost, and failure modes" ✅
+- C) "When you don't have a GPU"
+- D) "When the model is too small"
+</MiniQuiz>
+
+<InterviewExplanation>
+"I keep an answer template: claim, mechanism, decision. For the loop I name Thought/Action/Observation and stress that the controller executes tools, not the model. For termination I cite a hard max-iterations cap plus cost tracking, with the actual number I used. For hallucination I describe reflection grounded in gathered observations. And I make sure to nail the trap — an agent is the wrong choice when a single prompt or fixed pipeline would do, because agents add latency, cost, and new failure modes. Ending each answer with a real decision is what makes it land."
+</InterviewExplanation>

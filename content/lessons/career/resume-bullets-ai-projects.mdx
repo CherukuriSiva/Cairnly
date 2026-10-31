@@ -1,0 +1,166 @@
+---
+slug: resume-bullets-ai-projects
+title: "Writing Resume Bullets for AI Projects"
+track: career
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Write resume bullets for AI/ML projects that show engineering judgment, not just model usage
+- Use the Action-Architecture-Outcome formula for every bullet
+- Transform vague "used X model" statements into compelling technical narratives
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Every CS student in 2026 has an AI project on their resume. The difference between getting an interview and getting filtered is whether your bullets sound like "I followed a tutorial" or "I made engineering decisions." Hiring managers at AI-adjacent teams (and increasingly all teams) want to see that you understand tradeoffs — not just that you called an API.
+</WhyThisMatters>
+
+<Body>
+## The Action-Architecture-Outcome formula
+
+Every AI project bullet should follow this structure:
+
+**[Action verb] + [what you built/designed] + [specific architecture/technical choice] + [measurable outcome or tradeoff]**
+
+### Example transformation
+
+**Before (weak):**
+> Used OpenAI API to build a chatbot for answering questions about documents.
+
+**After (strong):**
+> Built a RAG pipeline using FAISS vector search and OpenAI embeddings, with a confidence-gated retrieval system that reduced hallucinated responses by 40% on a 500-document test corpus.
+
+The "after" version shows you made decisions (FAISS, confidence gating) and measured results (40%, 500-document corpus).
+
+## Category 1: RAG and retrieval projects
+
+### Template:
+> Built a [domain]-specific retrieval system using [embedding model] and [vector store], achieving [retrieval metric] on [dataset size] documents with [latency] p95 response time.
+
+### Real bullet examples:
+
+> Built a campus FAQ retrieval system using sentence-transformers embeddings and ChromaDB, achieving 87% top-3 retrieval accuracy across 1,200 policy documents with 340ms average query latency.
+
+> Designed a multi-stage RAG pipeline with query rewriting and re-ranking that improved answer relevance by 25% over naive top-k retrieval, benchmarked on 200 manually labeled question-answer pairs.
+
+> Implemented hybrid search combining BM25 keyword matching with dense vector retrieval, reducing zero-result queries from 18% to 4% on a 3,000-document academic paper corpus.
+
+## Category 2: Classification and NLP projects
+
+### Template:
+> Trained/fine-tuned [model] for [task] on [dataset], achieving [metric] while [specific technical decision — data augmentation, class balancing, inference optimization].
+
+### Real bullet examples:
+
+> Fine-tuned a DistilBERT classifier for toxic comment detection, handling 6:1 class imbalance with focal loss and stratified sampling to achieve 0.82 F1 on the held-out test set.
+
+> Built a resume screening classifier using TF-IDF + logistic regression as a baseline, then compared against a fine-tuned BERT model — the simpler model achieved 91% of BERT's F1 at 50x lower inference cost, informing the production architecture choice.
+
+> Trained a sentiment analysis model on 15K Hinglish (Hindi-English) product reviews, using custom tokenization to handle code-switching, achieving 78% accuracy vs. 62% for the English-only baseline.
+
+## Category 3: LLM application projects
+
+### Template:
+> Designed [LLM-powered feature] with [prompt engineering technique / guardrail / evaluation method], reducing [failure mode] by [amount] across [test size].
+
+### Real bullet examples:
+
+> Built an AI code reviewer using Claude API with structured output parsing and few-shot prompting, reducing false-positive lint suggestions from 35% to 12% across a 400-PR test set.
+
+> Designed a multi-turn tutoring chatbot with conversation memory and topic-boundary detection, preventing off-topic drift in 94% of 50-turn test conversations using a lightweight classifier gate.
+
+> Implemented prompt injection detection for a customer service bot using a two-stage approach (regex pre-filter + classifier), blocking 98% of adversarial inputs in a 1,000-sample red-team evaluation.
+
+## Category 4: Computer vision projects
+
+### Template:
+> Built [CV system] using [model/approach] on [dataset], with [preprocessing/augmentation strategy] to handle [specific challenge], achieving [metric].
+
+### Real bullet examples:
+
+> Built a document layout parser using YOLOv8 fine-tuned on 2,000 annotated pages, with rotation and noise augmentation to handle real-world scan quality, achieving 0.89 mAP on the test set.
+
+> Designed a real-time hand gesture recognition system using MediaPipe for landmark extraction and a lightweight CNN classifier, running at 28 FPS on a laptop GPU with 95% accuracy across 10 gesture classes.
+
+## Words that signal engineering judgment
+
+Use these to shift bullets from "I used a tool" to "I made decisions":
+
+| Weak verb | Strong replacement | Why it's better |
+|---|---|---|
+| Used | Designed, Implemented, Integrated | Shows agency |
+| Created | Built, Engineered, Developed | Shows construction |
+| Applied | Evaluated, Benchmarked, Compared | Shows judgment |
+| Worked on | Owned, Led, Shipped | Shows ownership |
+| Improved | Reduced [X] by [Y]%, Increased [X] by [Y]% | Shows measurement |
+
+## The "So what?" test
+
+Read each bullet and ask: "Could any CS student who followed a tutorial write this?" If yes, add:
+- A specific number (latency, accuracy, dataset size, user count)
+- A technical decision you made (and briefly why)
+- A comparison (vs. baseline, vs. previous approach, vs. alternative)
+</Body>
+
+<Code>
+```markdown
+## Before/After examples — copy and adapt these
+
+### RAG project
+BEFORE: Built a chatbot using LangChain and OpenAI API
+AFTER:  Built a domain-specific QA system using LangChain with FAISS
+        retrieval and OpenAI GPT-4, achieving 85% answer accuracy on
+        a 200-question evaluation set with average 1.2s response time
+
+### Classification project
+BEFORE: Trained a model to classify images using CNN
+AFTER:  Fine-tuned ResNet-50 on a 5,000-image medical imaging dataset
+        with stratified k-fold cross-validation, achieving 0.91 AUC-ROC
+        while maintaining <100ms inference time for deployment
+
+### LLM project
+BEFORE: Used prompt engineering to improve chatbot responses
+AFTER:  Designed a chain-of-thought prompting strategy with structured
+        output validation that reduced hallucinated citations from 23%
+        to 6% across 300 test queries
+```
+</Code>
+
+<TryItYourself>
+1. Open your current resume (or start a blank document)
+2. Pick your strongest AI/ML project
+3. Write 3 bullets using the Action-Architecture-Outcome formula
+4. For each bullet, verify it passes the "So what?" test — does it contain a number, a decision, or a comparison?
+5. Read each bullet aloud — if it takes more than 8 seconds to say, it is too long. Split it into two bullets.
+</TryItYourself>
+
+<CommonMistakes>
+- **Listing tools without decisions** — "Used LangChain, OpenAI, FAISS" tells the reader nothing about what you actually built or why those tools were chosen
+- **No numbers anywhere** — even rough numbers (dataset size, latency, accuracy) are better than zero numbers. If you did not measure, go back and measure.
+- **Claiming results you cannot defend** — if your bullet says "95% accuracy," be ready to explain the test set, the metric, and why 95% is meaningful for that task
+- **Writing 5+ bullets for one project** — 2-3 strong bullets beat 5 mediocre ones. Each bullet should highlight a different aspect (architecture, performance, a specific challenge solved).
+- **Burying the technical decision** — lead with the decision, not the context. "Chose FAISS over Pinecone for zero-cost local development" is better than "After evaluating multiple vector stores, decided to use FAISS."
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: Which resume bullet best demonstrates engineering judgment for an AI project?**
+
+- A) "Built a sentiment analysis model using Python and TensorFlow"
+- B) "Used BERT to classify text data with high accuracy"
+- C) "Compared TF-IDF + logistic regression against fine-tuned BERT for review classification; deployed the simpler model at 91% of BERT's F1 score and 50x lower inference cost" ✅
+- D) "Trained multiple machine learning models and selected the best one"
+</MiniQuiz>
+
+<InterviewExplanation>
+"Every AI project bullet on my resume follows a pattern: what I built, a specific technical decision I made and why, and a measurable outcome. For example, my RAG project bullet mentions that I chose FAISS over a managed vector DB for local development speed, implemented confidence-gated retrieval, and measured a 40% reduction in hallucinated responses. This shows I didn't just follow a tutorial — I evaluated tradeoffs."
+</InterviewExplanation>
+
+<CompletionChecklist>
+- [ ] Rewrote all AI/ML project bullets using the Action-Architecture-Outcome formula
+- [ ] Every bullet contains at least one number (metric, dataset size, latency, or comparison)
+- [ ] Every bullet passes the "So what?" test — it cannot be written by someone who just followed a tutorial
+- [ ] No bullet exceeds 2 lines on a standard resume template
+- [ ] Read each bullet aloud and confirmed it takes under 8 seconds to say
+</CompletionChecklist>

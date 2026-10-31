@@ -1,0 +1,239 @@
+---
+slug: reusable-components
+title: "Reusable Tailwind Components for Content Sites"
+track: full-stack
+tier: medium
+estimatedMinutes: 28
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Build a component library for content sites: cards, badges, page shells, and CTAs
+- Use Tailwind's utility classes to create consistent, responsive designs
+- Apply the `className` merging pattern with `clsx` and `tailwind-merge`
+- Understand the component API design decisions that make components truly reusable
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Content sites are 80% the same components — article cards, tag badges, page layouts, call-to-action sections. If you build these once and build them well, you ship features in hours instead of days. Interviewers at product companies look for candidates who think in reusable abstractions, not one-off pages.
+</WhyThisMatters>
+
+<Body>
+## The component toolkit for content sites
+
+Every content site needs these five components. We'll build each one:
+
+1. **ArticleCard** — a clickable card showing title, excerpt, date, and tags
+2. **Badge** — a small colored label for tags, categories, and status
+3. **PageShell** — a layout wrapper with consistent max-width, padding, and heading
+4. **CallToAction** — a section prompting the user to subscribe or sign up
+5. **Skeleton** — loading placeholders that match component dimensions
+
+## Pattern: `className` merging with `cn()`
+
+The most important utility in any Tailwind project is a `cn()` function that merges class names intelligently:
+
+```tsx
+// lib/cn.ts
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+`clsx` handles conditional classes. `twMerge` resolves Tailwind conflicts (e.g., `p-4` and `p-6` — the last one wins). Every component should accept an optional `className` prop and merge it:
+
+```tsx
+function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700", className)}>
+      {children}
+    </span>
+  );
+}
+
+// Usage: override the default colors
+<Badge className="bg-red-100 text-red-700">Layoff</Badge>
+```
+
+## Building the ArticleCard
+
+A good ArticleCard is a Server Component (no interactivity needed) with a clean prop interface:
+
+```tsx
+// components/ArticleCard.tsx
+import Link from "next/link";
+import { Badge } from "./Badge";
+import { cn } from "@/lib/cn";
+
+interface ArticleCardProps {
+  slug: string;
+  title: string;
+  excerpt: string;
+  publishedAt: Date;
+  tags: { name: string }[];
+  className?: string;
+}
+
+export function ArticleCard({ slug, title, excerpt, publishedAt, tags, className }: ArticleCardProps) {
+  return (
+    <Link
+      href={`/articles/${slug}`}
+      className={cn(
+        "block rounded-lg border border-gray-200 p-5 hover:border-gray-400 transition-colors",
+        className
+      )}
+    >
+      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      <p className="mt-1 text-sm text-gray-600 line-clamp-2">{excerpt}</p>
+      <div className="mt-3 flex items-center gap-2">
+        <time className="text-xs text-gray-500">
+          {publishedAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </time>
+        {tags.map((tag) => (
+          <Badge key={tag.name}>{tag.name}</Badge>
+        ))}
+      </div>
+    </Link>
+  );
+}
+```
+
+## Building the PageShell
+
+Instead of repeating `max-w-4xl mx-auto px-4` on every page, wrap it:
+
+```tsx
+// components/PageShell.tsx
+import { cn } from "@/lib/cn";
+
+interface PageShellProps {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function PageShell({ title, subtitle, children, className }: PageShellProps) {
+  return (
+    <main className={cn("mx-auto max-w-4xl px-4 py-10", className)}>
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">{title}</h1>
+        {subtitle && <p className="mt-2 text-lg text-gray-600">{subtitle}</p>}
+      </header>
+      {children}
+    </main>
+  );
+}
+```
+
+Now every page is just:
+
+```tsx
+export default function ArticlesPage() {
+  return (
+    <PageShell title="Articles" subtitle="Latest layoff analysis and reports">
+      {/* content */}
+    </PageShell>
+  );
+}
+```
+
+## Component API design principles
+
+1. **Accept `className` on every component** — consumers will always need to adjust spacing or colors
+2. **Use TypeScript interfaces, not inline types** — makes the API self-documenting
+3. **Prefer composition over configuration** — instead of a `variant` prop with 10 options, let consumers compose with `className`
+4. **Keep components as Server Components unless they need interactivity** — less client JS, faster pages
+5. **Use semantic HTML** — `<article>`, `<time>`, `<nav>` — better for accessibility and SEO
+</Body>
+
+<Code>
+```tsx
+// Complete component library for a content site
+
+// 1. Badge
+export function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-700", className)}>
+      {children}
+    </span>
+  );
+}
+
+// 2. CallToAction
+export function CallToAction({ title, description, buttonText, href }: {
+  title: string;
+  description: string;
+  buttonText: string;
+  href: string;
+}) {
+  return (
+    <section className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-10 text-white text-center">
+      <h2 className="text-2xl font-bold">{title}</h2>
+      <p className="mt-2 text-blue-100">{description}</p>
+      <a href={href} className="mt-4 inline-block rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+        {buttonText}
+      </a>
+    </section>
+  );
+}
+
+// 3. Skeleton (for loading states)
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("animate-pulse rounded-md bg-gray-200", className)} />;
+}
+
+export function ArticleCardSkeleton() {
+  return (
+    <div className="rounded-lg border border-gray-200 p-5">
+      <Skeleton className="h-5 w-3/4" />
+      <Skeleton className="mt-2 h-4 w-full" />
+      <Skeleton className="mt-1 h-4 w-2/3" />
+      <div className="mt-3 flex gap-2">
+        <Skeleton className="h-5 w-16 rounded-full" />
+        <Skeleton className="h-5 w-12 rounded-full" />
+      </div>
+    </div>
+  );
+}
+```
+</Code>
+
+<TryItYourself>
+1. Install the dependencies: `npm install clsx tailwind-merge`
+2. Create `lib/cn.ts` with the `cn()` utility
+3. Build the `Badge`, `ArticleCard`, and `PageShell` components
+4. Use `PageShell` on at least two pages to confirm consistency
+5. Override the `Badge` color by passing a `className` — confirm `twMerge` resolves the conflict correctly
+6. Build an `ArticleCardSkeleton` and use it in a `loading.tsx` file
+</TryItYourself>
+
+<CommonMistakes>
+- **Not using `tailwind-merge`** — without it, `cn("p-4", "p-6")` outputs `"p-4 p-6"` (both classes applied, last one wins by CSS specificity, which is unpredictable)
+- **Making every component a Client Component** — a card that displays data and a link doesn't need `"use client"`
+- **Hardcoding colors instead of accepting `className`** — kills reusability; the consumer knows their context better than the component
+- **Skipping the loading skeleton** — content sites have data-fetching latency; without skeletons, the page feels broken during loading
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Created `cn()` utility with `clsx` + `tailwind-merge`
+- [ ] Built at least 3 reusable components: card, badge, page shell
+- [ ] Every component accepts an optional `className` prop
+- [ ] Used components across multiple pages
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You pass `className="p-8"` to a component that has a default `className` of `"p-4"`. Without `tailwind-merge`, what happens?**
+
+- A) `p-8` overrides `p-4` cleanly
+- B) Both classes are applied — the result depends on CSS source order, which is unpredictable ✅
+- C) Tailwind throws an error
+- D) The component ignores the passed `className`
+</MiniQuiz>
+
+<InterviewExplanation>
+"For content sites, I build a small component library — article cards, badges, page shells, CTAs, and skeletons. Every component accepts a `className` prop merged through a `cn()` utility that combines `clsx` for conditional classes and `tailwind-merge` to resolve Tailwind conflicts. I keep most components as Server Components since they just render data. The key design principle is composition over configuration — I'd rather let consumers override via `className` than build a component with 15 variant props."
+</InterviewExplanation>

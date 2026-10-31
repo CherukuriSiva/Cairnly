@@ -1,0 +1,179 @@
+---
+slug: interviewer-questions-fullstack
+title: "Common Interviewer Questions on Databases, ORMs, and SEO"
+track: full-stack
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Answer the 12 most common full-stack interview questions with confidence
+- Explain database normalization, indexing, and N+1 queries in plain language
+- Articulate ORM tradeoffs and when raw SQL is better
+- Discuss SSR, SEO, and rendering strategies without buzzword soup
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Full-stack interviews test breadth. You'll get questions spanning databases, ORMs, rendering, SEO, and deployment — often in the same 30-minute session. Having rehearsed, concise answers for the most common questions lets you spend your mental energy on the hard follow-ups instead of fumbling the basics.
+</WhyThisMatters>
+
+<Body>
+## Database questions
+
+### Q1: "What is database normalization and why does it matter?"
+
+**Answer:** Normalization is the process of organizing tables to reduce data duplication. In a normalized schema, each fact is stored once. For example, a company name lives in the `Company` table, not repeated in every `Layoff` row. This prevents update anomalies — if the company name changes, you update one row, not hundreds.
+
+The common normal forms are:
+- **1NF** — no repeating groups (every cell has a single value)
+- **2NF** — every non-key column depends on the whole primary key
+- **3NF** — no column depends on another non-key column
+
+For most web apps, aiming for 3NF and then selectively denormalizing for performance is the right approach.
+
+### Q2: "What is an N+1 query problem?"
+
+**Answer:** An N+1 problem happens when you fetch a list of N items, then make a separate query for each item's related data. Example: fetching 50 articles, then querying the author for each one — that's 51 queries instead of 2.
+
+```tsx
+// BAD: N+1 — 51 queries
+const articles = await prisma.article.findMany(); // 1 query
+for (const article of articles) {
+  const author = await prisma.author.findUnique({ where: { id: article.authorId } }); // 50 queries
+}
+
+// GOOD: Eager loading — 1 query with JOIN
+const articles = await prisma.article.findMany({
+  include: { author: true }, // Prisma generates a JOIN
+});
+```
+
+With Prisma, the fix is `include`. With raw SQL, it's a `JOIN`. The key insight is: count your queries, not your lines of code.
+
+### Q3: "When would you add a database index?"
+
+**Answer:** Add an index on any column you frequently use in `WHERE`, `ORDER BY`, or `JOIN` clauses. Indexes speed up reads but slow down writes (the index must be updated on every insert/update). For a content site, I'd index `publishedAt` (for sorting), `slug` (for lookups), `categoryId` (for filtering), and `authorId` (for author pages).
+
+The rule: if a query is slow, check `EXPLAIN ANALYZE` — if it shows a sequential scan on a large table, add an index.
+
+## ORM questions
+
+### Q4: "Why use an ORM like Prisma instead of raw SQL?"
+
+**Answer:** Prisma gives type-safe queries — if a column doesn't exist, TypeScript catches it at compile time. It also handles migrations, generates a client with autocomplete, and abstracts database-specific SQL dialects. The tradeoff is less control over complex queries and an extra abstraction layer.
+
+### Q5: "When would you skip the ORM and write raw SQL?"
+
+**Answer:** For complex analytical queries (aggregations with window functions, CTEs), bulk operations (inserting 10,000 rows), or performance-critical paths where the ORM generates suboptimal SQL. Prisma supports `$queryRaw` for these cases — you can mix ORM and raw SQL in the same project.
+
+### Q6: "What is the Prisma singleton pattern and why is it needed?"
+
+**Answer:** In development, Next.js hot-reloads your code on every change. Without the singleton pattern, each reload creates a new Prisma client, which opens a new database connection pool. After a few reloads, you exhaust the connection limit. The singleton stores the client on `globalThis` so it persists across reloads.
+
+## Rendering and SEO questions
+
+### Q7: "What's the difference between SSR, SSG, and ISR?"
+
+**Answer:**
+- **SSR (Server-Side Rendering):** HTML is generated on every request. Use for personalized or frequently changing pages.
+- **SSG (Static Site Generation):** HTML is generated at build time. Use for pages that rarely change (blog posts, docs).
+- **ISR (Incremental Static Regeneration):** Like SSG, but pages revalidate after a set time. Use for pages that change occasionally (product listings, news).
+
+In the App Router, the default is SSR (dynamic rendering). To opt into static generation, don't use dynamic data sources. To add ISR, export `revalidate`:
+
+```tsx
+export const revalidate = 3600; // Revalidate every hour
+```
+
+### Q8: "How do Server Components help SEO?"
+
+**Answer:** Server Components render full HTML on the server. Search engine crawlers receive complete content without executing JavaScript. This means your page title, meta tags, headings, and body text are all in the initial HTML response — exactly what Google needs for indexing.
+
+### Q9: "What is `generateMetadata` and when do you use it?"
+
+**Answer:** It's a Next.js function you export from a page file to set dynamic `<title>`, `<meta>`, and Open Graph tags. I use it on any page where metadata depends on data — article pages, product pages, user profiles. For static pages, I use the simpler `metadata` export.
+
+## Deployment questions
+
+### Q10: "How do you manage environment variables across environments?"
+
+**Answer:** I separate secrets by environment — production, preview, and development. Secrets like database URLs and API keys are set in the hosting platform (Vercel Dashboard), never committed to code. I keep a `.env.example` file with dummy values so new developers know which variables are needed.
+
+### Q11: "What happens when you deploy a Prisma migration to production?"
+
+**Answer:** `prisma migrate deploy` reads the `prisma/migrations/` folder and applies any migration files that haven't been run yet. It doesn't create new migrations — that's `migrate dev`, which is for local development only. If a migration fails, Prisma marks it as failed and stops. You have to fix the issue and either retry or mark it as resolved.
+
+### Q12: "How do preview deployments work?"
+
+**Answer:** When I push a branch or open a PR, Vercel builds and deploys a separate instance at a unique URL. It uses the "Preview" environment variables. This lets code reviewers see changes live without merging to production. The preview deployment is destroyed when the branch is deleted or the PR is merged.
+</Body>
+
+<Code>
+```tsx
+// Quick reference: patterns interviewers expect you to know
+
+// 1. N+1 fix with Prisma include
+const articles = await prisma.article.findMany({
+  include: { author: true, tags: true },
+});
+
+// 2. Index definition in Prisma
+model Article {
+  slug        String   @unique
+  publishedAt DateTime
+  categoryId  String
+  @@index([publishedAt])
+  @@index([categoryId])
+}
+
+// 3. ISR with revalidate
+export const revalidate = 3600; // seconds
+
+// 4. Dynamic metadata
+export async function generateMetadata({ params }) {
+  const article = await getArticle(params.slug);
+  return { title: article.title, description: article.excerpt };
+}
+
+// 5. Prisma singleton
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
+</Code>
+
+<TryItYourself>
+1. Answer each of the 12 questions out loud, timing yourself — aim for 30-60 seconds per answer
+2. Have a friend ask 3 of these questions randomly — practice answering without looking at notes
+3. For each answer, add one concrete example from your capstone project
+4. Write down 3 follow-up questions an interviewer might ask and prepare answers
+5. Practice the "I don't know, but here's how I'd figure it out" response for at least one question
+</TryItYourself>
+
+<CommonMistakes>
+- **Memorizing definitions without understanding** — interviewers immediately follow up with "can you give me an example?" and memorized answers fall apart
+- **Not connecting to your own project** — generic answers are forgettable; "in my layoffs tracker, I indexed `reportedAt` because..." is memorable
+- **Saying "it depends" without following up** — every answer depends on context, but you must then explain *what* it depends on
+- **Over-explaining** — 60 seconds is enough for most answers; if the interviewer wants more depth, they'll ask
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Can answer all 12 questions in 30-60 seconds each
+- [ ] Each answer includes a concrete example from your project
+- [ ] Practiced with a partner who asked random follow-ups
+- [ ] Identified 2-3 questions where you need more depth and studied them
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: An interviewer asks about the N+1 query problem. Which answer is most effective?**
+
+- A) "It's when you make too many database queries"
+- B) "It's when fetching N items triggers N additional queries for related data. In my project, I fixed it by using Prisma's `include` to eager-load the author relation, reducing 51 queries to 1." ✅
+- C) "It's a problem with ORMs — you should always use raw SQL"
+- D) "I'd need to look that up"
+</MiniQuiz>
+
+<InterviewExplanation>
+"For full-stack interviews, I prepare concise answers for the 12 most common topics: normalization, N+1 queries, indexing, ORM tradeoffs, SSR vs SSG vs ISR, metadata, environment management, and deployment. Each answer follows a pattern: define the concept, explain when it matters, give a concrete example from my project, and acknowledge the tradeoff. The goal is 30-60 seconds per answer with enough depth to invite follow-ups."
+</InterviewExplanation>

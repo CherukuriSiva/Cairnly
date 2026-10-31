@@ -1,0 +1,235 @@
+---
+slug: what-is-an-agent
+title: "What Is an Agent and When Do You Actually Need One"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Define what an AI agent is versus a simple chain or pipeline
+- Identify the core loop: observe → plan → act → reflect
+- Distinguish agents from prompt chains, RAG pipelines, and function-calling
+- Recognize when an agent adds value and when it adds unnecessary complexity
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"Agent" is the most overhyped word in AI engineering right now. Everything from a chatbot to a Rube Goldberg chain of API calls gets called an agent. But real agents have a specific architecture and a specific set of problems they solve well. Knowing when you actually need one — and when a simpler pattern suffices — will save you from building an unreliable, expensive, hard-to-debug system when a 20-line script would have worked.
+</WhyThisMatters>
+
+<Body>
+## What makes something an agent?
+
+An AI agent is a system that autonomously decides which actions to take, executes those actions, observes the results, and decides what to do next — in a loop. The key word is **loop**: an agent makes multiple decisions over multiple steps, adapting its plan based on what happens.
+
+Compare this to simpler patterns:
+
+| Pattern | # of LLM calls | Decision-making | Example |
+|---|---|---|---|
+| Single prompt | 1 | None | "Summarize this text" |
+| Prompt chain | Fixed N | Hardcoded sequence | Summarize → Extract entities → Format |
+| RAG pipeline | 1-2 | Retrieval is automatic | Retrieve docs → Generate answer |
+| Function-calling | 1 | LLM picks tools once | "What's the weather?" → calls weather API |
+| **Agent** | Variable | LLM decides at each step | "Book me a flight" → searches → compares → asks clarification → books |
+
+The distinguishing features of an agent:
+1. **Dynamic number of steps** — the agent decides when it's done
+2. **Tool selection at each step** — the agent chooses which tool to use based on current state
+3. **Observation and reflection** — the agent reads tool outputs and adjusts its plan
+4. **Goal-oriented** — the agent works toward a stated objective, not a single transformation
+
+## The agent loop
+
+Every agent framework implements the same core loop:
+
+```python
+def agent_loop(goal: str, tools: list[Tool], max_steps: int = 10) -> str:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.append({"role": "user", "content": goal})
+    
+    for step in range(max_steps):
+        # 1. Plan: LLM decides what to do next
+        response = call_llm(messages, tools=tools)
+        
+        # 2. Check if done
+        if response.is_final_answer:
+            return response.content
+        
+        # 3. Act: Execute the chosen tool
+        tool_name = response.tool_call.name
+        tool_args = response.tool_call.arguments
+        result = execute_tool(tool_name, tool_args)
+        
+        # 4. Observe: Add the result to context
+        messages.append({"role": "assistant", "content": response})
+        messages.append({"role": "tool", "content": str(result)})
+        
+        # The loop continues — the LLM sees the tool result and decides next action
+    
+    return "Max steps reached without completing the goal."
+```
+
+## When you actually need an agent
+
+**Use an agent when:**
+- The task requires multiple tools and the sequence isn't predictable in advance
+- The user's request is ambiguous and needs clarification or decomposition
+- The task involves exploration (searching, comparing, iterating)
+- Intermediate results change the plan (e.g., search results determine next query)
+
+**Don't use an agent when:**
+- The task is a single transformation (summarize, translate, extract)
+- The sequence of steps is always the same (use a prompt chain)
+- You need deterministic, reproducible behavior (agents are inherently variable)
+- Latency matters — each agent step adds an LLM call (500ms-3s)
+
+## Real examples: agent vs not-agent
+
+### Example 1: Customer support ticket routing
+- **Not an agent**: Classify ticket → Route to team. Two steps, fixed sequence. Use a prompt chain.
+- **Agent**: "Investigate this ticket: check the customer's order history, look up their subscription status, draft a response, and escalate if needed." This requires dynamic tool selection based on findings.
+
+### Example 2: Code review
+- **Not an agent**: "Find bugs in this function." Single LLM call.
+- **Agent**: "Review this PR: check each file for bugs, verify the tests pass, check for style violations, and summarize findings." Multiple tools, dynamic exploration.
+
+### Example 3: RAG Q&A
+- **Not an agent**: Retrieve → Generate. Fixed two-step pipeline.
+- **Agent**: "Answer this complex question: search the knowledge base, if the answer isn't found try a different search strategy, check if the answer conflicts with other documents, synthesize." The agent adapts its search strategy based on initial results.
+
+## The reliability problem
+
+Agents have a fundamental reliability issue: each step has a probability of going wrong, and errors compound across steps.
+
+If each LLM decision is 95% correct:
+- 1 step: 95% success
+- 3 steps: 86% success
+- 5 steps: 77% success
+- 10 steps: 60% success
+
+This is why production agents need:
+1. **Step-level validation** — check each tool output before proceeding
+2. **Guardrails on tool calls** — limit what tools can do (read-only access, budget limits)
+3. **Human-in-the-loop checkpoints** — require approval for high-stakes actions
+4. **Max step limits** — prevent infinite loops
+5. **Observability** — log every decision so you can debug failures
+
+## The cost problem
+
+Each agent step costs an LLM call. A 5-step agent resolution costs 5x what a single RAG call costs. For a support bot handling 10,000 queries/day:
+
+- RAG: 10,000 LLM calls/day
+- Agent (avg 4 steps): 40,000 LLM calls/day
+
+At $0.01/call, that's $100/day vs $400/day. Make sure the agent's added value justifies the added cost.
+
+## When to graduate from RAG to an agent
+
+Start with RAG. If you find that:
+1. Users frequently need multi-step resolution that RAG can't handle in one shot
+2. You're building increasingly complex prompt chains with branching logic
+3. The "right" sequence of actions depends on intermediate results
+
+Then consider adding agent capabilities to specific flows — not replacing your entire system with an agent.
+</Body>
+
+<Code>
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Tool:
+    name: str
+    description: str
+    
+    def execute(self, args: dict) -> str:
+        raise NotImplementedError
+
+class SearchKB(Tool):
+    name = "search_kb"
+    description = "Search the knowledge base for relevant documents"
+    
+    def execute(self, args: dict) -> str:
+        query = args["query"]
+        # Simulated search
+        return f"Found 3 documents about '{query}'"
+
+class CheckOrderStatus(Tool):
+    name = "check_order"
+    description = "Look up order status by order ID"
+    
+    def execute(self, args: dict) -> str:
+        return f"Order {args['order_id']}: Shipped, arriving Thursday"
+
+# Simple agent decision simulator
+def should_use_agent(task_description: str) -> dict:
+    """Heuristic to decide if a task needs an agent."""
+    agent_signals = [
+        "investigate", "research", "compare", "find and then",
+        "check multiple", "if...then", "explore",
+    ]
+    chain_signals = [
+        "summarize", "translate", "extract", "classify",
+        "format", "convert",
+    ]
+    
+    task_lower = task_description.lower()
+    agent_score = sum(1 for s in agent_signals if s in task_lower)
+    chain_score = sum(1 for s in chain_signals if s in task_lower)
+    
+    return {
+        "recommendation": "agent" if agent_score > chain_score else "chain/rag",
+        "agent_signals": agent_score,
+        "chain_signals": chain_score,
+    }
+
+# Test
+tasks = [
+    "Summarize this document",
+    "Investigate this bug: check logs, find the root cause, suggest a fix",
+    "Translate this paragraph to Spanish",
+    "Research competitors and compare their pricing",
+]
+
+for task in tasks:
+    result = should_use_agent(task)
+    print(f"Task: {task}")
+    print(f"  -> {result['recommendation']}\n")
+```
+</Code>
+
+<TryItYourself>
+1. List 5 tasks from your own experience and classify each as "agent" or "not agent"
+2. For one agent-appropriate task, sketch the tools it would need and the possible step sequences
+3. Implement the simple `should_use_agent` heuristic above and test it with your tasks
+4. Calculate the reliability of a 5-step agent if each step is 90% correct vs 99% correct
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Can define what makes an agent different from a prompt chain or RAG pipeline
+- [ ] Can draw the observe-plan-act-reflect loop from memory
+- [ ] Listed 3+ scenarios where an agent is the right choice and 3+ where it isn't
+- [ ] Understand the compounding reliability and cost problems
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Calling everything an agent** — if the steps are fixed and predictable, it's a chain, not an agent
+- **Building an agent when RAG would suffice** — agents add complexity, latency, and cost
+- **No max step limit** — without it, a confused agent can loop forever, burning tokens
+- **Giving agents too much power** — an agent with write access to production databases is a disaster waiting to happen
+- **Not logging agent decisions** — when an agent fails, you need to see every step it took
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: A user asks "What is our refund policy?" Your system retrieves the relevant document and generates an answer. Is this an agent?**
+
+- A) Yes — it used a tool (retrieval) to answer
+- B) No — this is a standard RAG pipeline with a fixed two-step sequence ✅
+- C) Yes — it made a decision about which document to retrieve
+- D) It depends on the LLM used
+</MiniQuiz>
+
+<InterviewExplanation>
+"An agent is a system that autonomously decides which actions to take in a loop — observe, plan, act, reflect — with a variable number of steps. The key distinction from a RAG pipeline or prompt chain is that agents make dynamic decisions at each step based on intermediate results. I'd only reach for an agent when the task requires multi-step tool use where the sequence isn't predictable in advance. For most Q&A use cases, RAG is sufficient and far more reliable. When I do use agents, I add step-level validation, max step limits, and human-in-the-loop for high-stakes actions because agent reliability compounds — 95% per step becomes 77% over 5 steps."
+</InterviewExplanation>

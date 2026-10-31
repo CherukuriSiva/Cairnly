@@ -4,16 +4,6 @@ import argparse
 from pathlib import Path
 
 
-def cmd_curate(args: argparse.Namespace) -> None:
-    from cairnly.curate import curate, report, write_corpus
-
-    items = curate(Path(args.source))
-    write_corpus(items, Path(args.out))
-    Path(args.report).write_text(report(items))
-    kept = sum(i.decision != "dropped" for i in items)
-    print(f"{len(items)} files read, {kept} written to {args.out}/, report in {args.report}")
-
-
 def cmd_migrate(args: argparse.Namespace) -> None:
     from cairnly.db import connect, migrate
 
@@ -24,21 +14,24 @@ def cmd_migrate(args: argparse.Namespace) -> None:
 
 def cmd_ingest(args: argparse.Namespace) -> None:
     from cairnly.db import connect
-    from cairnly.ingest import ingest_folder
+    from cairnly.ingest import docs_for, ingest_docs
+    from cairnly.kb import get_kb
 
-    folder = Path(args.folder)
+    path = Path(args.path or get_kb(args.kb).path)
     with connect() as conn:
-        stats = ingest_folder(conn, folder, args.source or folder.name)
-    print(f"added {stats.added}, updated {stats.updated}, unchanged {stats.unchanged}, "
-          f"deleted {stats.deleted}; {stats.chunks} chunks embedded")
+        stats = ingest_docs(conn, docs_for(path), args.kb)
+    print(f"[{args.kb}] added {stats.added}, updated {stats.updated}, "
+          f"unchanged {stats.unchanged}, deleted {stats.deleted}; {stats.chunks} chunks embedded")
 
 
 def cmd_search(args: argparse.Namespace) -> None:
     from cairnly.db import connect
-    from cairnly.search import search
+    from cairnly.kb import get_kb
+    from cairnly.search import search, search_kb
 
     with connect() as conn:
-        result = search(conn, args.query, top_k=args.k)
+        result = (search_kb(conn, args.query, get_kb(args.kb), top_k=args.k) if args.kb
+                  else search(conn, args.query, top_k=args.k))
     print(f"top similarity {result.top_similarity:.3f}")
     for n, hit in enumerate(result.hits, start=1):
         print(f"{n}. [{hit.score:.4f}] {hit.citation}")
@@ -48,13 +41,15 @@ def cmd_ask(args: argparse.Namespace) -> None:
     from cairnly.answer import answer
     from cairnly.config import get_settings
     from cairnly.db import connect
+    from cairnly.kb import get_kb
     from cairnly.llm import get_llm
-    from cairnly.search import search
+    from cairnly.search import search_kb
 
-    s = get_settings()
+    s, kb = get_settings(), get_kb(args.kb)
+    sources: list[dict] = []
     with connect() as conn:
-        for event in answer(args.question, lambda q: search(conn, q, top_k=s.top_k),
-                            get_llm(args.provider), s.min_score):
+        for event in answer(args.question, lambda q: search_kb(conn, q, kb, top_k=s.top_k),
+                            get_llm(args.provider), kb):
             if event["type"] == "token":
                 print(event["text"], end="", flush=True)
             elif event["type"] == "sources":
@@ -62,6 +57,17 @@ def cmd_ask(args: argparse.Namespace) -> None:
     print("\n")
     for src in sources:
         print(f"[{src['n']}] {src['citation']}")
+    if kb.notice:
+        print(f"\n{kb.notice}")
+    from cairnly import tracing
+
+    tracing.flush()
+
+
+def cmd_eval(args: argparse.Namespace) -> None:
+    from cairnly.evals import main as eval_main
+
+    eval_main(args)
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
@@ -74,29 +80,35 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="cairnly")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("curate", help="convert MDX lessons into the markdown corpus")
-    p.add_argument("source", help="content folder to read (never modified)")
-    p.add_argument("--out", default="corpus")
-    p.add_argument("--report", default="CURATION.md")
-    p.set_defaults(func=cmd_curate)
-
     p = sub.add_parser("migrate", help="create the database schema")
     p.set_defaults(func=cmd_migrate)
 
-    p = sub.add_parser("ingest", help="chunk, embed and store a folder of markdown")
-    p.add_argument("folder")
-    p.add_argument("--source", help="label for this folder (default: its name)")
+    p = sub.add_parser("ingest", help="chunk, embed and store one knowledge base")
+    p.add_argument("--kb", default="lessons", help="knowledge base name from kbs.yaml")
+    p.add_argument("--path", help="override the path from kbs.yaml")
     p.set_defaults(func=cmd_ingest)
 
     p = sub.add_parser("search", help="show the top hybrid-search hits for a query")
     p.add_argument("query")
     p.add_argument("-k", type=int, default=6)
+    p.add_argument("--kb", help="limit to one knowledge base")
     p.set_defaults(func=cmd_search)
 
     p = sub.add_parser("ask", help="answer a question with citations")
     p.add_argument("question")
+    p.add_argument("--kb", default="lessons")
     p.add_argument("--provider", choices=["ollama", "anthropic"])
     p.set_defaults(func=cmd_ask)
+
+    p = sub.add_parser("eval", help="score retrieval (and optionally answers) on a golden set")
+    p.add_argument("--kb", default="lessons")
+    p.add_argument("--set", dest="golden", help="golden set file (default: per kb)")
+    p.add_argument("-k", type=int, default=5)
+    p.add_argument("--limit", type=int, help="only the first N questions")
+    p.add_argument("--judge", action="store_true", help="also score answer faithfulness")
+    p.add_argument("--gate", help="fail (exit 1) if metrics drop below this thresholds file")
+    p.add_argument("--out", help="write the JSON report here")
+    p.set_defaults(func=cmd_eval)
 
     p = sub.add_parser("serve", help="run the HTTP API")
     p.add_argument("--host", default="127.0.0.1")

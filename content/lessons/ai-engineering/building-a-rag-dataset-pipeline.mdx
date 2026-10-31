@@ -1,0 +1,144 @@
+---
+slug: building-a-rag-dataset-pipeline
+title: "Building a RAG Dataset Pipeline End-to-End"
+track: ai-engineering
+tier: deep
+estimatedMinutes: 55
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Orchestrate a full dataset pipeline: ingest → filter → normalize → dedupe → synthesize → split → validate
+- Make the pipeline resumable with checkpoints
+- Gate every write on a schema and enforce dataset-level assertions
+- Emit a dataset card (stats) so the artifact is auditable
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A model is downstream of its data, and the data is downstream of a pipeline. The teams that ship reliable AI treat dataset construction as real software — ordered stages, validation gates, checkpoints, and assertions — not a one-off notebook. This is the capstone of the data-engineering lessons and a portfolio piece that proves you can build the part nobody sees.
+</WhyThisMatters>
+
+<Diagram>
+```mermaid
+graph TD
+    A[Ingest sources] --> B[On-topic filter]
+    B --> C[Quality filter pass 1]
+    C --> D[Dedup (MinHash, curated-first)]
+    D --> E[Normalize terse answers via LLM]
+    E --> F[Synthesize refusals + multi-turn]
+    F --> G[Quality filter pass 2]
+    G --> H[Assign IDs + stratified split]
+    H --> I[Validate vs schema + atomic write]
+    I --> J[Build test sets + dataset card]
+    J --> K{Assertions: size, refusal %}
+    K -->|pass| L[Done]
+    K -->|fail| M[Raise]
+```
+</Diagram>
+
+<Body>
+## Stages, in order, each doing one job
+
+The pipeline is a sequence where each stage's output feeds the next. Order matters: filter *before* you spend LLM calls normalizing; dedup *before* splitting so duplicates can't straddle train/test; run a **second** quality pass *after* synthesis to catch bad LLM output.
+
+## Checkpoints make it resumable
+
+The expensive stages (LLM normalization, synthesis) must survive a crash. Persist a checkpoint of completed IDs after each batch; on restart, skip what's already done. A long pipeline you can't resume is a pipeline you'll never finish re-running.
+
+## Validate at every write boundary
+
+Every file write goes through a schema gate: validate each record against a Pydantic model, and a single bad record raises *before* the file is touched (atomic temp-file + rename). The dataset can never be left half-written or schema-invalid.
+
+## Stratified, reproducible splits
+
+Split *by kind* (QA / refusal / multi-turn) with a fixed seed so each split has the right mix and the result is reproducible. Dedup first — otherwise a near-duplicate in train leaks into test.
+
+## Assertions turn silent rot into a hard failure
+
+End with dataset-level checks: total size ≥ a floor, refusal fraction ≥ a threshold. If synthesis silently produced too few refusals, the pipeline *fails* instead of shipping a skewed dataset. Emit a stats "dataset card" so the artifact is auditable.
+</Body>
+
+<Code>
+```python
+def run_pipeline(squad_paths, skip_synthesis=False) -> dict:
+    checkpoint = load_checkpoint()                       # resumable
+
+    qa, passages = ingest_all_sources(squad_paths)       # 1. ingest
+    qa, rejected = filter_on_topic(qa)                   # 2. on-topic
+    qa, _ = quality_filter(qa)                           # 3. quality (pass 1)
+
+    curated = [r for r in qa if r["article_id"] == "curated_v1"]
+    qa, n_dupes = dedupe_records(curated + [r for r in qa if r not in curated])  # 4. dedup, curated-first
+
+    if not skip_synthesis:
+        normalize_records_batch(qa, checkpoint, ...)     # 5. normalize (checkpointed)
+        refusals = synthesize_refusals(...)              # 6a. synth refusals
+        multiturn = synthesize_multiturn(...)            # 6b. synth multi-turn
+        qa = qa + refusals + multiturn
+
+    qa, _ = quality_filter(qa)                           # 7. quality (pass 2, post-synthesis)
+    qa = assign_global_ids(qa)                           # 8. IDs
+    qa = assign_splits(qa, seed=42)                      # 9. stratified split
+
+    write_validated_jsonl(qa, TRAINING_FILE, TrainingRecord)  # 10. schema gate + atomic
+    _build_test_sets(qa, TEST_SETS_DIR)
+    stats = compute_stats(qa)
+
+    if stats["total"] < 3500:                            # 11. assertions
+        raise AssertionError(f"only {stats['total']} records — need >=3500")
+    if not skip_synthesis and stats["refusal_fraction"] < 0.10:
+        raise AssertionError(f"refusals {stats['refusal_fraction']:.1%} — need >=10%")
+    return stats
+```
+</Code>
+
+<TryItYourself>
+1. Wire the stages into one `run_pipeline` over a small source set
+2. Add a checkpoint and kill the run mid-normalization; confirm it resumes
+3. Route every write through a Pydantic schema gate and feed it one bad record
+4. Verify dedup runs before splitting (plant a near-duplicate across would-be splits)
+5. Trip an assertion (e.g. too few refusals) and confirm the pipeline fails loudly
+</TryItYourself>
+
+<CommonMistakes>
+- **Synthesizing before filtering** — you pay LLM calls to normalize junk you'll drop
+- **Dedup after splitting** — near-duplicates leak across train/test
+- **One quality pass only** — synthesis can emit bad records; filter again after
+- **No checkpoints** — a crash forces a full, expensive re-run
+- **Writing without a schema gate** — a malformed record poisons training silently
+- **No end assertions** — a skewed dataset ships unnoticed
+</CommonMistakes>
+
+<DebuggingChecklist>
+- [ ] Does each stage log counts in/out so you can spot a stage that drops too much?
+- [ ] Is the on-topic/quality filter order before the expensive LLM stages?
+- [ ] Does dedup run before split, curated-first?
+- [ ] Does a single invalid record abort the write (atomic temp + rename)?
+- [ ] Do the final assertions fail the run on size/refusal-fraction violations?
+- [ ] Is a dataset card (stats JSON) emitted for auditing?
+</DebuggingChecklist>
+
+<MiniQuiz>
+**Q: Why must deduplication run *before* the train/test split?**
+
+- A) It's faster that way
+- B) Otherwise a near-duplicate can land in train and test, leaking test answers into training ✅
+- C) Splitting deletes duplicates automatically
+- D) Dedup needs the split labels
+</MiniQuiz>
+
+<InterviewExplanation>
+"I treat dataset construction as real software: ordered stages where each does one job — ingest, on-topic filter, quality filter, dedup, LLM normalization, synthesis, a second quality pass, ID assignment, stratified split, then a schema-gated atomic write. Order is deliberate: I filter before spending LLM calls, dedup before splitting so duplicates can't straddle train and test, and quality-filter again after synthesis to catch bad model output. The expensive stages are checkpointed so a crash resumes instead of restarting. Every write validates against a Pydantic schema and aborts on a bad record, and the pipeline ends with assertions — minimum size, minimum refusal fraction — plus a stats dataset card, so a skewed dataset fails loudly instead of shipping."
+</InterviewExplanation>
+
+<ResumeBullet>
+Built a resumable, schema-validated dataset pipeline (ingest → filter → dedup → LLM normalization → synthesis → stratified split) with checkpointing and dataset-level assertions, producing an auditable training corpus with a generated dataset card
+</ResumeBullet>
+
+<CompletionChecklist>
+- [ ] Orchestrated the full ordered pipeline
+- [ ] Added checkpointing and verified resume after a crash
+- [ ] Gated every write on a schema with atomic writes
+- [ ] Ran dedup before a stratified, seeded split
+- [ ] Enforced end-of-pipeline assertions and emitted a dataset card
+</CompletionChecklist>

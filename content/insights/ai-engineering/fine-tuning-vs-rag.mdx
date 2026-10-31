@@ -1,0 +1,89 @@
+---
+slug: fine-tuning-vs-rag
+title: "Fine-Tuning vs RAG: When to Use Each"
+summary: "Most teams reach for fine-tuning before they need it. Here is a clear decision framework for when RAG is enough and when fine-tuning is actually the right call."
+category: ai-engineering
+tags: ["fine-tuning", "rag", "lora", "decision-framework"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1777814820778.jpeg
+relatedLessons:
+  - ai-engineering/lora-fine-tuning
+  - ai-engineering/what-is-rag
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+"Should we fine-tune?" is the wrong first question. RAG — retrieving relevant context and putting it in the prompt — solves most "the model needs to know our stuff" problems, and it is cheaper, faster to iterate, and easy to update. Fine-tuning earns its place for a narrower set of needs: baking in a consistent style, format, or domain behavior that prompting alone cannot hold. And when you do fine-tune, the practical default is PEFT (LoRA / QLoRA), which trains a tiny fraction of parameters instead of the whole model. The discipline is to reach for RAG first and treat fine-tuning as a targeted tool, not a reflex.
+</InsightSummary>
+
+<Body>
+## The default: start with RAG
+
+Fine-tuning feels like the "serious" move, so teams reach for it early — and usually regret it. It is expensive to run, slow to iterate on (every change means another training run), and easy to get subtly wrong. RAG, by contrast, injects the knowledge the model needs at query time, costs far less, and updates the moment you change the underlying documents. For the overwhelmingly common need — "the model should answer using our private, current data" — RAG is the right starting point.
+
+## When RAG is enough
+
+RAG handles the cases that look like *knowledge* problems:
+
+- The model needs access to **private or proprietary data** it was never trained on.
+- You need **grounded, citable answers** tied to source documents.
+- The knowledge **changes frequently** and must stay current without retraining.
+
+If your problem is "the model does not *know* something," RAG almost always solves it.
+
+## When to fine-tune
+
+Fine-tuning addresses *behavior*, not knowledge:
+
+- **Style, tone, or format** the model will not reliably hold through prompting — a specific voice, a strict output schema, a house format.
+- **Domain behavior** that prompt-plus-RAG cannot reach, such as specialized reasoning patterns or task adaptation where examples in the prompt are not enough.
+- **Performance enhancement** on a narrow, high-volume task where you want the behavior compiled into the weights for consistency and lower per-call overhead.
+
+Note these are mostly *how the model responds* problems, not *what the model knows* problems. That distinction is the cleanest way to decide.
+
+## Fine-tuning approaches
+
+- **Full fine-tuning** updates all of the model's weights. It is the most powerful and the most resource-intensive — and risky, because it can degrade general capabilities (catastrophic forgetting). Rarely the right first choice.
+- **PEFT (Parameter-Efficient Fine-Tuning)** is the practical default. Instead of retraining the whole model, you train a small set of added parameters and leave the base frozen.
+
+## LoRA and QLoRA in brief
+
+**LoRA** injects small trainable rank-decomposition matrices into the model and trains only those — a tiny fraction of total parameters — controlled by rank and alpha settings. The base weights stay frozen, so you get the adaptation you want at a fraction of the compute and storage. **QLoRA** goes further by quantizing the base model (e.g. to 4-bit NormalFloat) so it fits in far less memory, then training LoRA adapters on top — making it possible to fine-tune large models on modest hardware.
+
+## Complementary techniques
+
+Two related tools often travel with fine-tuning. **Quantization** (FP32 to INT8/FP4) shrinks a model and speeds up inference, trading a little precision for a lot of efficiency. **Distillation** trains a smaller "student" model to imitate a larger "teacher," capturing much of its behavior in a cheaper-to-run package. Neither replaces the RAG-vs-fine-tune decision, but both help you ship the result affordably.
+
+And one practical truth from the field: when you do fine-tune, expect to spend most of your effort — often around 80% — on data preparation. Quality, diversity, and clear input/output formatting of your training data matter far more than the training run itself.
+</Body>
+
+<CommonMistakes>
+- **Fine-tuning as a first resort.** The most common mistake is training a model before trying RAG and prompt engineering. Start with RAG; fine-tune only when a behavior need clearly survives that.
+- **Using fine-tuning to add knowledge.** Fine-tuning is for *behavior* (style, format, domain patterns), not for injecting facts the model should look up. Frequently-changing knowledge belongs in RAG, not the weights.
+- **Jumping to full fine-tuning.** Full fine-tuning is expensive and can erode general capabilities. PEFT (LoRA/QLoRA) is the practical default for almost everyone.
+- **Underinvesting in data.** Most of the work and most of the quality come from data preparation. A small, clean, well-formatted dataset beats a large messy one.
+- **Skipping evaluation.** Without a held-out eval set you cannot tell whether fine-tuning actually helped or quietly made the model worse on other tasks.
+</CommonMistakes>
+
+<KeyTakeaways>
+- Start with RAG: it is cheaper, iterates faster, and updates instantly — it solves most "the model needs our data" problems.
+- RAG fits *knowledge* needs (private data, grounded answers, frequent updates); fine-tuning fits *behavior* needs (style, format, domain patterns).
+- Prefer PEFT (LoRA/QLoRA) over full fine-tuning — train a tiny fraction of parameters and keep the base frozen; QLoRA quantizes the base to fit modest hardware.
+- Quantization and distillation are complementary techniques for shipping the result cheaply, not substitutes for the RAG-vs-fine-tune decision.
+- Expect roughly 80% of fine-tuning effort to go into data preparation; quality and format beat dataset size.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Get hands-on with adapters in [LoRA fine-tuning](/ai-engineering/lora-fine-tuning).
+- Make sure RAG is solid first with [What is RAG](/ai-engineering/what-is-rag).
+- Put both into a real system via the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

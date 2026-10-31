@@ -1,0 +1,32 @@
+[
+  {
+    "name": "section components, body headings and an h3",
+    "mdx": "<WhatYouWillLearn>\n- one\n</WhatYouWillLearn>\n\n<Body>\n# Big title\n\n## The core idea\n\nText.\n\n### A detail\n\nMore.\n</Body>\n\n<MiniQuiz>\n**Q: what?**\n</MiniQuiz>\n",
+    "anchors": ["what-you-will-learn", "big-title", "the-core-idea", "a-detail", "quick-quiz"]
+  },
+  {
+    "name": "duplicate headings get -1, -2 and skip used values",
+    "mdx": "<Body>\n## Example\n\none\n\n## Example\n\ntwo\n\n## Example 1\n\nthree\n</Body>\n\n<CommonMistakes>\n- x\n</CommonMistakes>\n\n<CommonMistakes>\n- y\n</CommonMistakes>\n",
+    "anchors": ["example", "example-1", "example-1-1", "common-mistakes", "common-mistakes-1"]
+  },
+  {
+    "name": "inline code, bold, links and symbols in headings",
+    "mdx": "<Body>\n## Run it with `asyncio.gather`\n\nx\n\n## The **bold** and [linked](https://example.com) parts\n\ny\n\n## Hi, I'm [Name]\n\nz\n\n## Tips & tricks\n\nw\n\n## ???\n\nv\n</Body>\n",
+    "anchors": ["run-it-with-asyncio-gather", "the-bold-and-linked-parts", "hi-i-m-name", "tips-tricks", "section"]
+  },
+  {
+    "name": "headings inside a code fence are ignored",
+    "mdx": "<Body>\n## Setup\n\n```python\n# not a heading\n## also not a heading\n```\n\n## After code\n</Body>\n",
+    "anchors": ["setup", "after-code"]
+  },
+  {
+    "name": "roadmap phases with and without duration, and the skill matrix",
+    "mdx": "<RoadmapPhase title=\"Month 1: Foundations\" duration=\"4 weeks\">\n- learn\n</RoadmapPhase>\n\n<RoadmapPhase title=\"Keep going\">\n- more\n</RoadmapPhase>\n\n<SkillPriorityMatrix\n  now={[\"Python\"]}\n  ignore={[\"Hype\"]}\n/>\n",
+    "anchors": ["month-1-foundations-4-weeks", "keep-going", "skill-priorities"]
+  },
+  {
+    "name": "book note with a chapter attribute",
+    "mdx": "<Body>\n## Idea\n\nx\n</Body>\n\n<BookNote chapter=\"6\">\n\nSome note in our own words.\n\nFurther reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 6\n</BookNote>\n\n<KeyTakeaways>\n- k\n</KeyTakeaways>\n",
+    "anchors": ["idea", "from-ai-engineering-chip-huyen", "key-takeaways"]
+  }
+]

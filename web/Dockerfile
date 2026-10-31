@@ -12,8 +12,8 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 ENV NODE_ENV=production PORT=3010 HOSTNAME=0.0.0.0
-COPY --from=build --chown=node /app/.next/standalone ./
-COPY --from=build --chown=node /app/.next/static ./.next/static
-USER node
+COPY --from=build --chown=1000 /app/.next/standalone ./
+COPY --from=build --chown=1000 /app/.next/static ./.next/static
+USER 1000
 EXPOSE 3010
 CMD ["node", "server.js"]

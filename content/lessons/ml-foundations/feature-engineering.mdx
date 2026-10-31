@@ -1,0 +1,246 @@
+---
+slug: feature-engineering
+title: "Feature Engineering: Encoding, Scaling, Selection, and SHAP"
+track: ml-foundations
+tier: medium
+estimatedMinutes: 40
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Apply the right encoding strategy for each type of categorical variable
+- Choose the right scaling method for each algorithm
+- Use SHAP values to rank features by their contribution to model predictions
+- Build a reproducible feature engineering pipeline with scikit-learn
+- Identify and remove low-value features before training
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"Data beats algorithms" is the most-cited rule in applied ML. Features that capture real-world signal — not just raw columns — consistently outperform algorithmic complexity. A well-engineered feature set with logistic regression often beats raw features with XGBoost. Feature engineering also reduces training time, improves interpretability, and prevents models from learning spurious correlations.
+</WhyThisMatters>
+
+<Body>
+## Encoding categorical variables
+
+Machine learning models require numeric inputs. Categorical columns need to be converted.
+
+**One-hot encoding** — creates a binary column for each category. Use for nominal variables with low cardinality (< 15–20 unique values).
+
+```python
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+
+# Nominal: no natural order
+df = pd.DataFrame({"city": ["Mumbai", "Delhi", "Mumbai", "Bangalore", "Delhi"]})
+encoder = OneHotEncoder(sparse_output=False, drop="first")  # drop first to avoid multicollinearity
+encoded = encoder.fit_transform(df[["city"]])
+df_encoded = pd.DataFrame(encoded, columns=encoder.get_feature_names_out())
+print(df_encoded)
+```
+
+**Ordinal encoding** — assigns integer codes preserving order. Use for ordinal variables (size: S < M < L < XL).
+
+```python
+from sklearn.preprocessing import OrdinalEncoder
+sizes = pd.DataFrame({"size": ["S", "M", "L", "XL", "M", "S"]})
+oe = OrdinalEncoder(categories=[["S", "M", "L", "XL"]])
+sizes["size_encoded"] = oe.fit_transform(sizes[["size"]])
+```
+
+**Target encoding** — replaces each category with the mean of the target for that category. Use for high-cardinality categoricals (zip codes, product IDs). Must be done with cross-fitting to avoid leakage.
+
+```python
+from sklearn.preprocessing import TargetEncoder  # sklearn >= 1.3
+te = TargetEncoder(target_type="binary", cv=5)    # cv=5 uses cross-fitting
+X_train_te = te.fit_transform(X_train[["zip_code"]], y_train)
+X_test_te  = te.transform(X_test[["zip_code"]])
+```
+
+## Scaling
+
+| Method | Formula | Use when |
+|---|---|---|
+| StandardScaler | (x − mean) / std | Feature has a normal-ish distribution; SVM, logistic regression, linear models |
+| MinMaxScaler | (x − min) / (max − min) | Neural networks; bounded output in [0,1] needed |
+| RobustScaler | (x − median) / IQR | Many outliers; resistant to extreme values |
+| No scaling | — | Tree-based models (decision trees, RF, XGBoost, LightGBM) — they split on ranks, not magnitudes |
+
+```python
+from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
+
+# Check for outliers first
+import numpy as np
+print("Max/min ratio:", X_train["income"].max() / X_train["income"].min())
+skew = X_train["income"].skew()
+print(f"Skewness: {skew:.2f}")  # |skew| > 1 suggests RobustScaler or log-transform
+
+# Log-transform skewed features before scaling
+import numpy as np
+X_train["log_income"] = np.log1p(X_train["income"])  # log1p = log(1+x), handles zeros
+```
+
+## Feature selection with SHAP
+
+Once you have a trained model (any tree-based model), SHAP values tell you which features the model actually relied on. Features with near-zero mean |SHAP| can be dropped without hurting performance — and dropping them speeds up training and reduces overfitting.
+
+```python
+import shap
+import xgboost as xgb
+import pandas as pd
+import numpy as np
+
+model = xgb.XGBClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(X_train)  # shape: (n_samples, n_features)
+
+# Mean absolute SHAP — global feature importance
+mean_shap = pd.Series(
+    np.abs(shap_values).mean(axis=0),
+    index=X_train.columns
+).sort_values(ascending=False)
+
+print("Feature importances (mean |SHAP|):")
+print(mean_shap)
+
+# Drop features with SHAP < 1% of top feature
+threshold = mean_shap.max() * 0.01
+features_to_keep = mean_shap[mean_shap >= threshold].index.tolist()
+print(f"\nKeeping {len(features_to_keep)}/{len(X_train.columns)} features")
+```
+
+## Building a reproducible pipeline
+
+All preprocessing steps must live inside a `Pipeline` so that the same transformations apply consistently to training and test data without leakage.
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OrdinalEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.ensemble import RandomForestClassifier
+
+numeric_features  = ["age", "income", "tenure_months"]
+ordinal_features  = ["education"]   # none < high-school < bachelor < master < phd
+categorical_features = ["city", "job_type"]
+
+numeric_pipeline = Pipeline([
+    ("imputer", SimpleImputer(strategy="median")),
+    ("scaler",  StandardScaler()),
+])
+
+ordinal_pipeline = Pipeline([
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("encoder", OrdinalEncoder(categories=[
+        ["none", "high-school", "bachelor", "master", "phd"]
+    ])),
+])
+
+categorical_pipeline = Pipeline([
+    ("imputer", SimpleImputer(strategy="most_frequent")),
+    ("encoder", OneHotEncoder(handle_unknown="ignore", drop="first")),
+])
+
+preprocessor = ColumnTransformer([
+    ("num",  numeric_pipeline,    numeric_features),
+    ("ord",  ordinal_pipeline,    ordinal_features),
+    ("cat",  categorical_pipeline, categorical_features),
+])
+
+full_pipeline = Pipeline([
+    ("preprocessor", preprocessor),
+    ("model", RandomForestClassifier(n_estimators=100, random_state=42)),
+])
+
+full_pipeline.fit(X_train, y_train)
+print(f"Pipeline accuracy: {full_pipeline.score(X_test, y_test):.3f}")
+```
+</Body>
+
+<Code>
+```python
+# Full feature engineering audit: encode → scale → SHAP select → retrain
+import pandas as pd, numpy as np, shap
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, TargetEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import cross_val_score
+import xgboost as xgb
+
+def build_pipeline(numeric_cols, cat_cols):
+    num_pipe = Pipeline([
+        ("imp", SimpleImputer(strategy="median")),
+        ("scl", StandardScaler()),
+    ])
+    cat_pipe = Pipeline([
+        ("imp", SimpleImputer(strategy="most_frequent")),
+        ("enc", OneHotEncoder(handle_unknown="ignore", drop="first", sparse_output=False)),
+    ])
+    preprocessor = ColumnTransformer([
+        ("num", num_pipe, numeric_cols),
+        ("cat", cat_pipe, cat_cols),
+    ])
+    return Pipeline([
+        ("prep", preprocessor),
+        ("mdl",  xgb.XGBClassifier(n_estimators=100, random_state=42, eval_metric="logloss")),
+    ])
+
+# --- Baseline ---
+baseline = build_pipeline(numeric_cols, cat_cols)
+baseline_scores = cross_val_score(baseline, X_train, y_train, cv=5, scoring="roc_auc")
+print(f"Baseline AUC: {baseline_scores.mean():.3f} ± {baseline_scores.std():.3f}")
+
+# --- SHAP selection ---
+baseline.fit(X_train, y_train)
+# Get feature names after transformation
+feature_names = (
+    numeric_cols
+    + list(baseline.named_steps["prep"]
+              .named_transformers_["cat"]
+              .named_steps["enc"]
+              .get_feature_names_out(cat_cols))
+)
+X_transformed = baseline.named_steps["prep"].transform(X_train)
+shap_values   = shap.TreeExplainer(baseline.named_steps["mdl"]).shap_values(X_transformed)
+mean_shap     = pd.Series(np.abs(shap_values).mean(axis=0), index=feature_names)
+top_features  = mean_shap[mean_shap >= mean_shap.max() * 0.01].index.tolist()
+print(f"\nKept {len(top_features)}/{len(feature_names)} features after SHAP pruning")
+```
+</Code>
+
+<TryItYourself>
+1. Load the `titanic` dataset from seaborn (`sns.load_dataset("titanic")`).
+2. Engineer three new features: `family_size = sibsp + parch + 1`, `is_alone = (family_size == 1).astype(int)`, `fare_per_person = fare / family_size`.
+3. Use `ColumnTransformer` to: StandardScale numeric features, OneHotEncode `sex` and `embarked`.
+4. Wrap in a `Pipeline` with `RandomForestClassifier`.
+5. Compare cross-val accuracy with vs without the engineered features. Does engineering help?
+</TryItYourself>
+
+<CommonMistakes>
+- **Fitting encoders on the full dataset before splitting** — always fit encoders inside a Pipeline so they only see training data. Fitting before splitting causes leakage (test-set category frequencies influence the encoder).
+- **One-hot encoding high-cardinality features** — encoding a column with 5,000 unique zip codes creates 5,000 sparse binary features. Use target encoding or embedding instead.
+- **Dropping all correlated features without checking importance** — two correlated features might both carry signal from slightly different angles. Remove only after confirming via SHAP that one adds nothing when the other is present.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: You're building a churn model and want to encode the `country` column, which has 180 unique values. Which encoding approach is most appropriate?**
+
+- A) One-hot encoding — creates an interpretable binary column per country
+- B) Label encoding — assigns integers 0–179 without adding columns
+- C) Target encoding with cross-fitting — replaces each country with its mean churn rate, estimated on out-of-fold data to prevent leakage ✅
+- D) Drop the column — too many values to encode reliably
+</MiniQuiz>
+
+<InterviewExplanation>
+"I treat feature engineering as the highest-leverage step in the ML workflow. My process: handle missing values with median/mode imputation or a learned indicator column, encode categoricals based on cardinality (one-hot for low-cardinality nominal, ordinal for ordered, target encoding for high-cardinality), scale based on algorithm (StandardScaler for linear models and SVMs, no scaling for trees), and then use SHAP values to prune features whose mean absolute importance is below 1% of the top feature. Everything lives in a scikit-learn Pipeline to prevent leakage."
+</InterviewExplanation>
+
+<CompletionChecklist>
+- [ ] Implemented one-hot, ordinal, and target encoding on a real dataset
+- [ ] Built a full ColumnTransformer + Pipeline
+- [ ] Generated SHAP feature importances and pruned low-value features
+- [ ] Compared model performance before and after feature engineering
+- [ ] Pushed the pipeline code to GitHub
+</CompletionChecklist>

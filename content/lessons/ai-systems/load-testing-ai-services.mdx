@@ -1,0 +1,101 @@
+---
+slug: load-testing-ai-services
+title: "Load-Testing AI Services with Locust"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why you must load-test before you trust a capacity number
+- Write a Locust test that simulates realistic mixed traffic
+- Read the metrics that matter: p50/p95/p99 latency, RPS, error rate
+- Find the knee — the concurrency where latency breaks down
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"It works on my machine with one request" tells you nothing about production. Load testing reveals the concurrency at which your inference service falls over, the real p95 under traffic, and whether your autoscaling actually kicks in. Shipping without it is how you discover your limits during the launch, in front of users.
+</WhyThisMatters>
+
+<Body>
+## Why a single request lies
+
+One request hits a warm cache, an idle CPU, no queueing. Production has dozens of concurrent requests competing for the same model and accelerator. Latency under load is a completely different number — and it's the only one that matters for capacity planning.
+
+## Locust: traffic as code
+
+Locust defines virtual users as Python tasks. You set how many users, how fast they ramp, and what mix of endpoints they hit. `@task(n)` weights make the mix realistic — e.g. mostly `/predict`, occasionally `/health`.
+
+## Read the right metrics
+
+- **p50 / p95 / p99 latency** — averages hide the tail; p95/p99 is what users feel.
+- **RPS (throughput)** — requests/sec the service sustains.
+- **Error rate** — timeouts and 5xx that appear *only* under load.
+- **The knee** — ramp concurrency until latency spikes; that point is your real capacity per replica.
+
+## Test the system, not just the box
+
+Load-test through your load balancer with autoscaling enabled, so you also verify that scaling triggers *and* that new replicas warm up before they're handed traffic.
+</Body>
+
+<Code>
+```python
+from locust import HttpUser, task, between
+import random
+
+class InferenceTester(HttpUser):
+    """Run: locust -f load_test.py --host=http://localhost:8000"""
+    wait_time = between(0.1, 0.5)            # rapid, realistic pacing
+
+    @task(3)                                # 3:1 weighting → mostly predictions
+    def predict(self):
+        features = [random.uniform(-3.0, 3.0) for _ in range(10)]
+        with self.client.post("/predict", json={"features": features},
+                              catch_response=True) as resp:
+            if resp.elapsed.total_seconds() > 1.0:
+                resp.failure("over SLA: >1s")   # flag latency-SLA breaches
+
+    @task(1)
+    def health(self):
+        self.client.get("/health")
+```
+</Code>
+
+<TryItYourself>
+1. Run Locust against your inference server with 50 users
+2. Read p50/p95/p99 and RPS off the Locust dashboard
+3. Ramp users until p95 spikes — record the knee
+4. Compare 1 worker vs 4 workers at the same load
+5. Enable autoscaling and confirm replicas scale up under load (and warm before serving)
+</TryItYourself>
+
+<CommonMistakes>
+- **Trusting single-request latency** — production concurrency tells a different story
+- **Looking only at averages** — the p95/p99 tail is what users experience
+- **Unrealistic traffic mix** — weight tasks to match real usage
+- **Testing the box, not the system** — go through the load balancer with autoscaling on
+- **No SLA assertion** — mark requests over your latency budget as failures
+- **Ignoring warm-up** — cold replicas under sudden load skew results
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Wrote a Locust test with a weighted task mix
+- [ ] Captured p50/p95/p99 and RPS under load
+- [ ] Found the concurrency knee
+- [ ] Compared replica counts at equal load
+- [ ] Verified autoscaling triggers and warms up
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Which metric best represents what your users actually feel under load?**
+
+- A) Average (mean) latency
+- B) p95 / p99 tail latency ✅
+- C) Total request count
+- D) CPU temperature
+</MiniQuiz>
+
+<InterviewExplanation>
+"A single request lies — it hits a warm, idle box with no queueing, while production has dozens of concurrent requests competing for the same accelerator. So I load-test with Locust, defining virtual users with a weighted task mix that matches real usage. I read p95 and p99, not the average, because the tail is what users feel, plus RPS and the error rate that only shows up under load. Then I ramp concurrency until latency spikes — that knee is my real capacity per replica. I test through the load balancer with autoscaling on, so I also confirm scaling triggers and that new replicas warm up before they get traffic."
+</InterviewExplanation>

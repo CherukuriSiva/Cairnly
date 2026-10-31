@@ -1,0 +1,110 @@
+---
+slug: designing-ai-api-contracts
+title: "Designing API Contracts for AI Services"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Carve an AI backend into clear service boundaries (ingest / chat / analytics)
+- Choose the right response style per endpoint (202, SSE, JSON)
+- Carry auth and RBAC claims through the contract (JWT, system tokens)
+- Return citations and lineage so answers are verifiable
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+The API contract is the agreement between your AI backend and everyone who calls it. Get it right and frontends, partners, and admins integrate cleanly; get it wrong and every change is a breaking change. "Sketch the API for an enterprise RAG product" is a frequent system-design prompt, and a crisp set of boundaries is the senior answer.
+</WhyThisMatters>
+
+<Body>
+## Three boundaries
+
+A RAG product splits cleanly into three services, each a versioned prefix (`/api/v1/...`):
+
+- **Ingestion** — onboard documents (admin/system auth). Async, so it returns `202` + `job_id` with a status endpoint.
+- **Retrieval & generation** — the user-facing chat. Auth is a **user JWT carrying RBAC claims**; responses stream via SSE.
+- **Telemetry & analytics** — admin-only health, drift, and security-event endpoints.
+
+Separating these keeps auth, scaling, and rate limits independent per concern.
+
+## Match response style to the work
+
+- **Ingestion** → `202 Accepted` (long-running) — never block.
+- **Chat** → **SSE stream**, where the final chunk includes a `cited_sources` array for lineage.
+- **Analytics** → plain `200` JSON.
+
+A one-size-fits-all JSON response forces slow blocking on ingestion and kills streaming UX on chat.
+
+## Auth and RBAC ride in the contract
+
+The chat request carries a user JWT whose claims include the user's roles. Those claims flow straight into the retrieval pre-filter (the RBAC-for-RAG lesson) so a user only ever retrieves what they're allowed to see. Ingestion uses a stronger admin/system token. Auth isn't a separate system — it's part of the request shape.
+
+## Return lineage, not just an answer
+
+For a RAG product, the answer without sources is half a response. The chat contract returns `cited_sources` so the user can verify the answer and you can audit it. Make citations a first-class field, not an afterthought.
+</Body>
+
+<Code>
+```text
+POST /api/v1/ingest/document        (admin/system token)
+  payload: file blob, document_metadata, allowed_roles[]
+  → 202 Accepted  { "job_id": "job-1234" }
+GET  /api/v1/ingest/status/{job_id} → { "status": "Embedding" }
+
+POST /api/v1/chat/completions       (user JWT with RBAC claims)
+  payload: { "messages": [...], "session_id": "uuid", "stream": true }
+  → text/event-stream; final chunk: { "cited_sources": ["doc-104A", ...] }
+
+GET  /api/v1/analytics/drift         (admin token)
+  → 200 { "average_similarity_score": 0.82, "top_missing_topics": [...] }
+GET  /api/v1/analytics/security_events  → 200 paginated injection attempts
+```
+
+```python
+# RBAC claims from the JWT flow into the retrieval pre-filter
+async def chat_completions(req: ChatRequest, user: User = Depends(verify_jwt)):
+    passages = await retrieve(req.messages[-1].content,
+                              tenant=user.tenant_id, roles=user.roles)  # claims → filter
+    return StreamingResponse(stream_with_citations(passages, req),
+                             media_type="text/event-stream")
+```
+</Code>
+
+<TryItYourself>
+1. Define the three service prefixes and their auth requirements
+2. Implement chat as an SSE endpoint whose final chunk carries `cited_sources`
+3. Verify a JWT and thread its RBAC claims into the retrieval filter
+4. Make ingestion async (202 + job_id) and analytics plain JSON
+5. Add `/api/v1` versioning and add a v2 chat field without breaking v1
+</TryItYourself>
+
+<CommonMistakes>
+- **One response style for everything** — blocks ingestion, kills chat streaming
+- **No API versioning prefix** — every change risks breaking clients
+- **Auth as an afterthought** — RBAC claims must be part of the contract and reach retrieval
+- **Returning answers without citations** — a RAG response needs lineage
+- **Mixing admin and user endpoints under one auth** — separate the boundaries
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Split the API into ingest / chat / analytics boundaries
+- [ ] Used 202 for ingestion, SSE for chat, JSON for analytics
+- [ ] Threaded JWT RBAC claims into the retrieval filter
+- [ ] Returned `cited_sources` from chat
+- [ ] Versioned the API under `/api/v1`
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why does the chat endpoint stream via SSE while the ingestion endpoint returns 202?**
+
+- A) Arbitrary preference
+- B) Chat benefits from token-by-token streaming UX; ingestion is long-running so it accepts and works in the background ✅
+- C) SSE is required for all POST endpoints
+- D) Ingestion can't return JSON
+</MiniQuiz>
+
+<InterviewExplanation>
+"I split an AI backend into three versioned boundaries: ingestion with admin auth, user-facing chat, and admin analytics — so auth, scaling, and rate limits stay independent. I match the response style to the work: ingestion returns 202 with a job_id because it's long-running, chat streams via SSE with the final chunk carrying cited_sources, and analytics is plain JSON. Auth is part of the contract, not a bolt-on — the chat request carries a user JWT whose RBAC claims flow straight into the retrieval pre-filter so users only see what they're allowed to. And citations are a first-class field, because a RAG answer without lineage is only half a response."
+</InterviewExplanation>

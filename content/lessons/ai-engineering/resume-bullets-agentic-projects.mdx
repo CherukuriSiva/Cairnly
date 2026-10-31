@@ -1,0 +1,57 @@
+---
+slug: resume-bullets-agentic-projects
+title: "Resume Bullets for Agentic & Tool-Use Projects"
+track: ai-engineering
+tier: short
+estimatedMinutes: 12
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Turn an agent project into bullets that survive a recruiter's 6-second scan
+- Lead with the architecture and the safety rails, not the framework
+- Quantify impact even on a personal project
+- Avoid the buzzword bullets that get you filtered out
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Recruiters and ATS filters skim for concrete, credible signals. "Built an AI agent with LangChain" says nothing; "Built a ReAct agent with a tool registry, max-iteration safety cap, and reflection-based hallucination check" says you understand the system. The right bullet is the difference between an interview and the reject pile.
+</WhyThisMatters>
+
+<Body>
+## The formula
+
+`Built/Designed [architecture] with [distinctive components], achieving [quantified outcome]`
+
+Lead with what you *engineered*, name the parts that prove depth (the safety rails especially), and end with a number — even a self-measured one.
+
+## Strong vs weak
+
+❌ "Used LangChain to make an AI agent."
+✅ "Built a ReAct agent (controller + tool registry + memory + reflection) with a max-iteration cap and citation-grounded self-correction, reducing unsupported answers by ~40% on a 50-query eval."
+
+❌ "Worked with RAG and vector databases."
+✅ "Designed a multi-tenant RAG service with chunk-level RBAC and an audit trail, enforcing access control at retrieval so forbidden documents never reached the model."
+
+## Quantify even without prod traffic
+
+No users yet? Measure on your own eval set: "cut p95 latency 35% with a semantic cache," "raised refusal recall to 0.92 on a 40-item safety set." Self-measured numbers beat no numbers.
+
+## Words that help vs hurt
+
+- **Help:** ReAct, tool registry, reflection, RBAC, eval harness, F1, p95, max-iteration cap.
+- **Hurt:** "cutting-edge," "leveraged AI," "synergy," and naming only a framework.
+</Body>
+
+<MiniQuiz>
+**Q: Which resume bullet is strongest?**
+
+- A) "Leveraged cutting-edge AI agents to drive synergy"
+- B) "Used LangChain for an agent project"
+- C) "Built a ReAct agent with a tool registry and max-iteration cap; reflection cut unsupported answers ~40% on a 50-query eval" ✅
+- D) "Familiar with agents and RAG"
+</MiniQuiz>
+
+<InterviewExplanation>
+"On a resume I lead with the architecture and the rails, not the framework: 'Built a ReAct agent — controller, tool registry, memory, reflection — with a max-iteration cap and citation-grounded self-correction.' Then I attach a number, even a self-measured one from my eval set, like reducing unsupported answers 40% on a 50-query test. Naming the safety rails and showing a metric is what signals I actually built and evaluated the thing, rather than just wiring a library together."
+</InterviewExplanation>

@@ -1,0 +1,159 @@
+---
+slug: interviewer-questions-ai
+title: "Common Interviewer Questions on Embeddings, Retrieval, Fine-Tuning"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Answer the 12 most common AI engineering interview questions with confidence
+- Distinguish "good enough" answers from standout answers
+- Handle questions you don't know the answer to gracefully
+- Use the STAR method adapted for technical AI questions
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+AI engineering interviews ask a predictable set of questions. The difference between passing and failing isn't knowing more — it's having practiced articulate, structured answers with specific examples. This lesson gives you the question bank and a framework for each answer. Knowing these 12 questions cold covers 80% of what interviewers ask at the mid-level.
+</WhyThisMatters>
+
+<Body>
+## The answer framework
+
+For every technical question, structure your answer as:
+
+1. **Definition** (1-2 sentences) — show you know the concept
+2. **When/why** (1-2 sentences) — show you know when to use it
+3. **Example** (2-3 sentences) — show you've actually done it
+4. **Tradeoff** (1 sentence) — show you think critically
+
+This takes 30-60 seconds. Then stop and let the interviewer probe deeper.
+
+## Question 1: What are embeddings and how do they work?
+
+**Good answer**: "Embeddings are fixed-length vectors of floats that represent semantic meaning. They're produced by transformer models trained with contrastive learning — similar texts get similar vectors. I use them for vector search in RAG: embed the query, find the closest document vectors, and pass those documents to the LLM."
+
+**Standout addition**: "The key engineering decision is which model to use. I tested bge-small (384 dims, local) against OpenAI's embedding model (1536 dims, API). The bigger model was 5% better on precision@5 but added 200ms latency. For our use case, local was the right call."
+
+## Question 2: What's the difference between cosine similarity and dot product?
+
+**Answer**: "Cosine similarity measures the angle between vectors, ignoring magnitude — values range from -1 to 1. Dot product measures both angle and magnitude. If you L2-normalize your vectors first, they're mathematically equivalent. In practice, I always normalize and use dot product because FAISS IndexFlatIP is optimized for it."
+
+## Question 3: When would you use RAG vs fine-tuning?
+
+**Answer**: "RAG when the answer depends on data the model wasn't trained on — private docs, recent events, anything that changes. Fine-tuning when the model's behavior needs to change — domain language, output format, reasoning patterns. In my experience, 90% of real applications are served by RAG alone. Fine-tuning is a fallback for when RAG plus good prompting still isn't enough. I'd always try RAG first because it's cheaper, faster to iterate, and the knowledge stays up to date."
+
+## Question 4: How do you evaluate a RAG system?
+
+**Answer**: "Two axes: retrieval and generation. For retrieval, I measure precision@k (are the retrieved docs relevant?), recall@k (did I find all the relevant docs?), and MRR (is the best doc ranked first?). For generation, I measure faithfulness — what fraction of claims are supported by the context — using an LLM-as-judge. I run these on a labeled test set of at least 50 queries. The test set is the most important investment — without it, every change is guesswork."
+
+## Question 5: What is a confidence gate?
+
+**Answer**: "A confidence gate is a checkpoint that decides whether the system has enough evidence to answer. I implement it after retrieval: if the top similarity score is below a calibrated threshold, the system refuses to answer rather than hallucinating. The threshold is tuned on labeled data — I plot precision vs recall at different thresholds and pick the point where precision hits my target (usually 90%). The tradeoff is refusal rate — a higher threshold means fewer hallucinations but more refused queries."
+
+## Question 6: How does chunking affect retrieval quality?
+
+**Answer**: "Chunking determines the granularity of search. Chunks that are too large produce generic embeddings that match everything weakly. Chunks that are too small lose context and match too many irrelevant queries. I typically use recursive character splitting at 400-600 tokens with 10-15% overlap. For a production system, I'd measure precision@k with different chunk sizes on a test set. One advanced pattern is parent-document retrieval — embed small chunks for precise matching but pass the larger parent section to the LLM for generation."
+
+## Question 7: What is LoRA and why does it matter?
+
+**Answer**: "LoRA — Low-Rank Adaptation — lets you fine-tune a model by training small adapter matrices instead of all parameters. It decomposes the weight update into two low-rank matrices, so you train 0.1-1% of parameters. This makes fine-tuning feasible on a single GPU. I'd use it when RAG plus prompting fails to capture domain-specific language or behavior. The key hyperparameters are rank (I start at 16) and which layers to target (usually query and value projections)."
+
+## Question 8: How do you handle prompt injection?
+
+**Answer**: "Two layers: regex for known patterns and an LLM classifier for everything else. Regex catches common injection attempts like 'ignore previous instructions' instantly. The LLM classifier catches creative attacks that regex misses. I put the regex layer first because it's free and fast — the LLM layer only runs on queries that pass regex. On the output side, I also check for PII leakage and toxic content before returning to the user."
+
+## Question 9: How would you reduce latency in a RAG system?
+
+**Answer**: "LLM generation dominates latency — typically 70-80% of total time. Three approaches: First, stream the response so the user sees the first token in 200ms instead of waiting 2 seconds. Second, use model tiering — route easy queries to a fast cheap model, complex ones to a better model. Third, semantic caching for near-duplicate queries. On the retrieval side, FAISS brute-force is fast enough under 100k vectors; above that, switch to an approximate index like IVF or HNSW."
+
+## Question 10: What's the difference between an agent and a RAG pipeline?
+
+**Answer**: "A RAG pipeline has a fixed sequence: retrieve, augment, generate. An agent makes dynamic decisions in a loop — it chooses which tool to use based on the previous step's output. I'd use RAG for straightforward Q&A and an agent when the task requires multi-step tool use where the path isn't predictable. Agents are more powerful but less reliable — each step has a failure probability that compounds. I've found that most applications don't need agents; RAG with good prompts covers 80% of use cases."
+
+## Question 11: How do you handle data that changes frequently?
+
+**Answer**: "RAG handles this naturally — you update the document corpus and rebuild the index. The LLM doesn't need retraining. For my pipeline, I run a nightly index rebuild job. If documents change intra-day, I use an incremental approach: maintain a small 'recent' index alongside the main index and merge results. The tradeoff is that fine-tuned knowledge is frozen at training time, which is another reason RAG is usually the better choice."
+
+## Question 12: What would you do differently if you were starting this project over?
+
+This is a character question. The interviewer wants to see self-awareness and learning.
+
+**Answer**: "I'd invest more in the test set upfront. I started with 10 labeled queries, which wasn't enough to calibrate thresholds or catch regressions. It took a production failure to convince me to expand to 50. I'd also add observability from day one — structured logging with trace IDs — instead of adding it reactively after debugging got painful."
+
+## When you don't know the answer
+
+Don't bluff. Use this pattern:
+
+> "I haven't worked with [X] directly, but based on what I know about [related concept], I'd expect [reasonable inference]. I'd want to test that assumption with [specific experiment]."
+
+Example: "I haven't implemented HNSW indexing, but I know it trades exact accuracy for speed by building a multi-layer graph. For my use case with under 100k vectors, the brute-force index was fast enough, so I haven't needed approximate methods yet. If we scaled past 500k vectors, that's where I'd start experimenting."
+
+Saying "I don't know but here's how I'd find out" is always better than a wrong answer delivered confidently.
+</Body>
+
+<Code>
+```python
+# Interview prep: flashcard-style practice
+import random
+
+questions = [
+    ("What are embeddings?", "Fixed-length vectors capturing semantic meaning, via contrastive-trained transformers"),
+    ("Cosine similarity vs dot product?", "Cosine = angle only, dot = angle + magnitude. Equivalent after L2 normalization"),
+    ("RAG vs fine-tuning?", "RAG for private/changing data. Fine-tuning for behavior/style. RAG first, fine-tune as fallback"),
+    ("How to evaluate RAG?", "Retrieval: P@k, R@k, MRR. Generation: faithfulness, relevancy. Need 50+ labeled test cases"),
+    ("What is a confidence gate?", "Threshold check on retrieval score. Refuse if below threshold. Calibrate on labeled data"),
+    ("How does chunking affect quality?", "Too large = generic embeddings. Too small = lost context. 400-600 tokens + overlap"),
+    ("What is LoRA?", "Low-rank adapter matrices, ~0.1% params trainable. Fine-tune on single GPU. Rank 16, q/v projections"),
+    ("How to handle prompt injection?", "Regex first (fast, free), LLM classifier second. Check both input and output"),
+    ("How to reduce RAG latency?", "Streaming, model tiering, semantic caching. LLM gen is the bottleneck"),
+    ("Agent vs RAG pipeline?", "RAG = fixed sequence. Agent = dynamic loop. Agents less reliable. Most apps don't need agents"),
+    ("Frequently changing data?", "RAG handles naturally via index rebuild. Fine-tuned knowledge is frozen"),
+    ("What would you do differently?", "Invest in test set earlier. Add observability from day one"),
+]
+
+# Shuffle and quiz
+random.shuffle(questions)
+for i, (q, key_points) in enumerate(questions[:5], 1):
+    print(f"\nQ{i}: {q}")
+    input("  [Press Enter to see key points]")
+    print(f"  Key points: {key_points}")
+```
+</Code>
+
+<TryItYourself>
+1. Pick 5 questions from the list and write your own answers (don't copy the ones above)
+2. Practice answering each one aloud in under 60 seconds
+3. For each answer, make sure you include: definition, when/why, example, and tradeoff
+4. Have a friend randomly quiz you on 3 questions without warning
+5. Record one mock interview session covering all 12 questions
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Can answer all 12 questions without notes in under 60 seconds each
+- [ ] Each answer includes at least one specific metric or example from your own work
+- [ ] Practiced the "I don't know" pattern for at least one unfamiliar question
+- [ ] Did at least one practice session with another person
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Memorizing answers word-for-word** — it sounds robotic; internalize the key points and speak naturally
+- **No specific examples** — "I use embeddings" is generic; "I used bge-small, measured 82% P@5" is credible
+- **Answering questions you weren't asked** — if asked about embeddings, don't volunteer fine-tuning
+- **Not admitting uncertainty** — guessing wrong is worse than saying "I haven't done that but here's how I'd approach it"
+- **Forgetting to mention tradeoffs** — every answer should acknowledge what you gave up
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: An interviewer asks "How do you evaluate a RAG system?" Which answer is strongest?**
+
+- A) "I check if the answers look correct"
+- B) "I use RAGAS framework"
+- C) "I measure precision@5 and faithfulness on a labeled test set of 50 queries using an LLM-as-judge" ✅
+- D) "Evaluation isn't my focus — I focus on building"
+</MiniQuiz>
+
+<InterviewExplanation>
+"I prepare for AI interviews by structuring every answer with four beats: a crisp definition, when and why I'd use it, a concrete example from my own work with specific metrics, and the tradeoff I accepted. I keep initial answers under 60 seconds and let the interviewer guide depth. For questions I don't know, I map to the closest thing I do know and explain how I'd experiment to fill the gap."
+</InterviewExplanation>

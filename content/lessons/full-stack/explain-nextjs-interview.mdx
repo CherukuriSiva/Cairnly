@@ -1,0 +1,146 @@
+---
+slug: explain-nextjs-interview
+title: "How to Explain a Next.js Architecture in an Interview"
+track: full-stack
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Structure a 2-minute architecture walkthrough for an interviewer
+- Explain Server vs Client Components without jargon overload
+- Connect technical decisions to business outcomes
+- Handle follow-up questions about tradeoffs and alternatives
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"Walk me through a project you've built" is the most common opening question in full-stack interviews. If you ramble about implementation details without structure, the interviewer loses interest in 30 seconds. A crisp, layered explanation signals senior-level thinking — even from a junior candidate.
+</WhyThisMatters>
+
+<Body>
+## The 4-layer explanation framework
+
+When asked "tell me about your project," use this structure:
+
+### Layer 1: What it does (15 seconds)
+State the product in one sentence. What problem does it solve? Who uses it?
+
+> "I built a layoffs tracker — a content site that aggregates tech layoff data, lets users browse reports by company, and gates premium analysis behind a paywall."
+
+### Layer 2: Architecture overview (30 seconds)
+Name the key technologies and explain how they fit together. Focus on *why* each choice was made.
+
+> "It's a Next.js App Router app. Server Components fetch data directly from PostgreSQL via Prisma — no REST API layer for internal reads. Client Components handle interactivity like search and save buttons. Auth is NextAuth with GitHub OAuth. Payments go through Stripe Checkout with webhook-based confirmation."
+
+### Layer 3: One interesting technical decision (45 seconds)
+Pick the decision you're most proud of or that shows the most depth. Explain the problem, the options you considered, and why you chose your approach.
+
+> "The most interesting decision was content gating. I considered three approaches: checking payment status in middleware, checking in the page component, or using Stripe's customer portal. I chose checking in the Server Component because it lets me show a teaser of premium content before the paywall — middleware would block the entire page. I store payment status in the database via webhook, not the client redirect, because the redirect can fail."
+
+### Layer 4: What you'd improve (15 seconds)
+Showing self-awareness is more impressive than claiming perfection.
+
+> "If I rebuilt it, I'd add subscription management instead of one-time payments and implement incremental static regeneration for the listing pages to reduce database load."
+
+## Practice scripts for common follow-ups
+
+**"Why Next.js instead of a SPA + API?"**
+> "SEO is critical for a content site — Server Components render full HTML that search engines can index without executing JavaScript. A React SPA would require a separate SEO solution. Plus, Server Components let me query the database directly without an API layer, which reduces latency and code surface."
+
+**"How do you handle state management?"**
+> "There's no global state library. Server Components fetch their own data — no Redux, no context. The only client state is local to interactive components — a search input, a save toggle. For mutations, I use Server Actions that revalidate the affected pages."
+
+**"What happens if the Stripe webhook fails?"**
+> "Stripe retries webhooks for up to 3 days with exponential backoff. My handler is idempotent — if it receives the same event twice, the `update` call with `hasPaidAccess: true` is a no-op the second time. For edge cases, I'd add a manual reconciliation script that compares Stripe's records with the database."
+
+**"How does auth work?"**
+> "NextAuth handles the OAuth flow and stores sessions in the database via the Prisma adapter. I protect pages by calling `auth()` in Server Components — if there's no session, I redirect to sign-in. Server Actions also check the session before any mutation. Auth checks always happen server-side."
+
+## Whiteboard walkthrough tips
+
+If asked to draw the architecture:
+
+```
+Browser → Vercel Edge → Server Component → Prisma → PostgreSQL
+                   ↓
+            Client Component (hydrates with JS)
+
+Stripe Dashboard → Webhook → API Route → Prisma → PostgreSQL
+```
+
+Draw the data flow, not the file structure. Interviewers care about how requests move through the system, not which folder your components live in.
+
+## Body language and pacing
+
+- **Pause between layers** — let the interviewer ask follow-ups
+- **Use "I chose X because Y" not "I used X"** — decisions matter more than tools
+- **If you don't know something, say so** — "I haven't implemented that yet, but I'd approach it by..." is always better than making something up
+</Body>
+
+<Code>
+```text
+## Interview Answer Template
+
+"I built [PRODUCT] — [one sentence what it does].
+
+The architecture is [FRAMEWORK] with [DATABASE] via [ORM]. 
+[RENDERING STRATEGY] handles [REASON]. 
+Auth is [AUTH SOLUTION] and payments use [PAYMENT PROVIDER].
+
+The most interesting decision was [DECISION]. I considered 
+[OPTION A] and [OPTION B], but chose [CHOSEN] because [REASON].
+
+If I rebuilt it, I'd [IMPROVEMENT 1] and [IMPROVEMENT 2]."
+```
+
+```text
+## Practice: Fill in your version
+
+"I built ______ — a content site that ______.
+
+The architecture is Next.js App Router with PostgreSQL via Prisma.
+Server Components handle data fetching and SEO because ______.
+Auth is NextAuth with ______ OAuth and payments use Stripe Checkout.
+
+The most interesting decision was ______. I considered 
+______ and ______, but chose ______ because ______.
+
+If I rebuilt it, I'd ______ and ______."
+```
+</Code>
+
+<TryItYourself>
+1. Write out your 2-minute architecture explanation using the 4-layer framework
+2. Record yourself saying it aloud — aim for under 2 minutes
+3. Have a friend ask 3 follow-up questions — practice answering without preparation
+4. Draw the system diagram on paper in under 60 seconds
+5. Practice explaining one technical decision in depth with "I considered X, chose Y because Z"
+</TryItYourself>
+
+<CommonMistakes>
+- **Starting with implementation details** — "So first I ran `create-next-app`..." is the wrong opening; start with what the product does
+- **Listing technologies without explaining why** — "I used React, Next.js, Tailwind, Prisma, PostgreSQL, NextAuth, Stripe, Vercel" is a grocery list, not an explanation
+- **Not mentioning tradeoffs** — every decision has a downside; acknowledging them shows engineering maturity
+- **Claiming the project is perfect** — interviewers trust candidates who identify improvements over those who claim perfection
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Wrote a 2-minute architecture explanation using the 4-layer framework
+- [ ] Practiced answering 5 common follow-up questions
+- [ ] Can draw the system architecture in under 60 seconds
+- [ ] Recorded and timed yourself — under 2 minutes for the overview
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: An interviewer asks "Walk me through your project." What should you say first?**
+
+- A) "I used Next.js App Router with Prisma and PostgreSQL"
+- B) "It's a content site that tracks tech layoffs and gates premium analysis behind a paywall" ✅
+- C) "Let me pull up the code and show you the file structure"
+- D) "I started by designing the database schema"
+</MiniQuiz>
+
+<InterviewExplanation>
+"When explaining architecture in interviews, I use a 4-layer structure: what the product does, the architecture overview, one deep technical decision, and what I'd improve. This gives the interviewer a clear narrative and natural points to ask follow-ups. The key is leading with business context — what problem does it solve — before diving into tech stack decisions."
+</InterviewExplanation>

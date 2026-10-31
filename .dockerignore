@@ -2,7 +2,7 @@
 .venv
 .env
 .idea
-corpus
+data
 web
 tests
 **/__pycache__

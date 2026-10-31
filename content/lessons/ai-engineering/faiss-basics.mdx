@@ -1,0 +1,213 @@
+---
+slug: faiss-basics
+title: "FAISS Basics: A Vector Search You Can Run Locally"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Install FAISS and create a vector index from scratch
+- Distinguish between `IndexFlatL2`, `IndexFlatIP`, and `IndexIVFFlat`
+- Add, search, and persist an index with real embeddings
+- Decide when to use FAISS vs a managed vector database
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+FAISS (Facebook AI Similarity Search) is the most widely-used open-source vector search library. It powers retrieval at companies from Meta to Spotify. Learning FAISS gives you a concrete, local-first tool to build RAG pipelines without paying for a hosted vector database — and the concepts transfer directly to Pinecone, Weaviate, and Qdrant.
+</WhyThisMatters>
+
+<Body>
+## What FAISS does
+
+FAISS is a C++ library (with Python bindings) that stores vectors and finds the nearest neighbors to a query vector extremely fast. It is *not* a database — it has no built-in metadata storage, no access control, and no network layer. It is a search engine for vectors, nothing more.
+
+The workflow is simple:
+1. Create an index with a specific distance metric
+2. Add your document vectors to the index
+3. Search the index with a query vector to get top-k results
+4. Optionally save the index to disk for reuse
+
+## Installing FAISS
+
+```bash
+# CPU-only (recommended for learning)
+pip install faiss-cpu
+
+# GPU-accelerated (requires CUDA)
+pip install faiss-gpu
+```
+
+## Index types that matter
+
+FAISS has dozens of index types, but you only need to understand three:
+
+### IndexFlatL2 — Exact L2 distance
+
+Computes the exact Euclidean (L2) distance between the query and every vector in the index. Guaranteed to find the true nearest neighbors. Slow for large datasets because it's a brute-force scan.
+
+```python
+import faiss
+import numpy as np
+
+dim = 384
+index = faiss.IndexFlatL2(dim)
+
+# Add 1000 random vectors
+vectors = np.random.rand(1000, dim).astype("float32")
+index.add(vectors)
+
+# Search for the 5 nearest neighbors of a query
+query = np.random.rand(1, dim).astype("float32")
+distances, indices = index.search(query, k=5)
+```
+
+### IndexFlatIP — Exact inner product (dot product)
+
+Same brute-force approach, but uses dot product instead of L2 distance. If your vectors are L2-normalized, this is equivalent to cosine similarity — and it's the index type you'll use most often in RAG.
+
+```python
+# L2-normalize vectors first
+faiss.normalize_L2(vectors)
+
+index = faiss.IndexFlatIP(dim)
+index.add(vectors)
+
+# Higher score = more similar
+query_norm = query.copy()
+faiss.normalize_L2(query_norm)
+scores, indices = index.search(query_norm, k=5)
+```
+
+### IndexIVFFlat — Approximate search with clusters
+
+For datasets over ~100k vectors, brute-force gets slow. `IndexIVFFlat` partitions vectors into clusters (Voronoi cells) and only searches the closest clusters at query time.
+
+```python
+nlist = 100  # number of clusters
+quantizer = faiss.IndexFlatIP(dim)
+index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_INNER_PRODUCT)
+
+# Must train on a representative sample before adding
+index.train(vectors)
+index.add(vectors)
+
+# nprobe controls accuracy vs speed — higher = more accurate, slower
+index.nprobe = 10
+scores, indices = index.search(query_norm, k=5)
+```
+
+## Persisting the index
+
+FAISS indices can be saved to and loaded from disk:
+
+```python
+faiss.write_index(index, "my_index.faiss")
+loaded_index = faiss.read_index("my_index.faiss")
+```
+
+This is how you avoid re-embedding your entire corpus every time you restart your application.
+
+## Storing metadata alongside vectors
+
+FAISS only stores vectors and returns integer IDs. You need a side-car mapping from those IDs to your actual document text, file paths, or URLs. A simple approach:
+
+```python
+import json
+
+metadata = {
+    0: {"text": "First document chunk...", "source": "doc1.pdf", "page": 1},
+    1: {"text": "Second document chunk...", "source": "doc1.pdf", "page": 2},
+}
+
+# Save metadata alongside the index
+with open("metadata.json", "w") as f:
+    json.dump(metadata, f)
+```
+
+At query time, use the returned indices to look up metadata:
+
+```python
+scores, ids = index.search(query_norm, k=5)
+results = [{"score": float(scores[0][i]), **metadata[int(ids[0][i])]} for i in range(5)]
+```
+
+## When to use FAISS vs a managed vector DB
+
+| Scenario | Use FAISS | Use managed DB (Pinecone, Weaviate, etc.) |
+|---|---|---|
+| Learning / prototyping | Yes | Overkill |
+| < 1M vectors, single machine | Yes | Optional |
+| Multi-user, multi-tenant | Awkward | Yes |
+| Need metadata filtering | Requires workarounds | Built-in |
+| Need real-time updates | Rebuild index | Built-in |
+
+**Rule of thumb**: Start with FAISS. Migrate to a managed vector database only when you need features FAISS doesn't provide — metadata filtering, access control, or horizontal scaling.
+</Body>
+
+<Code>
+```python
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+# 1. Embed your documents
+model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+documents = [
+    "RAG combines retrieval with generation for grounded answers.",
+    "FAISS is a library for fast similarity search of dense vectors.",
+    "Fine-tuning adapts a pre-trained model to a specific domain.",
+    "Prompt engineering is the art of crafting effective LLM inputs.",
+]
+embeddings = model.encode(documents, normalize_embeddings=True)
+
+# 2. Build a FAISS index
+dim = embeddings.shape[1]
+index = faiss.IndexFlatIP(dim)
+index.add(embeddings.astype("float32"))
+
+# 3. Query the index
+query = "How does retrieval-augmented generation work?"
+query_vec = model.encode([query], normalize_embeddings=True).astype("float32")
+scores, ids = index.search(query_vec, k=2)
+
+for rank, (score, idx) in enumerate(zip(scores[0], ids[0])):
+    print(f"#{rank+1} (score={score:.3f}): {documents[idx]}")
+```
+</Code>
+
+<TryItYourself>
+1. Install dependencies: `pip install faiss-cpu sentence-transformers`
+2. Create a Python file and paste the code above
+3. Run it and confirm the RAG-related document ranks first
+4. Add 3 more documents on different topics and verify the ranking still makes sense
+5. Save the index to disk with `faiss.write_index()` and reload it
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Built a FAISS `IndexFlatIP` index with at least 5 documents
+- [ ] Ran a query and got meaningful ranked results
+- [ ] Saved and reloaded the index from disk
+- [ ] Can explain the difference between `IndexFlatL2` and `IndexFlatIP`
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Forgetting to normalize vectors before using `IndexFlatIP`** — without normalization, dot product is not cosine similarity and results will be wrong
+- **Using float64 arrays** — FAISS requires float32; pass `.astype("float32")` before adding
+- **Not training IVF indices before adding vectors** — `IndexIVFFlat` requires a `train()` call on representative data before `add()`
+- **Storing metadata inside the FAISS index** — FAISS only stores vectors; keep a separate mapping for text and metadata
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: You have 50,000 document embeddings and need exact nearest-neighbor search with cosine similarity. Which FAISS index type should you use?**
+
+- A) `IndexFlatL2`
+- B) `IndexFlatIP` with L2-normalized vectors ✅
+- C) `IndexIVFFlat` — always use approximate search
+- D) `IndexPQ` — product quantization is required
+</MiniQuiz>
+
+<InterviewExplanation>
+"FAISS is an open-source library for efficient vector similarity search. For a RAG pipeline, I'd use IndexFlatIP with L2-normalized embeddings to get cosine similarity via dot product. For datasets under a million vectors on a single machine, this brute-force index is fast enough and guarantees exact results. I'd keep a side-car JSON or SQLite file mapping FAISS integer IDs to document text and metadata. If I needed filtering, multi-tenancy, or horizontal scaling, I'd migrate to a managed vector database like Pinecone or Weaviate."
+</InterviewExplanation>

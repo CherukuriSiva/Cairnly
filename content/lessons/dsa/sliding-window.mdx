@@ -1,0 +1,109 @@
+---
+slug: sliding-window
+title: "Sliding Window: Solving Subarray Problems in Linear Time"
+track: dsa
+tier: short
+estimatedMinutes: 12
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Distinguish fixed-size from variable-size sliding windows
+- Implement the expand/contract template for variable windows
+- Solve max subarray sum, longest substring without repeating characters, and minimum window substring
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Sliding window eliminates redundant computation by reusing previous results as you shift through a sequence. It's the go-to technique for contiguous subarray and substring problems and appears in nearly every interview question bank.
+</WhyThisMatters>
+
+<Body>
+## The core idea
+
+Maintain a "window" defined by two indices `[left, right]`. Expand the window by advancing `right`, and contract it by advancing `left`. Track a running result (sum, count, character set) so each expansion or contraction is O(1) work.
+
+## Fixed-size window
+
+When the window size k is given, slide it across in one pass.
+
+```python
+def max_sum_subarray(nums, k):
+    """Maximum sum of any contiguous subarray of size k."""
+    window_sum = sum(nums[:k])
+    best = window_sum
+    for i in range(k, len(nums)):
+        window_sum += nums[i] - nums[i - k]  # add right, drop left
+        best = max(best, window_sum)
+    return best
+```
+
+**Time:** O(n). **Space:** O(1).
+
+## Variable-size window template
+
+When the window size is unknown, expand until a condition breaks, then contract until it's restored.
+
+```python
+def longest_substring_no_repeat(s):
+    """LeetCode 3: Longest Substring Without Repeating Characters."""
+    seen = {}
+    left = 0
+    best = 0
+    for right, char in enumerate(s):
+        if char in seen and seen[char] >= left:
+            left = seen[char] + 1
+        seen[char] = right
+        best = max(best, right - left + 1)
+    return best
+```
+
+**Time:** O(n) &mdash; each character is visited at most twice (once by `right`, once by `left`).
+**Space:** O(min(n, alphabet size)).
+
+## Variable window: Minimum Window Substring
+
+```python
+from collections import Counter
+
+def min_window(s, t):
+    """LeetCode 76: Minimum Window Substring."""
+    need = Counter(t)
+    missing = len(t)
+    left = 0
+    start, end = 0, float('inf')
+    for right, char in enumerate(s):
+        if need[char] > 0:
+            missing -= 1
+        need[char] -= 1
+        while missing == 0:               # window contains all of t
+            if right - left < end - start:
+                start, end = left, right
+            need[s[left]] += 1
+            if need[s[left]] > 0:
+                missing += 1
+            left += 1
+    return s[start:end + 1] if end < float('inf') else ""
+```
+
+## When to reach for sliding window
+
+| Signal | Window type |
+|---|---|
+| "Subarray of size k" or "k consecutive elements" | Fixed |
+| "Longest/shortest subarray with condition X" | Variable |
+| "Substring containing all characters of T" | Variable with frequency map |
+| "At most k distinct elements" | Variable with counter |
+</Body>
+
+<MiniQuiz>
+**Q: You need the maximum sum of any contiguous subarray of size k. A brute-force approach recalculates the sum from scratch for each window. What does the sliding window approach save?**
+
+- A) It reduces space from O(n) to O(1)
+- B) It avoids re-summing the overlapping k-1 elements each step ✅
+- C) It sorts the array first
+- D) It uses binary search to find the window
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd maintain a running sum. Start with the sum of the first k elements. For each new position, add the incoming element and subtract the outgoing one. This way each step is O(1) and the whole pass is O(n). For variable-size windows I use the expand-then-contract template: grow the right boundary until a condition breaks, then shrink from the left until it's restored, tracking the best answer throughout."
+</InterviewExplanation>

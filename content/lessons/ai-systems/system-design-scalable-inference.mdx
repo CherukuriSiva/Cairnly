@@ -1,0 +1,102 @@
+---
+slug: system-design-scalable-inference
+title: "System Design: Scalable Inference Service"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Drive a "design a model-serving system at scale" interview
+- Sequence the components: gateway → cache → workers → registry → monitoring
+- Raise the levers that matter: batching, autoscaling, quantization, fallback
+- Defend a target like "p95 < 300ms at 1000 RPS" with concrete choices
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"Design a system to serve this model to a million users" is the capstone MLOps interview. It ties together everything in this track — serving, scaling, caching, quantization, fallback, monitoring. A structured answer that names trade-offs and hits a latency/throughput target is a strong senior signal.
+</WhyThisMatters>
+
+<Body>
+## Start with the numbers
+
+Pin the targets before designing: expected RPS, p95 latency budget, payload size, and whether it's GPU- or CPU-bound. "p95 < 300ms at 1000 RPS" turns a vague question into an engineering problem you can reason about.
+
+## The request path
+
+**Gateway/LB** → **semantic cache** (return hits instantly) → **inference workers** (stateless, model loaded once, behind autoscaling) → **response**. Cross-cutting: a **model registry** feeds workers their versioned model; **monitoring** watches latency/errors/drift.
+
+## The levers, and when to pull each
+
+- **Semantic cache** — kills latency and cost on repeat/near-duplicate queries. First lever.
+- **Micro-batching** — pack concurrent requests into one model call for throughput.
+- **Horizontal autoscaling** — stateless workers, scale on concurrency/p95, readiness probes for warm-up.
+- **Quantization** — INT8/FP16 to fit more per accelerator and cut latency, gated on an eval check.
+- **Provider/replica fallback + circuit breakers** — for availability under partial failure.
+
+## Capacity math, out loud
+
+"If one worker holds ~50 RPS at the latency budget, 1000 RPS needs ~20 workers plus headroom; autoscale 5→30 on concurrency." Showing the arithmetic is the senior move.
+
+## Close with observability
+
+Audit/structured logs, p50/p95/p99 dashboards, drift monitors, and load-test-derived capacity numbers. A design without monitoring is a prototype.
+</Body>
+
+<Code>
+```text
+WHITEBOARD ORDER:
+
+  Client → API Gateway / Load Balancer
+         → Semantic Cache (hit? return)            [latency + cost lever]
+         → Inference Workers (stateless, model-once, micro-batching)
+              ↑ Model Registry (versioned)         [deploy = promotion]
+              ↳ autoscale on concurrency/p95, readiness probes
+         → Response
+  Fallback: secondary provider + circuit breaker   [availability]
+  Cross-cutting: metrics (p50/p95/p99), drift monitor, audit log
+
+OPENING LINE:
+"First, the targets — say p95 < 300ms at 1000 RPS. Then I'll walk the
+request path and name the lever and trade-off at each hop."
+```
+</Code>
+
+<TryItYourself>
+1. Whiteboard the request path from memory in under 4 minutes
+2. State a target (RPS + p95) and do the capacity arithmetic out loud
+3. For each lever, say when you'd pull it and its trade-off
+4. Have a friend add "now it must be highly available"; add fallback + breakers
+5. Run a timed 20-minute mock and trim any over-long section
+</TryItYourself>
+
+<CommonMistakes>
+- **Designing without targets** — pin RPS and p95 first
+- **Stateful workers** — breaks horizontal scaling
+- **Forgetting the cache** — the cheapest latency/cost win goes unmentioned
+- **Quantizing without an eval gate** — silent accuracy loss
+- **No capacity arithmetic** — naming components isn't sizing a system
+- **No monitoring/fallback** — reads as a prototype, not production
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Opened with concrete RPS + p95 targets
+- [ ] Walked the full request path with trade-offs
+- [ ] Did capacity arithmetic for worker count
+- [ ] Covered cache, batching, autoscaling, quantization, fallback
+- [ ] Closed with monitoring and load-test-derived numbers
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: What's the best first move when asked to "design a scalable inference service"?**
+
+- A) Pick a vector database
+- B) Pin the targets — expected RPS and p95 latency budget — before designing ✅
+- C) Choose the biggest GPU available
+- D) Start writing the FastAPI code
+</MiniQuiz>
+
+<InterviewExplanation>
+"I open by pinning targets — say p95 under 300ms at 1000 RPS — because that turns a vague prompt into an engineering problem. Then I walk the request path: gateway, a semantic cache that returns hits instantly, stateless inference workers that load the model once and micro-batch, fed versioned models from a registry, with autoscaling on concurrency and readiness probes for warm-up. I name each lever and when to pull it — cache first for latency and cost, batching for throughput, quantization gated on an eval check, provider fallback with circuit breakers for availability. I do the capacity arithmetic out loud — if a worker holds 50 RPS, 1000 needs ~20 plus headroom — and I close on observability: p95/p99 dashboards, drift monitors, and load-test-derived capacity."
+</InterviewExplanation>

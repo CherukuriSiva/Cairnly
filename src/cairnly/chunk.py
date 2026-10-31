@@ -18,11 +18,12 @@ class Chunk:
     start_line: int  # 1-based, inclusive, counted in the body (after front matter)
     end_line: int
     text: str
+    anchor: str = ""  # id of the section's heading on the rendered page; "" when none
 
 
 def chunk_markdown(body: str, max_chars: int = 1800) -> list[Chunk]:
     lines = body.splitlines()
-    in_fence = _fence_mask(lines)
+    in_fence = fence_mask(lines)
     chunks: list[Chunk] = []
     for trail, start, end in _sections(lines, in_fence):
         if not any(line.strip() for line in lines[start:end + 1]):
@@ -34,7 +35,7 @@ def chunk_markdown(body: str, max_chars: int = 1800) -> list[Chunk]:
     return chunks
 
 
-def _fence_mask(lines: list[str]) -> list[bool]:
+def fence_mask(lines: list[str]) -> list[bool]:
     mask, fence = [], None
     for line in lines:
         m = FENCE.match(line)

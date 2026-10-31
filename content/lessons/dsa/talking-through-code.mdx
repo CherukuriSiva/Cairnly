@@ -1,0 +1,101 @@
+---
+slug: talking-through-code
+title: "Talking Through Code: The Interviewer's Perspective"
+track: dsa
+tier: short
+estimatedMinutes: 12
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Structure your verbal communication during a coding interview
+- Use the "think aloud" technique without rambling
+- Know what interviewers are actually evaluating beyond correctness
+- Handle common scenarios: getting stuck, finding a bug, running out of time
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Many strong engineers fail interviews not because they can't solve the problem, but because they solve it silently. Interviewers evaluate your thought process, communication, and collaboration just as much as your code. A candidate who talks through a 70% solution often scores higher than one who silently writes a perfect one.
+</WhyThisMatters>
+
+<Body>
+## The interviewer's scorecard
+
+Most companies evaluate four dimensions:
+
+1. **Problem solving**: Can you break down the problem and find an approach?
+2. **Coding**: Is your code clean, correct, and well-structured?
+3. **Communication**: Can you explain your thinking clearly?
+4. **Verification**: Do you test your code and handle edge cases?
+
+Communication affects all four scores. Talking through your approach gives the interviewer confidence in your problem-solving even before you write a line of code.
+
+## The 5-step interview framework
+
+### Step 1: Clarify (2 minutes)
+Repeat the problem in your own words. Ask questions:
+- "So the input is a sorted array of integers and I need to find two that sum to target?"
+- "Can there be negative numbers?"
+- "Should I return indices or values?"
+- "What if there are multiple valid answers?"
+
+### Step 2: Examples (1 minute)
+Walk through a small example by hand:
+- "Let me trace through [2, 7, 11, 15] with target 9. I'd check 2 + 15 = 17, too big. 2 + 11 = 13, still big. 2 + 7 = 9, found it."
+
+### Step 3: Approach (2 minutes)
+State your approach before coding:
+- "I'll use two pointers since the array is sorted. Left starts at 0, right at the end. If the sum is too small, move left right. If too big, move right left. This is O(n) time, O(1) space."
+- Wait for interviewer acknowledgment before proceeding.
+
+### Step 4: Code (15-20 minutes)
+Narrate as you write:
+- "I'll initialize left and right..."
+- "Inside the while loop, I compute the sum..."
+- "If we find the target, return the indices..."
+
+### Step 5: Verify (3-5 minutes)
+Trace through your code with the example:
+- "Let me trace this with [2, 7, 11, 15], target 9. left=0, right=3. Sum = 2+15 = 17 > 9, so right becomes 2. Sum = 2+11 = 13 > 9, right becomes 1. Sum = 2+7 = 9, return [0, 1]. Correct."
+- Check edge cases: empty array, single element, no valid pair.
+
+## Phrases that score well
+
+| Situation | What to say |
+|---|---|
+| Starting the problem | "Let me make sure I understand: [restate problem]" |
+| Choosing an approach | "I see two approaches. Brute force is O(n^2). But since the array is sorted, I can use two pointers for O(n)." |
+| While coding | "I'm adding a visited check here to avoid cycles." |
+| Spotting an issue | "Wait, I think there's an off-by-one here. Let me check... yes, it should be `<` not `<=`." |
+| Getting stuck | "I'm going to step back and think about what data structure would help here. I need fast lookups, so a hash map might work." |
+| After finishing | "Let me trace through an example to verify. And I should check: what if the input is empty?" |
+
+## When you're stuck
+
+Do NOT go silent. Instead:
+
+1. **State what you know**: "I know I need to find the shortest path, and BFS gives shortest paths in unweighted graphs."
+2. **State what's blocking you**: "I'm not sure how to handle the case where we can modify the grid."
+3. **Try a simpler version**: "Let me think about a 1D version of this problem first."
+4. **Ask for a hint gracefully**: "I'm considering a few approaches. Would you suggest focusing on the BFS direction?"
+
+## When you find a bug
+
+This is actually a scoring opportunity:
+- "I just realized my loop should be `while left < right`, not `while left <= right`, because if left equals right we'd use the same element twice. Let me fix that."
+
+Interviewers are impressed by candidates who catch and fix their own bugs.
+</Body>
+
+<MiniQuiz>
+**Q: You've just been given a coding problem. What should you do FIRST?**
+
+- A) Start writing code immediately
+- B) Ask clarifying questions and restate the problem in your own words ✅
+- C) State the optimal time complexity
+- D) Write test cases
+</MiniQuiz>
+
+<InterviewExplanation>
+"In a coding interview, I follow a five-step process: clarify the problem with questions, walk through a small example by hand, state my approach and its complexity before coding, write the code while narrating my decisions, and then verify by tracing through my code with the example plus edge cases. If I get stuck, I vocalize what I'm thinking rather than going silent, because the interviewer can only help if they know my thought process."
+</InterviewExplanation>

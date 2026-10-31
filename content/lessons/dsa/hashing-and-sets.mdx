@@ -1,0 +1,111 @@
+---
+slug: hashing-and-sets
+title: "Hashing and Sets: When O(1) Lookup Changes Everything"
+track: dsa
+tier: short
+estimatedMinutes: 12
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Understand how hash tables provide average O(1) insert, delete, and lookup
+- Choose between hash maps and hash sets for different problem types
+- Solve "group anagrams," "longest consecutive sequence," and "intersection of two arrays"
+- Recognize the complement-lookup pattern (the key technique behind Two Sum)
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Hash-based data structures are the most frequently used tool in coding interviews. The ability to turn an O(n) inner scan into an O(1) lookup is the single most impactful optimization you can make. Nearly every "can you do better than O(n^2)?" question has a hash-based answer.
+</WhyThisMatters>
+
+<Body>
+## Hash map vs. hash set
+
+- **Hash map** (`dict` in Python): stores key-value pairs. Use when you need to associate data with each key (index, count, last-seen position).
+- **Hash set** (`set` in Python): stores only keys. Use when you only need existence checks.
+
+Both give average O(1) for insert, delete, and lookup.
+
+## The complement-lookup pattern
+
+Two Sum is the canonical example: instead of checking every pair, store seen values and look up the complement.
+
+```python
+def two_sum(nums, target):
+    seen = {}  # value -> index
+    for i, num in enumerate(nums):
+        complement = target - num
+        if complement in seen:
+            return [seen[complement], i]
+        seen[num] = i
+    return []
+```
+
+**Time:** O(n). **Space:** O(n).
+
+## Group Anagrams
+
+Group strings by their sorted character signature.
+
+```python
+from collections import defaultdict
+
+def group_anagrams(strs):
+    groups = defaultdict(list)
+    for s in strs:
+        key = tuple(sorted(s))   # anagrams share the same sorted form
+        groups[key].append(s)
+    return list(groups.values())
+
+# group_anagrams(["eat","tea","tan","ate","nat","bat"])
+# -> [["eat","tea","ate"], ["tan","nat"], ["bat"]]
+```
+
+**Time:** O(n * k log k) where k is the max string length.
+
+## Longest Consecutive Sequence
+
+Find the length of the longest consecutive element sequence in an unsorted array, in O(n) time.
+
+```python
+def longest_consecutive(nums):
+    num_set = set(nums)
+    best = 0
+    for n in num_set:
+        if n - 1 not in num_set:   # only start counting from sequence starts
+            length = 1
+            while n + length in num_set:
+                length += 1
+            best = max(best, length)
+    return best
+
+# longest_consecutive([100, 4, 200, 1, 3, 2]) -> 4  (sequence: 1,2,3,4)
+```
+
+The trick: only begin counting from numbers that have no left neighbor (`n - 1 not in set`). This ensures each element is visited at most twice total.
+
+**Time:** O(n). **Space:** O(n).
+
+## When to use hashing
+
+| Signal | Structure |
+|---|---|
+| "Find if X exists" or "find complement" | Hash set or hash map |
+| "Count occurrences" | Hash map (Counter) |
+| "Group by property" | Hash map with computed key |
+| "Find duplicates" | Hash set |
+| "O(1) lookup needed to avoid O(n^2)" | Hash set or hash map |
+</Body>
+
+<MiniQuiz>
+**Q: In the Longest Consecutive Sequence solution, why do we check `n - 1 not in num_set` before starting a count?**
+
+- A) To avoid counting sequences that start in the middle, ensuring each sequence is counted exactly once ✅
+- B) To handle negative numbers
+- C) To skip duplicate values
+- D) To sort the set implicitly
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd put all numbers in a hash set for O(1) lookups. Then for each number, I check if it's the start of a sequence by verifying n-1 isn't in the set. If it is a start, I count consecutive elements. This way each element is processed at most twice, giving O(n) total time. The key insight is that we avoid redundant work by only starting counts from sequence boundaries."
+</InterviewExplanation>

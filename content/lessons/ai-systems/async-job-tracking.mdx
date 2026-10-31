@@ -1,0 +1,109 @@
+---
+slug: async-job-tracking
+title: "Async Job Tracking for Long-Running Ingestion"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Recognize when an endpoint must be asynchronous (return now, work later)
+- Return `202 Accepted` with a `job_id` instead of blocking
+- Expose a status endpoint that reports pipeline progress
+- Choose a job backend and avoid blocking the request worker
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Document ingestion — OCR, chunking, embedding — can take minutes. If your upload endpoint blocks until it's done, the request times out and your worker is tied up. The async-job pattern (`202 Accepted` + `job_id` + status polling) is how every serious ingestion API works, and "how would you handle a slow upload?" is a common design question.
+</WhyThisMatters>
+
+<Body>
+## Some work can't fit in a request
+
+A user uploads a 200-page PDF. Parsing, OCR, chunking, and embedding take minutes — far longer than a request should live. Blocking means timeouts, a stalled worker, and a terrible UX. The fix: **accept the work and do it in the background.**
+
+## The 202 + job_id pattern
+
+The upload endpoint validates the input, enqueues the job, and immediately returns **`202 Accepted`** with a `job_id`. The heavy lifting happens off the request path. The client uses the `job_id` to poll progress.
+
+```text
+POST /api/v1/ingest/document   → 202 { "job_id": "job-abc123" }
+GET  /api/v1/ingest/status/job-abc123
+     → { "status": "Embedding", "progress": 0.6 }
+```
+
+## Report meaningful progress
+
+A boolean "done?" isn't enough for a minutes-long job. Track the pipeline *stage* — `Parsing → Sanitizing → Chunking → Embedding → Stored` — so the UI can show real progress and you can debug where a job is stuck.
+
+## Don't block the worker
+
+Returning 202 only helps if the work truly runs elsewhere. Use a task queue (Celery, RQ, Arq) or at least a background worker — not an in-request thread that still pins the web worker. Persist job state (Redis/DB) so status survives a restart and any worker can answer the poll.
+</Body>
+
+<Code>
+```python
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import JSONResponse
+import uuid
+
+app = FastAPI()
+jobs: dict[str, dict] = {}     # Redis/DB in production, not an in-memory dict
+
+@app.post("/ingest/document", status_code=202)
+async def ingest(file: UploadFile = File(...), queue=Depends(get_queue)):
+    job_id = f"job-{uuid.uuid4().hex[:8]}"
+    jobs[job_id] = {"status": "Queued", "progress": 0.0}
+    blob = await file.read()
+    queue.enqueue(process_document, job_id, blob, file.filename)   # off the request path
+    return JSONResponse({"job_id": job_id}, status_code=202)
+
+@app.get("/ingest/status/{job_id}")
+async def status(job_id: str):
+    return jobs.get(job_id, {"status": "unknown"})
+
+def process_document(job_id, blob, filename):     # runs in a worker
+    for stage, p in [("Parsing", .2), ("Sanitizing", .4), ("Chunking", .6),
+                     ("Embedding", .8), ("Stored", 1.0)]:
+        jobs[job_id] = {"status": stage, "progress": p}    # update persisted state
+        run_stage(stage, blob)
+```
+</Code>
+
+<TryItYourself>
+1. Build the upload endpoint and confirm it returns 202 + a `job_id` immediately
+2. Implement a worker that walks the stages and updates job state
+3. Poll the status endpoint and watch the stage/progress advance
+4. Move job state to Redis and confirm status survives a server restart
+5. Simulate a stage failure and expose a `failed` status with the failing stage
+</TryItYourself>
+
+<CommonMistakes>
+- **Blocking the request until ingestion finishes** — timeouts and pinned workers
+- **In-memory job dict in production** — status is lost on restart and not shared across workers
+- **Boolean done/not-done** — report the stage for real progress and debugging
+- **"Background" work that still runs in the web worker** — use a real queue
+- **No failure status** — a stuck job looks identical to a slow one
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Returned `202 Accepted` with a `job_id` from the upload endpoint
+- [ ] Ran the heavy work in a queue/worker, off the request path
+- [ ] Exposed a status endpoint reporting the pipeline stage
+- [ ] Persisted job state so status survives restarts
+- [ ] Handled and surfaced job failure
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: A document-ingestion upload takes ~3 minutes. What should the upload endpoint return?**
+
+- A) 200 OK after the full pipeline finishes
+- B) 202 Accepted with a job_id, doing the work in a background worker ✅
+- C) A streaming response of the raw file
+- D) 500 if it takes over 30 seconds
+</MiniQuiz>
+
+<InterviewExplanation>
+"Ingestion — OCR, chunking, embedding — can take minutes, which is far longer than a request should live, so I don't block. The endpoint validates the input, enqueues the job, and returns 202 Accepted with a job_id immediately; the heavy work runs in a task queue off the request path. The client polls a status endpoint that reports the pipeline stage — Parsing, Sanitizing, Chunking, Embedding, Stored — not just done-or-not, so the UI shows real progress and I can see where a job is stuck. Job state lives in Redis or a DB so it survives restarts and any worker can answer the poll, and I expose a failed status so a stuck job is distinguishable from a slow one."
+</InterviewExplanation>

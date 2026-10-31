@@ -8,9 +8,6 @@ __pycache__/
 # Secrets: copy .env.example to .env and fill it in
 .env
 
-# Paid lessons are converted locally but never committed (see CURATION.md)
-corpus/private/
-
 # Editors
 .idea/
 .vscode/
@@ -19,3 +16,25 @@ corpus/private/
 # Web
 web/node_modules/
 web/.next/
+
+# Local datasets, never committed
+data/
+
+# Reference books and other PDFs in the repo root, never committed
+/*.pdf
+
+# eval reports (re-generated on every run)
+evals/last-*.json
+
+# Terraform (keep .terraform.lock.hcl: it pins provider versions)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+# Personal drafts (LinkedIn posts etc.), never published with the repo
+drafts/
+
+# Claude Code session records (local tooling, never published)
+awesome-artifacts/
+awesome-artifacts.private/

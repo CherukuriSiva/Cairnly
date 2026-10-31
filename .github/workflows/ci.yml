@@ -28,6 +28,54 @@ jobs:
       # Tests use fake embedders and LLMs, so CI needs Postgres but not Ollama or an API key.
       - run: uv run pytest -q
 
+  # Eval gate: real embeddings over the public lessons; fails the build if retrieval quality
+  # drops below evals/gates.yaml. Only the embedding model is needed (no chat model, no key).
+  eval:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: cairnly
+          POSTGRES_PASSWORD: cairnly
+          POSTGRES_DB: cairnly
+        ports: ["5434:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cairnly" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.23"
+      - name: Install Ollama and the embedding model
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > /tmp/ollama.log 2>&1 &)
+          for _ in $(seq 1 30); do curl -sf localhost:11434/api/version && break; sleep 1; done
+          ollama pull nomic-embed-text
+      - run: uv sync --frozen --extra rerank   # same retrieval pipeline as production
+      - run: uv run cairnly migrate
+      - run: uv run cairnly ingest --kb lessons
+      - run: uv run cairnly eval --kb lessons -k 5 --gate evals/gates.yaml --out eval-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: eval-report.json
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.0
+      - run: terraform fmt -check -recursive infra
+      - run: terraform -chdir=infra/terraform init -backend=false -input=false && terraform -chdir=infra/terraform validate
+      - run: terraform -chdir=infra/bootstrap init -backend=false -input=false && terraform -chdir=infra/bootstrap validate
+      - uses: azure/setup-helm@v4
+      - run: helm lint infra/helm/cairnly
+
   docker:
     runs-on: ubuntu-latest
     steps:

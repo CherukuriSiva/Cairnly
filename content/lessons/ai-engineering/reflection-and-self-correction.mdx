@@ -1,0 +1,104 @@
+---
+slug: reflection-and-self-correction
+title: "Reflection & Self-Correction with an LLM Judge"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Add a reflection step that validates a draft answer against gathered facts
+- Use an LLM judge to detect unsupported claims and missing citations
+- Decide when reflection should accept, rewrite, or escalate
+- Avoid the failure mode where reflection just rubber-stamps everything
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+An agent's first answer is a draft, not a verdict. A reflection loop catches the agent confidently stating something its own observations never supported — the most common and most damaging agent failure. Adding a self-correction step is a high-signal portfolio feature and a frequent "how would you reduce hallucinations?" interview answer.
+</WhyThisMatters>
+
+<Body>
+## Reflection = a second pass with a different job
+
+The generation pass tries to *answer*. The reflection pass tries to *falsify*. You give a separate LLM call the draft answer plus the **observations the agent actually collected**, and ask: is every claim supported by these facts? Did it cite what was requested?
+
+## The contract: VALID or a rewrite
+
+Keep the output binary and actionable:
+
+- If the draft is fully supported → return the literal token `VALID`.
+- If not → return a corrected answer that strictly adheres to the observations.
+
+Your code then either keeps the draft (on `VALID`) or substitutes the rewrite. No fuzzy "confidence score" to misinterpret.
+
+## Ground reflection in observations, not the world
+
+The judge must check the answer against the **collected context**, not its own training knowledge — otherwise it'll "approve" plausible-sounding claims that the agent never actually verified. Extract the observations from memory and pass only those.
+
+## Don't let it rubber-stamp
+
+A lazy judge prompt returns `VALID` for everything. Force it to first *list* unsupported claims, then decide. Making it do the work before the verdict dramatically improves catch rate.
+</Body>
+
+<Code>
+```python
+def run_reflection_loop(draft_answer: str, memory_history: list[dict], llm) -> str:
+    """Validate a draft against the observations the agent gathered."""
+    observations = [m["content"] for m in memory_history
+                    if m["content"].startswith("Observation:")]
+    context = "\n".join(observations)
+
+    system = (
+        "You are an objective validator. Using ONLY the Context Observations:\n"
+        "1. List any claims in the Draft NOT supported by the context.\n"
+        "2. Note any requested citations that are missing.\n"
+        "If the draft is fully supported, output exactly: VALID\n"
+        "Otherwise output a corrected answer that adheres strictly to the context."
+    )
+    user = f"Context Observations:\n{context}\n\nDraft Answer:\n{draft_answer}"
+
+    verdict = llm.generate(system_prompt=system, messages=[{"role": "user", "content": user}])
+    if verdict.strip().upper() == "VALID":
+        return draft_answer          # accepted
+    return verdict                   # rewritten, grounded answer
+```
+</Code>
+
+<TryItYourself>
+1. Add `run_reflection_loop` after your ReAct loop's final answer
+2. Feed it a draft with one fabricated fact and confirm it rewrites rather than returns VALID
+3. Feed it a fully grounded draft and confirm it returns VALID
+4. Make the judge first list unsupported claims; compare catch rate vs a bare yes/no prompt
+5. Add an "escalate to human" branch when reflection rewrites more than N times
+</TryItYourself>
+
+<CommonMistakes>
+- **Judging against world knowledge instead of the observations** — approves ungrounded claims
+- **A lazy prompt that returns VALID for everything** — make it enumerate issues first
+- **Using a tiny/weak model as the judge** — reflection needs reasoning headroom
+- **Infinite rewrite loops** — cap rewrites and escalate
+- **Reflecting on the wrong thing** — pass the gathered facts, not the whole noisy transcript
+- **Ignoring cost** — reflection is an extra LLM call; reserve it for high-stakes answers
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Added a reflection pass that runs on the final answer
+- [ ] Grounded the judge in collected observations only
+- [ ] Verified it catches a fabricated claim and rewrites it
+- [ ] Verified it passes a fully grounded answer
+- [ ] Capped rewrites / added an escalation branch
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: What's the single most important input to give the reflection judge?**
+
+- A) The agent's system prompt
+- B) The observations the agent actually gathered, so it checks support rather than plausibility ✅
+- C) The temperature setting
+- D) The full chat template
+</MiniQuiz>
+
+<InterviewExplanation>
+"After the agent produces a draft answer, I run a reflection pass whose job is to falsify, not to answer. I pass it the draft plus the observations the agent actually collected, and ask it to list any unsupported claims and missing citations before giving a verdict. I keep the contract binary: it returns VALID, and I keep the draft, or it returns a grounded rewrite, and I substitute that. The key is grounding the judge in the gathered facts rather than its own knowledge — otherwise it rubber-stamps plausible claims the agent never verified. Since it's an extra LLM call, I reserve it for high-stakes answers."
+</InterviewExplanation>

@@ -1,0 +1,59 @@
+---
+slug: tokenization-and-context-windows
+title: "Tokens, Context Windows, and Why They Cost Money"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Explain what a token is and why it's not the same as a word
+- Count tokens with `tiktoken` before you send a request
+- Understand the context window as a hard budget shared by prompt + output
+- Estimate the cost of a request from input and output token counts
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Every LLM bill is a token bill. If you can't predict token counts, you can't predict cost or latency, and you'll get surprised by a "context length exceeded" error in production. Token math is the unglamorous skill that separates engineers who ship affordable AI from those whose demo bankrupts the team.
+</WhyThisMatters>
+
+<Body>
+## A token is a chunk, not a word
+
+Models read **tokens** — sub-word chunks. "tokenization" might be 3 tokens; a common word like "the" is 1. A rough rule for English is ~4 characters per token, or ~0.75 words per token, but you should never guess in production — you should count.
+
+## The context window is a shared budget
+
+The context window (e.g. 8K, 128K, 1M tokens) is the **total** the model can hold at once: system prompt + conversation history + retrieved context + the answer it generates. They all draw from the same pool. Stuff 120K tokens of context into a 128K model and you've left almost no room for the answer.
+
+## Counting tokens before you spend
+
+```python
+import tiktoken
+
+def count_tokens(text: str, model_name: str = "gpt-4-turbo-preview") -> int:
+    try:
+        encoding = tiktoken.encoding_for_model(model_name)
+    except KeyError:
+        encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(text))
+```
+
+## Cost is just two multiplications
+
+Input and output tokens are usually priced **differently** (output is pricier). Cost = `input_tokens × input_rate + output_tokens × output_rate`. Track it per request and you'll never be surprised by the invoice.
+</Body>
+
+<MiniQuiz>
+**Q: Your model has a 128K-token context window. You inject 125K tokens of retrieved documents and ask for a 5K-token summary. What happens?**
+
+- A) It works fine — 128K is the input limit only
+- B) It likely fails or truncates — prompt + output share the 128K budget ✅
+- C) The output is automatically compressed
+- D) The model ignores the oldest tokens silently with no downside
+</MiniQuiz>
+
+<InterviewExplanation>
+"A token is a sub-word chunk, not a word — roughly 4 characters in English, but I always count with tiktoken rather than guess. The context window is a single shared budget: system prompt, history, retrieved context, and the generated answer all come out of it, so I leave headroom for the output. Cost is input tokens times the input rate plus output tokens times the output rate, and since output is usually more expensive, trimming verbose responses is often the cheapest win."
+</InterviewExplanation>

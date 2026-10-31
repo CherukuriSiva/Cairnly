@@ -1,0 +1,111 @@
+---
+slug: ai-app-mental-model
+title: "The AI App Mental Model: Prompts vs Retrieval vs Fine-Tuning"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Distinguish between prompting, retrieval (RAG), and fine-tuning as strategies
+- Map each strategy to the problem types it solves best
+- Recognize when to combine strategies instead of choosing just one
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+New AI engineers reach for the most exciting tool first — usually fine-tuning or agents. But in production, the right starting point is almost always the simplest one that works. Getting the mental model right saves you weeks of unnecessary work and thousands of dollars in compute. Interviewers also love asking "how would you decide between these approaches?" because it separates builders from tutorial followers.
+</WhyThisMatters>
+
+<Body>
+## The three strategies
+
+Every AI application uses one or more of these strategies to get an LLM to produce useful output. Think of them as layers you can stack, not competing choices.
+
+### Strategy 1: Prompt engineering
+
+You write a carefully crafted prompt — system instructions, few-shot examples, formatting rules — and send it directly to the LLM. The model answers from its training data.
+
+**Best for:**
+- Tasks where the LLM already has the knowledge (general Q&A, summarization, code generation)
+- Controlling output format (JSON, markdown, specific schemas)
+- Rapid prototyping before you've collected domain data
+
+**Limitations:**
+- Cannot access private or recent data
+- No source citations
+- Hallucination risk on domain-specific questions
+
+### Strategy 2: Retrieval-Augmented Generation (RAG)
+
+You embed a corpus of documents, store them in a vector index, retrieve relevant passages at query time, and inject them into the prompt. The model answers from your data, not just its training.
+
+**Best for:**
+- Private knowledge bases (company docs, legal contracts, medical records)
+- Applications that require citations
+- Data that changes frequently (support tickets, news)
+
+**Limitations:**
+- Retrieval quality depends on chunking, embedding model, and indexing
+- Adds latency (embedding + search + larger prompt)
+- Cannot change the model's behavior or tone — only its knowledge
+
+### Strategy 3: Fine-tuning
+
+You train the model on your own dataset to change its weights. The model learns new patterns, vocabulary, or behaviors.
+
+**Best for:**
+- Domain-specific language the base model doesn't handle well (medical, legal, code in a proprietary language)
+- Consistent tone or style that's hard to enforce via prompting
+- Reducing prompt size by baking few-shot examples into the weights
+
+**Limitations:**
+- Expensive (GPU compute + data preparation)
+- Requires high-quality training data (hundreds to thousands of examples)
+- Knowledge is frozen at training time — won't know about new documents
+
+## The decision framework
+
+Ask these questions in order:
+
+1. **Does the model already know the answer?** Try prompt engineering first. If the base model gives correct, well-formatted answers 90%+ of the time, you're done.
+
+2. **Does the answer depend on private or recent data?** Add RAG. Embed your documents, retrieve relevant context, and inject it into the prompt.
+
+3. **Does the model fail on style, tone, or domain-specific language even with good context?** Consider fine-tuning. But only after you've exhausted prompting and RAG.
+
+4. **Do you need all three?** Yes, sometimes. A fine-tuned model can be paired with RAG to get both domain-specific behavior and up-to-date knowledge.
+
+## Real-world example
+
+Imagine building a customer support chatbot for a SaaS company:
+
+- **Prompt engineering alone**: The bot can answer general questions but hallucinates about your specific product features and pricing.
+- **Add RAG**: The bot now retrieves from your docs and answers accurately with citations. This covers 85% of queries.
+- **Add fine-tuning**: The bot also adopts your brand voice and handles your custom terminology naturally. This gets you from 85% to 95%.
+
+Most teams stop at RAG. Fine-tuning is a marginal improvement that costs significantly more to build and maintain. Know when the juice isn't worth the squeeze.
+
+## The combination matrix
+
+| Need | Prompting | + RAG | + Fine-tuning |
+|---|---|---|---|
+| General Q&A | Sufficient | Overkill | Overkill |
+| Private knowledge | Fails | Sufficient | Optional |
+| Domain language | Struggles | Helps with context | Best solution |
+| Consistent style | Fragile | Still fragile | Reliable |
+| Up-to-date data | Impossible | Solves this | Doesn't help |
+</Body>
+
+<MiniQuiz>
+**Q: A legal tech startup wants their AI to answer questions about client contracts uploaded last month, using formal legal language. Which strategy combination makes the most sense?**
+
+- A) Prompt engineering only
+- B) RAG only — retrieval handles both the knowledge and the tone
+- C) RAG for the contract knowledge + fine-tuning for legal language style ✅
+- D) Fine-tuning only — train the model on the contracts
+</MiniQuiz>
+
+<InterviewExplanation>
+"I think of AI app architecture as three layers: prompt engineering, RAG, and fine-tuning. I always start with the simplest — good prompts with few-shot examples. If the answer depends on private data the model wasn't trained on, I add RAG to retrieve relevant context. Fine-tuning comes last, only when the model needs to learn domain-specific language or a consistent style that prompting can't enforce. In practice, most production apps are RAG with good prompts; fine-tuning is the exception, not the rule."
+</InterviewExplanation>

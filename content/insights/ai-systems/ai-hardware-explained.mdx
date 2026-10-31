@@ -1,0 +1,75 @@
+---
+slug: ai-hardware-explained
+title: "AI Hardware Explained: CPU, GPU, TPU, NPU, LPU, DPU"
+summary: "Six types of processors power modern AI workloads. Here is what each is for, how they differ, and how to choose when it matters."
+category: ai-systems
+tags: ["hardware", "gpu", "inference", "architecture"]
+audience: ["cs-students", "working-pros"]
+depth: short
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1780634018815.jpeg
+relatedLessons:
+  - ai-systems/model-quantization
+  - ai-systems/system-design-scalable-inference
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Modern AI runs on a small zoo of processors, and they are not interchangeable. The CPU orchestrates and handles general work; the GPU does the massively parallel matrix math that training and large-model inference demand; the TPU is a tensor-specialized chip for large-scale training; the NPU brings low-power inference to phones and edge devices; the LPU is built purely for blazing-fast token generation; and the DPU quietly offloads networking and storage so the others stay busy. You rarely need to pick at the transistor level, but knowing what each is *for* makes infrastructure and cost decisions far clearer.
+</InsightSummary>
+
+<Body>
+## CPU — the general-purpose backbone
+
+The CPU handles any task, runs the operating system, and orchestrates the whole system. It has excellent single-thread performance, which makes it great for preprocessing, serving small models, and coordinating work — but it has limited parallelism, so it is slow on large models and low on raw throughput for matrix math. For prototyping and light workloads, a CPU is perfectly fine.
+
+## GPU — massive parallelism
+
+The GPU is built for matrix multiplication at scale: thousands of cores, high-bandwidth memory, and a mature ecosystem (NVIDIA CUDA being the dominant one). It is the workhorse for both training and large-model inference. The trade-offs are real: high power draw, high cost, and overkill for small tasks. When people talk about "needing GPUs," this parallel matrix-math capability is why.
+
+## TPU — tensor processing at scale
+
+The TPU is a custom chip built around systolic arrays of matrix units, where data flows through hardware in lockstep. It shines on large-scale training runs and pods that scale to thousands of chips, with strong performance per watt. The catch is ecosystem lock-in — it is happiest in its native framework stack and less flexible than a GPU.
+
+## NPU — AI in your pocket
+
+The NPU (Neural Processing Unit) is dedicated, low-power inference hardware found in phones, laptops, and edge devices (think on-device neural engines). It runs quantized models (INT8/INT4) for inference in milliseconds with no cloud round-trip, which means privacy and instant response. The trade-offs: it is inference-only and limited in model size.
+
+## LPU — deterministic, ultra-fast generation
+
+The LPU (Language Processing Unit) is purpose-built for one job: generating tokens extremely fast and deterministically, using on-chip SRAM rather than slower external memory. It delivers very high tokens-per-second for inference. The cost of that focus is flexibility — it is inference-only, holds a limited model per chip, and is less general than a GPU.
+
+## DPU — the invisible layer
+
+The DPU (Data Processing Unit) is not an AI accelerator at all — it offloads networking, storage I/O, encryption, and firewalling from the CPU and GPU. In a data center it frees the expensive compute chips to do actual AI work instead of shuffling data. You will rarely interact with it directly, but it is why large AI clusters stay efficient.
+
+## A decision guide
+
+- **Training a large model?** GPU or TPU.
+- **Production inference?** GPU or LPU, chosen by your cost-versus-latency needs — LPU when raw token speed dominates, GPU when you need flexibility.
+- **On-device or edge?** NPU, for low-power, private, instant inference.
+- **Just prototyping?** A CPU is fine — do not buy hardware before you need it.
+
+The honest summary the field uses: choose based on latency, parallelism, power, cost, and scale — not on which chip is trending.
+</Body>
+
+<KeyTakeaways>
+- Six processor types power AI, each with a distinct job; they are not interchangeable.
+- CPU orchestrates and handles small/preprocessing work; GPU does massively parallel matrix math for training and large-model inference.
+- TPU is tensor-specialized for large-scale training; NPU brings low-power, private inference to phones and edge devices.
+- LPU is built for ultra-fast deterministic token generation; DPU offloads networking and storage so compute chips stay busy.
+- Choose by training vs. inference, cloud vs. edge, and your latency/cost/power constraints — a CPU is fine for prototyping.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Learn how models are shrunk to fit smaller hardware in [Model quantization](/ai-systems/model-quantization).
+- Design inference infrastructure with [System design for scalable inference](/ai-systems/system-design-scalable-inference).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) to apply this in real deployments.
+</WhatToDoNext>
+
+<SourceNote />

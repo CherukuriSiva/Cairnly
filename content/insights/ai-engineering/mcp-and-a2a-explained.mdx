@@ -1,0 +1,91 @@
+---
+slug: mcp-and-a2a-explained
+title: "MCP and A2A Explained: The New Plumbing for AI Agents"
+summary: "MCP is the standard for connecting AI agents to tools and data. A2A is the emerging protocol for agents to coordinate with each other. Here is what each does and why it matters."
+category: ai-engineering
+tags: ["mcp", "a2a", "protocols", "agents", "tools"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1775230019984.pdf
+  - references/linkedin/1779885039024.gif
+  - references/linkedin/1780333017380.pdf
+  - references/linkedin/1780679583034.pdf
+  - references/linkedin/1780664470972.jpeg
+relatedLessons:
+  - ai-engineering/mcp-tool-use
+  - ai-engineering/what-is-an-agent
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Two protocols are quietly becoming the plumbing of agentic AI. MCP standardizes how a model connects to tools and data — one server works with any compatible model, so you stop hand-rolling a bespoke integration for every system. A2A standardizes how agents talk to *each other* — so a specialist agent built in one framework can be discovered and delegated to by an agent built in another. Understanding both, and how they fit together, is fast becoming table stakes for anyone building real AI systems.
+</InsightSummary>
+
+<Body>
+## What MCP is: the USB-C for AI tools
+
+The Model Context Protocol (MCP) is a standardized client-server protocol for exposing tools, data, and prompts to an AI model. The popular analogy is "USB-C for AI": one standard connector instead of a different cable for every device. Before a standard, every integration was bespoke — if you wanted your model to read a database, call an internal API, or touch a file system, you wrote a custom connector for each one. MCP defines a common contract so any MCP-compatible model can talk to any MCP server.
+
+What an MCP server can expose:
+
+- **Tools** — actions the model can execute (call an API, run a query).
+- **Resources** — data the model can read (documents, records).
+- **Prompts** — reusable, parameterized task templates.
+- **Schemas** — clear input/output structure for each capability.
+- **Permissions** — controlled access boundaries on what the model may do.
+
+## MCP architecture and discovery
+
+MCP follows a client-server design. The **client** lives inside your application (the model host — a desktop app, IDE, or agent). It connects to one or more **servers**, each of which exposes capabilities through the standard protocol. At connection time, the client asks the server what it offers ("which tools do you have available?"), the server advertises its tools, resources, and prompts, and the model can then invoke them through a uniform interface. One application can connect to several servers at once — a data store, a CRM, a version-control system — each as a separate MCP server.
+
+## Why MCP matters
+
+The value is leverage. Without a standard, N models times M tools means N×M custom integrations — chaos that does not scale. With MCP, you build one server per system and it works with every compatible model: one protocol, many tools, reusable servers, shared integrations. The payoffs cited by teams adopting it are faster rollout, less duplicated work, and easier developer adoption. It also makes agent workflows easier to *govern*: because access flows through a defined protocol, enterprises can layer authentication, authorization, tool allowlists, access restrictions, audit-friendly logging, and human review onto a single chokepoint rather than scattering it across bespoke connectors.
+
+## The "is MCP dead?" debate
+
+MCP launched in late 2024 and was adopted fast — hundreds of servers and integration into major coding tools like Cursor, Claude Desktop, and Windsurf. By 2026 it was getting publicly criticized, sometimes by the very people who built on it, which sparked a recurring "MCP is dead?" debate.
+
+The honest verdict: **not dead, evolving.** The original promise — plug any tool into any model, standardized integration with no hand-rolled connectors, an open community-driven ecosystem — largely held, which is exactly why it spread. The 2026 criticisms are real and worth taking seriously: rough edges around versioning, security, scaling, and developer ergonomics as usage outgrew the early design. But "this standard has growing pains" is a very different claim from "this standard is finished." Treat MCP as a maturing protocol you should learn, not a fad to wait out.
+
+## A2A: when agents need to talk to each other
+
+MCP connects an agent to *tools*. It does not help one agent talk to *another* agent. That is the gap A2A (Agent-to-Agent) addresses — an open protocol from Google, released in 2025 under an Apache-2.0 license, that gives agents a standard way to communicate over HTTP regardless of which framework built them.
+
+The analogy here is HTTP for websites: any browser loads any website because they all speak HTTP. A2A does the same for agents — any agent can discover and call any other agent. Key facts: it uses JSON over HTTP (familiar to every developer), works across frameworks (LangChain, CrewAI, AutoGen, and others), supports real-time streaming and long-running tasks, and launched with contributions from dozens of companies.
+
+## The problem A2A solves: isolated islands
+
+Before A2A, agents could use tools but could not talk to other agents. Every framework was its own closed world: a LangChain agent could not delegate to a CrewAI agent, there was no common message format, duplicate tools had to be rebuilt for every agent team, and complex tasks forced you to build one giant do-everything agent instead of a team of specialists. A2A changes that — any agent can discover and call any other, there is one shared protocol across frameworks, and specialists can collaborate without rebuilding each other's tools. In an A2A system, a client agent fronts the user and delegates to remote specialist agents over the protocol.
+
+## How MCP and A2A fit together
+
+They are complementary layers, not competitors:
+
+- **MCP is the tool-connectivity layer** — it gives a single agent controlled access to tools, APIs, data, and prompts.
+- **A2A is the agent-coordination layer** — it lets agents discover, message, and delegate to one another.
+
+A realistic 2026 stack uses both: each agent uses MCP to reach the tools and data it needs, and A2A to hand off sub-tasks to specialist agents across frameworks. MCP makes a single agent capable; A2A makes a *system* of agents capable. Together they are the emerging plumbing that turns isolated demos into interoperable, governable AI systems.
+</Body>
+
+<KeyTakeaways>
+- MCP is a standardized client-server protocol — "USB-C for AI" — that exposes tools, resources, prompts, schemas, and permissions so one server works with any compatible model.
+- MCP's value is leverage: build one server per system instead of an N×M mess of bespoke connectors, with governance applied at a single protocol chokepoint.
+- The "MCP is dead" debate overstates real growing pains; the honest read is that MCP is evolving, not finished — learn it.
+- A2A is an open HTTP/JSON protocol from Google that lets agents discover and delegate to each other across frameworks, ending the "isolated islands" problem.
+- MCP and A2A are complementary: MCP connects an agent to tools, A2A connects agents to each other — production systems use both.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Build a concrete integration with [MCP tool use](/ai-engineering/mcp-tool-use).
+- Reinforce the fundamentals with [What is an agent](/ai-engineering/what-is-an-agent).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) to connect protocols to full agent systems.
+</WhatToDoNext>
+
+<SourceNote />

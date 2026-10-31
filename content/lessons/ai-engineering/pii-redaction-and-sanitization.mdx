@@ -1,0 +1,110 @@
+---
+slug: pii-redaction-and-sanitization
+title: "PII Redaction & Output Sanitization"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Detect common PII (SSN, email, phone, credit card) with regex
+- Redact rather than block, so legitimate requests still work
+- Sanitize both inputs (before the LLM) and outputs (before the user)
+- Know when to escalate from regex to a dedicated PII engine
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+PII flows through AI apps constantly — users paste their email to reset a password, a retrieved document contains a customer's phone number. If that PII lands in a log, a prompt sent to a third-party API, or a generated response, you have a compliance incident. Redaction and output sanitization are the cheapest controls that keep you out of that headline.
+</WhyThisMatters>
+
+<Body>
+## Redact, don't block
+
+A user typing "my email is jane@acme.com, reset my password" is making a *legitimate* request. Blocking it is bad UX. The right move is to **redact** the PII and let the request continue, so the model never sees the raw value and your logs stay clean.
+
+## Detect the common patterns
+
+Regex handles the well-structured identifiers cheaply and instantly:
+
+```python
+import re
+
+PII_PATTERNS = {
+    "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
+    "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+    "phone": r"\b\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b",
+    "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
+}
+
+def redact_pii(text: str) -> str:
+    for kind, pattern in PII_PATTERNS.items():
+        text = re.sub(pattern, f"[REDACTED_{kind.upper()}]", text)
+    return text
+```
+
+## Sanitize at two boundaries
+
+- **Input boundary** — sanitize and redact *before* the prompt is built, so PII never reaches a third-party model or your logs.
+- **Output boundary** — the model can echo PII back from its context or training data; scan the generated answer too before returning it.
+
+## When regex isn't enough
+
+Regex misses names, addresses, and context-dependent identifiers. For regulated workloads, graduate to a dedicated engine (Microsoft Presidio, AWS Macie) that does NER-based detection. Start with regex; escalate when the compliance bar demands it.
+</Body>
+
+<Code>
+```python
+def sanitize_input(text: str) -> str:
+    text = text.replace("\x00", "")
+    text = re.sub(r"\s+", " ", text).strip()
+    return redact_pii(text)            # redact before the model ever sees it
+
+def sanitize_output(answer: str) -> tuple[str, bool]:
+    """Scan generated text for leaked PII before returning to the user."""
+    leaked = any(re.search(p, answer) for p in PII_PATTERNS.values())
+    return redact_pii(answer), leaked  # redact + flag for logging/alerting
+
+# Demo
+print(sanitize_input("My SSN is 123-45-6789, what benefits apply?"))
+clean, leaked = sanitize_output("Per the file, contact jane@acme.com.")
+print(clean, "| leaked:", leaked)
+```
+</Code>
+
+<TryItYourself>
+1. Implement `PII_PATTERNS` and `redact_pii`
+2. Run `sanitize_input` on 5 messages containing different PII types
+3. Implement `sanitize_output` and confirm it flags + redacts a leaked email
+4. Add a passport or IBAN pattern and test it
+5. Compare your regex results to Microsoft Presidio on a paragraph with names and addresses
+</TryItYourself>
+
+<CommonMistakes>
+- **Blocking instead of redacting** — kills legitimate requests
+- **Only sanitizing input** — the model can leak PII into the output from context
+- **Logging raw requests before redaction** — the log itself becomes the breach
+- **Over-trusting regex** — it misses names/addresses; escalate for regulated data
+- **Redacting inconsistently** — use stable placeholders so downstream code can detect them
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented regex PII detection and redaction
+- [ ] Sanitized inputs before prompt construction
+- [ ] Scanned outputs and flagged leaks
+- [ ] Added at least one custom PII pattern
+- [ ] Can explain when to move beyond regex to an NER engine
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: A user writes "my email is jane@acme.com, please resend the invoice." What should your pipeline do?**
+
+- A) Block the request entirely
+- B) Redact the email to a placeholder and continue processing ✅
+- C) Forward the raw email to the LLM and log it verbatim
+- D) Ignore it — emails aren't PII
+</MiniQuiz>
+
+<InterviewExplanation>
+"My rule is redact, don't block — a user pasting their email to reset a password is legitimate, so I replace the PII with a stable placeholder and let the request continue, which also keeps it out of logs and out of any third-party API call. I sanitize at two boundaries: the input, before the prompt is built, and the output, because the model can echo PII back from its context. Regex covers structured identifiers like SSNs and cards cheaply, but it misses names and addresses, so for regulated workloads I escalate to an NER-based engine like Presidio or Macie."
+</InterviewExplanation>

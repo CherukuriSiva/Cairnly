@@ -1,0 +1,236 @@
+---
+slug: clustering-kmeans-dbscan
+title: "Clustering: K-Means, DBSCAN, and Choosing the Right Number of Clusters"
+track: ml-foundations
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain how k-means assigns points to clusters and updates centroids
+- Use the elbow method and silhouette score to choose k
+- Describe when DBSCAN outperforms k-means (arbitrary shapes, noise)
+- Implement both algorithms and visualise the results
+- Identify the failure modes of each algorithm
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Clustering is the unsupervised learning technique used most often in production: customer segmentation, anomaly detection, document grouping, recommendation pre-filtering. Interviewers ask "how would you segment our users?" and the answer requires knowing when k-means is the right tool and when you need DBSCAN, hierarchical clustering, or embeddings-based clustering.
+</WhyThisMatters>
+
+<Body>
+## K-means clustering
+
+K-means partitions data into `k` clusters by minimising the within-cluster sum of squared distances to the centroid:
+
+**Algorithm:**
+1. Randomly initialise `k` centroids (k-means++ picks smart initial positions)
+2. Assign each point to the nearest centroid
+3. Move each centroid to the mean of its assigned points
+4. Repeat steps 2–3 until centroids stop moving (convergence)
+
+```python
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.datasets import make_blobs
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Generate synthetic data with 4 true clusters
+X, y_true = make_blobs(
+    n_samples=500, centers=4, cluster_std=0.8, random_state=42
+)
+
+# Scale — k-means uses Euclidean distance, so scale matters
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# k-means++ initialisation avoids bad random starts
+kmeans = KMeans(n_clusters=4, init="k-means++", n_init=10, random_state=42)
+kmeans.fit(X_scaled)
+
+labels = kmeans.labels_
+centroids = scaler.inverse_transform(kmeans.cluster_centers_)
+
+plt.figure(figsize=(8, 5))
+for k in range(4):
+    mask = labels == k
+    plt.scatter(X[mask, 0], X[mask, 1], alpha=0.5, label=f"Cluster {k}")
+plt.scatter(centroids[:, 0], centroids[:, 1], s=200, marker="X",
+            c="black", zorder=5, label="Centroids")
+plt.legend()
+plt.title("K-Means Clustering")
+plt.savefig("kmeans.png", bbox_inches="tight")
+```
+
+## Choosing k: elbow method and silhouette score
+
+K-means requires you to specify `k` in advance. Two methods help choose it:
+
+**Elbow method:** Plot inertia (within-cluster sum of squares) vs k. Look for the "elbow" — the point where adding another cluster gives diminishing returns.
+
+**Silhouette score:** Measures how similar each point is to its own cluster compared to other clusters. Ranges from -1 (wrong cluster) to 1 (well-clustered). Higher is better.
+
+```python
+from sklearn.metrics import silhouette_score
+
+inertias = []
+silhouette_scores = []
+k_values = range(2, 11)
+
+for k in k_values:
+    km = KMeans(n_clusters=k, init="k-means++", n_init=10, random_state=42)
+    km.fit(X_scaled)
+    inertias.append(km.inertia_)
+    silhouette_scores.append(silhouette_score(X_scaled, km.labels_))
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+ax1.plot(k_values, inertias, "bo-")
+ax1.set_xlabel("k")
+ax1.set_ylabel("Inertia")
+ax1.set_title("Elbow Method")
+
+ax2.plot(k_values, silhouette_scores, "rs-")
+ax2.set_xlabel("k")
+ax2.set_ylabel("Silhouette Score")
+ax2.set_title("Silhouette Score")
+
+plt.savefig("choosing_k.png", bbox_inches="tight")
+print(f"Best k by silhouette: {k_values[np.argmax(silhouette_scores)]}")
+```
+
+## DBSCAN: density-based clustering
+
+K-means assumes clusters are spherical and roughly equal in size. DBSCAN finds clusters of arbitrary shape by detecting dense regions of points.
+
+**Key parameters:**
+- `eps`: maximum distance between two points to be considered neighbours
+- `min_samples`: minimum points within `eps` to form a dense region
+
+Points that can't join any dense region are labelled **noise** (label = -1).
+
+```python
+from sklearn.cluster import DBSCAN
+from sklearn.datasets import make_moons
+
+# make_moons generates two interleaved crescents — k-means fails on this
+X_moons, _ = make_moons(n_samples=300, noise=0.1, random_state=42)
+
+# DBSCAN — no need to specify number of clusters
+dbscan = DBSCAN(eps=0.2, min_samples=5)
+labels = dbscan.fit_predict(X_moons)
+
+n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+n_noise    = list(labels).count(-1)
+print(f"Clusters found: {n_clusters}")
+print(f"Noise points:   {n_noise}")
+
+plt.figure(figsize=(8, 4))
+unique_labels = set(labels)
+for label in unique_labels:
+    mask = labels == label
+    color = "grey" if label == -1 else None
+    marker = "x" if label == -1 else "o"
+    plt.scatter(X_moons[mask, 0], X_moons[mask, 1],
+                c=color, marker=marker, alpha=0.7,
+                label="Noise" if label == -1 else f"Cluster {label}")
+plt.legend()
+plt.title("DBSCAN on make_moons")
+plt.savefig("dbscan.png", bbox_inches="tight")
+```
+
+## Which algorithm to choose
+
+| Situation | Use |
+|---|---|
+| You know the number of clusters | K-means |
+| Clusters are spherical and similar size | K-means |
+| Clusters have arbitrary shapes (crescents, rings) | DBSCAN |
+| You need to detect outliers/noise explicitly | DBSCAN |
+| High-dimensional data (> 50 dims) | K-means (DBSCAN's eps degrades in high dims) |
+| You want a dendrogram / hierarchical structure | Agglomerative clustering |
+</Body>
+
+<Code>
+```python
+# Customer segmentation pipeline — k-means on real transaction data
+import pandas as pd
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
+import matplotlib.pyplot as plt
+
+# RFM features: Recency, Frequency, Monetary — classic customer segmentation
+# (Simulate with random data if no real dataset available)
+np.random.seed(42)
+n = 500
+df = pd.DataFrame({
+    "recency_days":    np.random.exponential(30, n).astype(int),
+    "frequency":       np.random.poisson(5, n) + 1,
+    "monetary_value":  np.random.lognormal(4, 1, n).round(2),
+})
+
+X = df.values
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Choose k
+scores = {}
+for k in range(2, 8):
+    km = KMeans(n_clusters=k, init="k-means++", n_init=10, random_state=42)
+    km.fit(X_scaled)
+    scores[k] = silhouette_score(X_scaled, km.labels_)
+
+best_k = max(scores, key=scores.get)
+print(f"Best k: {best_k} (silhouette={scores[best_k]:.3f})")
+
+# Final model
+km_final = KMeans(n_clusters=best_k, init="k-means++", n_init=10, random_state=42)
+df["segment"] = km_final.fit_predict(X_scaled)
+
+# Segment profiles
+print("\n=== Segment Profiles ===")
+print(df.groupby("segment").agg(
+    count=("recency_days", "count"),
+    avg_recency=("recency_days", "mean"),
+    avg_frequency=("frequency", "mean"),
+    avg_spend=("monetary_value", "mean"),
+).round(1))
+```
+</Code>
+
+<TryItYourself>
+1. Load the [Online Retail dataset](https://archive.ics.uci.edu/ml/datasets/online+retail) (UCI ML Repository).
+2. Compute RFM features: recency (days since last purchase), frequency (total orders), monetary (total spend).
+3. Scale with `StandardScaler` and apply k-means with `k=4`.
+4. Profile each cluster: what is the "Champions" cluster, the "At Risk" cluster, etc.?
+5. Generate a scatter plot of Recency vs Monetary coloured by cluster. Push to GitHub.
+</TryItYourself>
+
+<CommonMistakes>
+- **Not scaling before k-means** — a feature with range 0–100,000 will dominate a feature with range 0–1. K-means uses Euclidean distance, so all features must be on the same scale.
+- **Taking the elbow method literally** — the "elbow" is often ambiguous. Always compute silhouette scores alongside the elbow plot and cross-check with domain knowledge: "does k=4 produce segments that make business sense?"
+- **Using DBSCAN in high dimensions without first reducing dimensionality** — the concept of "density" breaks down in high dimensions (the curse of dimensionality). Apply PCA or UMAP first, then DBSCAN.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: You run k-means with k=3 on customer data and get three clusters, but two of them have very negative silhouette scores. What should you do first?**
+
+- A) Try a different random seed
+- B) Try k=2 and k=4 and compare silhouette scores — the cluster count is likely wrong ✅
+- C) Normalise the silhouette scores to make them positive
+- D) Switch to DBSCAN immediately
+</MiniQuiz>
+
+<InterviewExplanation>
+"K-means assigns each point to its nearest centroid and iteratively moves centroids to the mean of their cluster. I use the silhouette score (not just the elbow method) to choose k — it directly measures whether points are better matched to their own cluster than to neighbouring clusters. DBSCAN is my default when clusters have irregular shapes or when I need explicit noise detection — it discovers cluster count automatically from the data. For high-dimensional customer segmentation, I typically reduce dimensions first with PCA or UMAP, then apply k-means, and validate each segment by interpreting its centroid in original feature space."
+</InterviewExplanation>
+
+<CompletionChecklist>
+- [ ] Applied k-means to a real or realistic dataset; chose k using the silhouette score
+- [ ] Applied DBSCAN to the make_moons dataset and verified it finds both crescents
+- [ ] Generated segment profiles from k-means output and gave each segment a human-readable name
+- [ ] Documented the pipeline in a GitHub notebook
+</CompletionChecklist>

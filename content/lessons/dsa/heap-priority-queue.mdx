@@ -1,0 +1,224 @@
+---
+slug: heap-priority-queue
+title: "Heap and Priority Queue Patterns"
+track: dsa
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Understand min-heaps and max-heaps and their O(log n) insert/extract operations
+- Use Python's `heapq` module effectively (it's a min-heap)
+- Solve "top K elements," "merge K sorted lists," "find median from data stream," and "K closest points"
+- Recognize the "maintain a heap of size K" pattern for optimal performance
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Heaps solve a specific class of problems efficiently: anything involving "top K," "Kth largest," or "continuously track min/max." Without a heap, these problems require sorting every time new data arrives. With a heap, each update is O(log K) instead of O(n log n). This pattern is also fundamental to system design (priority queues, schedulers, rate limiters).
+</WhyThisMatters>
+
+<Body>
+## Python's heapq
+
+Python only provides a min-heap. For a max-heap, negate the values.
+
+```python
+import heapq
+
+# Min-heap basics
+heap = []
+heapq.heappush(heap, 5)
+heapq.heappush(heap, 2)
+heapq.heappush(heap, 8)
+print(heapq.heappop(heap))  # 2 (smallest)
+
+# Max-heap trick: negate values
+max_heap = []
+heapq.heappush(max_heap, -5)
+heapq.heappush(max_heap, -2)
+heapq.heappush(max_heap, -8)
+print(-heapq.heappop(max_heap))  # 8 (largest)
+
+# Build a heap from a list in O(n)
+nums = [5, 2, 8, 1, 9]
+heapq.heapify(nums)  # nums is now a valid heap in-place
+```
+
+## Pattern: Top K Elements
+
+### Kth Largest Element (LC 215)
+
+Use a min-heap of size K. The top of the heap is the Kth largest.
+
+```python
+def find_kth_largest(nums, k):
+    heap = nums[:k]
+    heapq.heapify(heap)        # O(k)
+    for num in nums[k:]:
+        if num > heap[0]:
+            heapq.heapreplace(heap, num)  # pop smallest, push new
+    return heap[0]
+
+# find_kth_largest([3,2,1,5,6,4], 2) -> 5
+```
+
+**Time:** O(n log k). **Space:** O(k). Much better than sorting O(n log n) when k is small.
+
+### K Closest Points to Origin (LC 973)
+
+```python
+def k_closest(points, k):
+    # Max-heap of size k (negate distance so heapq acts as max-heap)
+    heap = []
+    for x, y in points:
+        dist = -(x*x + y*y)  # negative for max-heap behavior
+        if len(heap) < k:
+            heapq.heappush(heap, (dist, x, y))
+        elif dist > heap[0][0]:  # closer than the farthest in heap
+            heapq.heapreplace(heap, (dist, x, y))
+    return [[x, y] for _, x, y in heap]
+```
+
+## Walkthrough: Merge K Sorted Lists (LC 23)
+
+Use a min-heap to always pick the smallest head among all K lists.
+
+```python
+def merge_k_lists(lists):
+    heap = []
+    for i, lst in enumerate(lists):
+        if lst:
+            heapq.heappush(heap, (lst.val, i, lst))
+
+    dummy = current = ListNode(0)
+    while heap:
+        val, i, node = heapq.heappop(heap)
+        current.next = node
+        current = current.next
+        if node.next:
+            heapq.heappush(heap, (node.next.val, i, node.next))
+
+    return dummy.next
+```
+
+**Time:** O(N log K) where N = total nodes, K = number of lists.
+**Space:** O(K) for the heap.
+
+The `i` (list index) in the tuple breaks ties so Python doesn't try to compare ListNode objects.
+
+## Walkthrough: Find Median from Data Stream (LC 295)
+
+Maintain two heaps: a max-heap for the lower half and a min-heap for the upper half.
+
+```python
+class MedianFinder:
+    def __init__(self):
+        self.lo = []  # max-heap (negated) for lower half
+        self.hi = []  # min-heap for upper half
+
+    def add_num(self, num):
+        heapq.heappush(self.lo, -num)
+        # Ensure max of lo <= min of hi
+        heapq.heappush(self.hi, -heapq.heappop(self.lo))
+        # Balance sizes: lo can have at most 1 more than hi
+        if len(self.hi) > len(self.lo):
+            heapq.heappush(self.lo, -heapq.heappop(self.hi))
+
+    def find_median(self):
+        if len(self.lo) > len(self.hi):
+            return -self.lo[0]
+        return (-self.lo[0] + self.hi[0]) / 2
+```
+
+**add_num:** O(log n). **find_median:** O(1).
+
+## When to use a heap
+
+| Signal | Pattern |
+|---|---|
+| "K largest" or "K smallest" | Min/max heap of size K |
+| "Kth largest/smallest" | Heap of size K, answer is heap[0] |
+| "Merge K sorted ___" | Min-heap of K elements |
+| "Continuously track median/max/min" | Two heaps or one heap |
+| "Schedule tasks by priority" | Priority queue (heap) |
+</Body>
+
+<TryItYourself>
+1. **LC 215 - Kth Largest Element**: Implement with a heap. Also try Python's `heapq.nlargest()` one-liner and compare.
+2. **LC 23 - Merge K Sorted Lists**: Trace through the heap state with 3 short lists.
+3. **LC 295 - Find Median from Data Stream**: Add the numbers [5, 2, 8, 1, 9] one by one and verify the median after each insertion.
+4. **LC 347 - Top K Frequent Elements**: Combine a frequency map with a heap.
+</TryItYourself>
+
+<Code>
+```python
+import heapq
+
+# --- Kth Largest ---
+def find_kth_largest(nums, k):
+    heap = nums[:k]
+    heapq.heapify(heap)
+    for num in nums[k:]:
+        if num > heap[0]:
+            heapq.heapreplace(heap, num)
+    return heap[0]
+
+print("2nd largest of [3,2,1,5,6,4]:", find_kth_largest([3,2,1,5,6,4], 2))  # 5
+
+# --- Top K Frequent Elements ---
+from collections import Counter
+def top_k_frequent(nums, k):
+    freq = Counter(nums)
+    return heapq.nlargest(k, freq.keys(), key=freq.get)
+
+print("Top 2 frequent:", top_k_frequent([1,1,1,2,2,3], 2))  # [1, 2]
+
+# --- Median Finder ---
+class MedianFinder:
+    def __init__(self):
+        self.lo, self.hi = [], []
+    def add_num(self, num):
+        heapq.heappush(self.lo, -num)
+        heapq.heappush(self.hi, -heapq.heappop(self.lo))
+        if len(self.hi) > len(self.lo):
+            heapq.heappush(self.lo, -heapq.heappop(self.hi))
+    def find_median(self):
+        if len(self.lo) > len(self.hi):
+            return -self.lo[0]
+        return (-self.lo[0] + self.hi[0]) / 2
+
+mf = MedianFinder()
+for num in [5, 2, 8, 1, 9]:
+    mf.add_num(num)
+    print(f"After adding {num}, median = {mf.find_median()}")
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can use `heapq` for min-heap operations and negate values for max-heap
+- [ ] I can solve "Kth largest" using a min-heap of size K
+- [ ] I implemented Merge K Sorted Lists with a heap
+- [ ] I understand the two-heap approach for streaming median
+- [ ] I know that heap operations are O(log n) and heapify is O(n)
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Forgetting Python's heapq is min-heap only**: For max-heap behavior, negate all values on push and negate again on pop. Don't try to use `heapq` as a max-heap directly.
+- **Comparing uncomparable objects**: When heap elements have equal priority values, Python tries to compare the next tuple element. If that's a custom object, it crashes. Add a tiebreaker (like an index) as the second tuple element.
+- **Using a heap when sorting suffices**: If you process all data at once (not streaming), sorting might be simpler and have the same complexity. Heaps shine when data arrives incrementally.
+- **Not using `heapreplace`**: `heapreplace(heap, val)` is faster than `heappop` + `heappush` because it does one sift instead of two.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: To find the Kth largest element in an unsorted array using a heap, what size heap gives the best time complexity?**
+
+- A) Size n (the full array)
+- B) Size K ✅
+- C) Size n - K
+- D) Size 1
+</MiniQuiz>
+
+<InterviewExplanation>
+"For Kth largest, I maintain a min-heap of size K. I iterate through the array, pushing each element and popping when the heap exceeds size K. At the end, the heap's top is the Kth largest. This is O(n log K), which beats sorting at O(n log n) when K is small. For streaming median, I use two heaps: a max-heap for the lower half and a min-heap for the upper half, balanced so the median is always at one of the tops."
+</InterviewExplanation>

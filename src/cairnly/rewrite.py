@@ -1,0 +1,43 @@
+"""Rewrite a follow-up question into a standalone one before searching.
+
+"How do I evaluate it?" finds nothing useful on its own: "it" lives in the conversation. A
+small LLM call turns the follow-up plus the recent turns into one standalone question
+("How do I evaluate a RAG pipeline?"), and search runs on that. Any failure (an exception, an
+empty, multi-line or overlong reply) falls back to the original question, so rewriting can
+make retrieval better but never stops an answer.
+"""
+
+from collections.abc import Sequence
+
+from cairnly.kb import load_prompt
+from cairnly.llm import LLM
+
+MAX_TURNS = 6  # earlier turns a client may send (the API rejects more)
+MAX_ANSWER_CHARS = 600  # each earlier answer is cut to this before it reaches the prompt
+MAX_REWRITE_CHARS = 300
+PROMPT_VERSION = "rewrite-v1"
+
+
+def format_history(history: Sequence[dict], question: str) -> str:
+    """The conversation as Q:/A: pairs, then the follow-up to rewrite."""
+    lines = ["Conversation:"]
+    for turn in history[-MAX_TURNS:]:
+        lines += [f"Q: {turn['question']}", f"A: {turn['answer'][:MAX_ANSWER_CHARS]}", ""]
+    lines.append(f"Follow-up question: {question}")
+    return "\n".join(lines)
+
+
+def rewrite_question(question: str, history: Sequence[dict], llm: LLM) -> str:
+    """A standalone version of `question`, or `question` itself when there is no history or the
+    rewrite fails."""
+    if not history:
+        return question
+    try:
+        reply = "".join(llm.stream(load_prompt(PROMPT_VERSION), format_history(history, question)))
+    except Exception:  # a failed rewrite must never cost an answer
+        return question
+    lines = [line.strip() for line in reply.strip().splitlines() if line.strip()]
+    if len(lines) != 1:
+        return question
+    candidate = lines[0].strip("\"'“”‘’ ").strip()
+    return candidate if 0 < len(candidate) <= MAX_REWRITE_CHARS else question

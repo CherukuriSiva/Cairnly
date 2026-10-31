@@ -1,0 +1,96 @@
+---
+slug: evaluating-llms-and-agents
+title: "Evaluating LLMs and Agents: 6 Methods That Actually Work"
+summary: "You can't improve what you don't measure. Here are the six evaluation methods for LLM applications — from human review to LLM-as-judge — and when to use each."
+category: ai-systems
+tags: ["evaluation", "evals", "llm-as-judge", "testing", "quality"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1780065162092.gif
+  - references/linkedin/1780627079644.pdf
+relatedLessons:
+  - ai-engineering/building-an-eval-harness
+  - ai-engineering/hallucination-detection-llm-judge
+  - ai-engineering/evaluating-an-ai-app
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+A demo proves your LLM app can produce a good answer once. Evaluation proves it produces good answers reliably, and tells you whether your latest change helped or hurt. There is no single eval method — there are six, each trading coverage against cost: human evaluation, automated metrics, LLM-as-judge, adversarial/red-teaming, task-specific evaluation, and benchmark testing. The skill is combining them into a harness that catches regressions before your users do, and adapting it for the extra moving parts of agentic systems.
+</InsightSummary>
+
+<Body>
+## Why evals matter more than demos
+
+It is easy to make an LLM app *look* finished — try five questions, get five good answers, ship. The trouble is that anecdotes are not measurements. When you change a prompt, swap a model, or tweak retrieval, "it still seems fine" is not evidence. Without evaluation you are flying blind: you cannot tell whether a change improved quality or quietly degraded it, and you only learn about failures when a user reports one.
+
+The mindset shift is the same one that drives RAG and agents from prototype to production: stop asking "does it answer?" and start asking "is it accurate, reliably, across every kind of input — and did my last change move that number?" Evals are how you answer that.
+
+## The six methods
+
+**1. Human evaluation.** People score outputs against a rubric. It is the gold standard for nuanced judgment — it catches tone, subtle errors, and context that automated metrics miss. The cost: slow, expensive, and hard to scale, and you need clear guidelines so different raters agree. Workflow: define a rubric, sample outputs, have raters score, aggregate, and resolve conflicts. Use it to set ground truth and calibrate everything else.
+
+**2. Automated metrics.** Programmatic scores like BLEU, ROUGE, BERTScore, and perplexity. They are fast, cheap, and fully repeatable, which makes them ideal for regression monitoring — but they are weak on meaning and creativity, often rewarding surface overlap over real correctness. These include simple string/reference-based metrics (exact match, BLEU/ROUGE against a reference answer) and embedding-based semantic similarity, which compares meaning rather than exact words. Workflow: pick a metric, prepare references, run outputs, compute scores, and track trends over time.
+
+**3. LLM-as-judge.** Use a strong model to grade other models' outputs against criteria. It scales human-like judgment cheaply, which is why it has become a workhorse for continuous evaluation. The catches: watch for position and length bias, and always validate the judge against human ground truth before trusting it. Workflow: write a judge prompt, set criteria, calibrate against human scores, let the judge score at scale.
+
+**4. Adversarial and red-teaming.** Deliberately attack the system to find jailbreaks, prompt injections, and unsafe behavior. This stress-tests safety and limits and is critical *before* a production launch, not after. Workflow: craft attacks, probe edge cases, categorize risks, capture failures, and patch-and-retest.
+
+**5. Task-specific evaluation.** Build custom datasets that mirror *your* production traffic and measure real business value. This tests the job that actually matters rather than a generic benchmark, at the cost of effort to build and maintain. Workflow: define the use case, build a test set, set a success metric, iterate on prompts, and evaluate outputs.
+
+**6. Benchmark testing.** Run standardized suites (e.g. MMLU, HellaSwag, GSM8K, HumanEval) for comparable, cross-model scores. Great for picking between models, but two caveats: risk of training-data leakage (the model may have seen the benchmark), and benchmarks may miss your real-world tasks. Workflow: select benchmarks, standardize prompts, run the suite, compare models, score answers.
+
+## The cost vs. coverage tradeoff
+
+No single method is sufficient. Human evaluation has the deepest coverage but the highest cost; automated metrics are nearly free but shallow; LLM-as-judge sits in the middle and scales well once calibrated; adversarial testing covers safety; task-specific evals cover *your* domain; benchmarks cover model selection. A mature setup layers them: cheap automated metrics and a calibrated LLM-judge run continuously in CI, task-specific evals guard your core use case, human review calibrates and spot-checks, and adversarial testing gates each release.
+
+## What changes when the system is agentic
+
+Evaluating an agent is harder than evaluating a single answer, because agents are **multi-step, tool-using, and non-deterministic**. The same input can take different paths. So you evaluate more than the final output:
+
+- **Trajectory, not just outcome.** Did the agent take a sensible path — call the right tools, in a reasonable order — even if it eventually got the answer?
+- **Tool-call correctness.** Did it choose the right tool and pass valid arguments?
+- **Step-level checks.** Where in a multi-step run did it go wrong?
+- **Non-determinism.** Run each case multiple times and look at distributions, not a single pass, since the same input can vary.
+
+An agent that reaches the right answer through a reckless path is still a problem in production.
+
+## Building an eval harness
+
+Turn methods into a system:
+
+- **Curate a golden dataset** — representative inputs with known-good outputs (and, for RAG, known-relevant documents).
+- **Run continuous evaluation** in CI so every prompt tweak or model swap is scored automatically.
+- **Detect regressions** — fail the build (or alert) when a key metric drops, so a "small" change can't silently degrade quality.
+- **Monitor in production** against ground truth where you can, and feed real failures back into the golden set.
+</Body>
+
+<CommonMistakes>
+- **Shipping without evals.** Eyeballing a handful of answers feels sufficient until a silent regression reaches users. If you can't measure it, you can't tell whether a change helped or hurt.
+- **Trusting accuracy on a bad test set.** A high score on an unrepresentative or leaked benchmark is worse than no score — it gives false confidence. Build task-specific evals that mirror real traffic.
+- **Using an uncalibrated LLM-judge.** LLM-as-judge is powerful but biased (toward length, position, its own style). Validate it against human ground truth before relying on its scores.
+- **Evaluating only the final output of an agent.** Agents fail mid-trajectory — wrong tool, bad arguments, reckless path. Check tool calls and step-level behavior, not just the end result.
+- **Running an eval once.** Quality drifts as prompts rot and data shifts. Evals belong in CI and in production monitoring, not in a one-time notebook.
+</CommonMistakes>
+
+<KeyTakeaways>
+- Demos prove an app can answer once; evals prove it answers reliably and tell you whether each change helped or hurt.
+- The six methods are human evaluation, automated metrics, LLM-as-judge, adversarial/red-teaming, task-specific evaluation, and benchmark testing — each trading coverage against cost.
+- No method is enough alone: layer cheap continuous metrics and a calibrated LLM-judge with task-specific evals, human spot-checks, and adversarial gating.
+- Agent evaluation adds trajectory, tool-call correctness, step-level checks, and non-determinism — a right answer via a reckless path is still a failure.
+- Build a harness: a golden dataset, continuous evaluation in CI, regression detection, and production monitoring that feeds failures back into the dataset.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Turn methods into a system with [Building an eval harness](/ai-engineering/building-an-eval-harness).
+- Implement automated grading with [Hallucination detection with an LLM judge](/ai-engineering/hallucination-detection-llm-judge).
+- See it applied end to end in [Evaluating an AI app](/ai-engineering/evaluating-an-ai-app), then follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

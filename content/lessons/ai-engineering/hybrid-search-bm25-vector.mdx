@@ -1,0 +1,50 @@
+---
+slug: hybrid-search-bm25-vector
+title: "Hybrid Search: Combining BM25 Keyword + Vector Retrieval"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why pure vector search misses exact terms (codes, names, IDs)
+- Describe BM25 keyword retrieval in one sentence
+- Fuse keyword and vector results with Reciprocal Rank Fusion (RRF)
+- Know when hybrid beats either method alone
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Vector search is great at *meaning* but surprisingly bad at *exact strings* — error code "E-4042", a product SKU, a person's surname. Users expect those to match exactly. Hybrid search combines a keyword index with a vector index so you get semantic recall *and* exact-term precision. It's a fast-rising interview topic and a real quality lever in production RAG.
+</WhyThisMatters>
+
+<Body>
+## Where pure vector search fails
+
+Embeddings capture meaning, so "how do I reset my password" finds "credential recovery steps" — great. But ask for error code `E-4042` and the embedding of that token is near-meaningless; a keyword index would nail it instantly. Vector search has a blind spot for rare, exact tokens.
+
+## BM25 in one sentence
+
+BM25 is the classic keyword ranking function: it scores a document by how often the query terms appear, dampened by how common each term is across the corpus. It's exact-match, fast, and decades-proven.
+
+## Fuse the two with RRF
+
+Run both retrievers, then merge their ranked lists. **Reciprocal Rank Fusion** is the simple, robust default: each result scores `1 / (k + rank)` in each list, and you sum across lists. No score normalization needed — it works on ranks alone.
+
+## When to use hybrid
+
+Use hybrid when your corpus has identifiers, jargon, or names users will type verbatim (technical docs, legal, code, catalogs). For purely conversational corpora, vector alone is often enough — measure before adding complexity.
+</Body>
+
+<MiniQuiz>
+**Q: A user searches your docs for the exact error code "E-4042". Which retriever is most likely to surface it?**
+
+- A) Pure vector search — embeddings capture everything
+- B) BM25 keyword search (or hybrid) — exact rare tokens are a vector blind spot ✅
+- C) Neither can find error codes
+- D) Only a fine-tuned model
+</MiniQuiz>
+
+<InterviewExplanation>
+"Vector search captures meaning but has a blind spot for rare exact tokens — error codes, SKUs, surnames — because their embeddings carry little signal. BM25 keyword search nails those. Hybrid search runs both and fuses the ranked lists, usually with Reciprocal Rank Fusion, which scores each hit as one over k-plus-rank and sums across lists, so I don't need to normalize incompatible scores. I reach for hybrid when the corpus has identifiers or jargon users type verbatim, and I measure rather than assume — for purely conversational data, vector alone is often enough."
+</InterviewExplanation>

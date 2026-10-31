@@ -1,0 +1,192 @@
+---
+slug: pattern-recognition
+title: "Pattern Recognition: How to Read a Problem and Pick the Right Approach"
+track: dsa
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Build a mental decision tree for selecting the right algorithm pattern
+- Identify 10+ trigger phrases in problem statements that map to specific patterns
+- Practice the "classify before you code" discipline
+- Walk through 8 example problems and see the pattern selection process in real time
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Knowing every pattern means nothing if you can't recognize which one to use. The gap between "studied DSA" and "aces interviews" is almost entirely pattern recognition speed. This lesson gives you a systematic framework for reading a problem statement and narrowing to the right approach within 60 seconds, which is exactly what top candidates do.
+</WhyThisMatters>
+
+<Body>
+## The decision framework
+
+Before writing any code, ask yourself these questions in order:
+
+### 1. What is the input structure?
+
+| Input | Likely patterns |
+|---|---|
+| Sorted array | Binary search, two pointers |
+| Unsorted array | Hash map, sorting first, sliding window |
+| String | Sliding window, hash map, two pointers |
+| Tree | DFS, BFS |
+| Graph / grid | DFS, BFS, topological sort |
+| Intervals | Sort + sweep |
+| Linked list | Two pointers (fast/slow) |
+
+### 2. What is being asked?
+
+| Question type | Likely patterns |
+|---|---|
+| "Find pair/triplet with property X" | Two pointers (sorted), hash map (unsorted) |
+| "Longest/shortest subarray with condition" | Sliding window |
+| "All combinations/permutations/subsets" | Backtracking |
+| "Minimum/maximum with optimal substructure" | DP or greedy |
+| "Kth largest/smallest" | Heap |
+| "Find if path exists" | DFS/BFS |
+| "Shortest path (unweighted)" | BFS |
+| "Can you complete all tasks with dependencies?" | Topological sort |
+| "Design a data structure" | Combine structures (hash map + list, etc.) |
+| "Next greater/smaller element" | Monotonic stack |
+
+### 3. What are the constraints?
+
+| Constraint | Implication |
+|---|---|
+| n <= 20 | Backtracking or bitmask DP (2^20 = 1M, feasible) |
+| n <= 1000 | O(n^2) is fine |
+| n <= 10^5 | Need O(n log n) or O(n) |
+| n <= 10^7 | Need O(n) or better |
+| "Do it in O(1) extra space" | Two pointers, in-place manipulation |
+
+## Walkthrough: 8 problems classified
+
+### Problem 1: "Given a sorted array, find two numbers that sum to target"
+- **Sorted array** + **pair search** = Two pointers. O(n).
+
+### Problem 2: "Find the longest substring without repeating characters"
+- **String** + **longest subarray with condition** = Sliding window with hash set. O(n).
+
+### Problem 3: "Given a list of meeting times, find the minimum number of rooms needed"
+- **Intervals** + **concurrent events** = Sort + heap or sweep line. O(n log n).
+
+### Problem 4: "Return all possible letter combinations of a phone number"
+- **All combinations** = Backtracking. Exponential but necessary.
+
+### Problem 5: "Find the minimum number of coins to make a given amount"
+- **Minimum** + **choices at each step** + **optimal substructure** = DP. O(amount * coins).
+
+### Problem 6: "Given a binary tree, return the level-order traversal"
+- **Tree** + **level-by-level** = BFS with queue. O(n).
+
+### Problem 7: "Find if there's a cycle in a linked list"
+- **Linked list** + **cycle detection** = Fast/slow pointers. O(n) time, O(1) space.
+
+### Problem 8: "Given daily temperatures, find how many days until a warmer temperature"
+- **"Next greater element"** = Monotonic stack. O(n).
+
+## The 60-second process
+
+1. **Read the problem once fully** (30 seconds)
+2. **Identify**: input type, question type, constraints (15 seconds)
+3. **State your approach** to the interviewer (15 seconds)
+4. Then start coding
+
+## When multiple patterns could work
+
+Sometimes a problem can be solved multiple ways. For example, "two sum" works with hash map (O(n) time, O(n) space) or with sorting + two pointers (O(n log n) time, O(1) space). In an interview:
+- Mention the brute-force approach first ("I could check every pair in O(n^2)...")
+- Then state the optimized approach and why
+- If the interviewer asks for a different trade-off, you have alternatives ready
+
+## The "I'm stuck" recovery plan
+
+If you don't recognize the pattern:
+1. Try brute force. Write it out. What's slow about it?
+2. Look for repeated work. Can you cache it? (DP)
+3. Can you sort the input to enable a better approach? (Two pointers, binary search)
+4. Can you use a hash map to avoid a nested loop? (O(n) lookup)
+5. Draw a small example and trace through it. The pattern often becomes visible.
+</Body>
+
+<TryItYourself>
+1. Open LeetCode's "Top Interview 150" list. For each problem, practice just reading the title and classifying it into a pattern before looking at any solutions.
+2. Set a timer: can you classify 10 problems in under 5 minutes?
+3. Pick 3 problems you classified incorrectly and analyze why. Was the trigger phrase misleading? Was it a hybrid problem?
+4. Practice verbalizing your classification: "This is a sliding window problem because we need the longest subarray with at most K distinct elements."
+</TryItYourself>
+
+<Code>
+```python
+# Pattern recognition cheat sheet as a Python dictionary
+# Use this as a study aid - quiz yourself on which pattern fits each signal
+
+PATTERN_MAP = {
+    # Trigger phrases -> Pattern
+    "sorted array + pair":          "Two Pointers (converging)",
+    "longest/shortest subarray":    "Sliding Window",
+    "find in sorted":               "Binary Search",
+    "all combinations/subsets":     "Backtracking",
+    "minimum cost / maximum value": "Dynamic Programming",
+    "top K / Kth largest":          "Heap",
+    "shortest path unweighted":     "BFS",
+    "detect cycle":                 "DFS / Fast-Slow Pointers",
+    "task dependencies":            "Topological Sort",
+    "next greater element":         "Monotonic Stack",
+    "merge overlapping":            "Sort + Sweep",
+    "design data structure":        "Combine (HashMap + LinkedList, etc.)",
+    "count occurrences":            "Hash Map / Counter",
+    "prefix search":                "Trie",
+}
+
+# Quick self-test: given a problem, what pattern?
+PROBLEMS = [
+    ("Container With Most Water",           "Two Pointers"),
+    ("Minimum Window Substring",            "Sliding Window"),
+    ("Koko Eating Bananas",                 "Binary Search (on answer)"),
+    ("Generate Parentheses",                "Backtracking"),
+    ("Climbing Stairs",                     "Dynamic Programming"),
+    ("Find K Closest Points to Origin",     "Heap"),
+    ("Word Ladder",                         "BFS"),
+    ("Course Schedule",                     "Topological Sort"),
+    ("Daily Temperatures",                  "Monotonic Stack"),
+    ("Merge Intervals",                     "Sort + Sweep"),
+    ("LRU Cache",                           "HashMap + Doubly-Linked List"),
+    ("Implement Trie",                      "Trie"),
+]
+
+print("=== Pattern Recognition Quiz ===")
+for problem, answer in PROBLEMS:
+    print(f"  {problem:<40} -> {answer}")
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can classify a problem into a pattern within 60 seconds of reading it
+- [ ] I know the trigger phrases for all 12+ patterns covered in this track
+- [ ] I've practiced classifying at least 20 problems from LeetCode's top interview list
+- [ ] I have a recovery plan for when I don't immediately recognize the pattern
+- [ ] I can explain to an interviewer why I chose a specific approach
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Jumping to code before classifying**: The biggest time waster in interviews. Spend 60 seconds thinking before touching the keyboard. Interviewers actively reward this.
+- **Fixating on the first pattern you see**: Some problems are hybrids (e.g., "minimum window substring" uses sliding window AND a hash map). Stay flexible.
+- **Ignoring constraints**: A solution that's O(n^2) is perfect when n <= 1000 but will TLE when n = 10^5. Always check the constraint to calibrate your target complexity.
+- **Not considering brute force**: Even if you recognize the optimal pattern, mentioning brute force first shows structured thinking and gives you a fallback if you get stuck on the optimal approach.
+- **Treating DP and Greedy as interchangeable**: DP finds the global optimum by trying all subproblems. Greedy makes locally optimal choices. Greedy only works when you can prove the greedy choice property (e.g., activity selection). When in doubt, use DP.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: You see a problem that asks "find the longest subarray where the sum is at most K." Which pattern should you try first?**
+
+- A) Binary search
+- B) Dynamic programming
+- C) Sliding window (variable size) ✅
+- D) Backtracking
+</MiniQuiz>
+
+<InterviewExplanation>
+"My process is: read the problem, identify the input type and what's being asked, check the constraints, then state my approach. For example, if I see a sorted array and a pair search, I immediately think two pointers. If I see 'longest subarray with condition,' I think sliding window. I always mention the brute-force complexity first, then explain why my chosen pattern improves on it. If I'm stuck, I try to identify what's slow about brute force and look for caching or sorting opportunities."
+</InterviewExplanation>

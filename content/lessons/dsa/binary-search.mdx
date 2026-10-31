@@ -1,0 +1,130 @@
+---
+slug: binary-search
+title: "Binary Search Beyond Sorted Arrays: The Search-Space Pattern"
+track: dsa
+tier: short
+estimatedMinutes: 15
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Implement binary search correctly (the off-by-one-free template)
+- Apply binary search on answer (search-space reduction) for non-obvious problems
+- Identify the monotonic-predicate pattern that makes binary search applicable
+- Solve problems like "find first bad version," "koko eating bananas," and "search in rotated sorted array"
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Binary search is tested constantly, yet even experienced engineers write buggy versions due to off-by-one errors. More importantly, the "binary search on answer" pattern applies to problems that don't look like search problems at all, such as minimizing the maximum workload or finding the minimum speed to finish a task.
+</WhyThisMatters>
+
+<Body>
+## The bug-free template
+
+Most binary search bugs come from boundary handling. Use this template consistently:
+
+```python
+def binary_search(nums, target):
+    lo, hi = 0, len(nums) - 1
+    while lo <= hi:
+        mid = lo + (hi - lo) // 2   # avoids overflow in other languages
+        if nums[mid] == target:
+            return mid
+        elif nums[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1  # not found
+```
+
+**Time:** O(log n). **Space:** O(1).
+
+## Finding the leftmost (first) occurrence
+
+When duplicates exist, a small tweak finds the first position where a condition becomes true:
+
+```python
+def first_true(lo, hi, condition):
+    """Returns the smallest index in [lo, hi] where condition(index) is True."""
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if condition(mid):
+            hi = mid       # mid might be the answer, keep it
+        else:
+            lo = mid + 1   # mid is definitely not the answer
+    return lo  # lo == hi
+```
+
+This is the foundation of binary search on answer.
+
+## Binary search on answer: Koko Eating Bananas
+
+Koko can eat at speed `k` bananas/hour. Given piles and `h` hours, find the minimum `k` so she finishes in time.
+
+The insight: if speed `k` works, every speed `> k` also works. This monotonic property means we can binary search on `k`.
+
+```python
+import math
+
+def min_eating_speed(piles, h):
+    def can_finish(speed):
+        return sum(math.ceil(p / speed) for p in piles) <= h
+
+    lo, hi = 1, max(piles)
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if can_finish(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+```
+
+**Time:** O(n log m) where n = number of piles, m = max pile size.
+
+## Search in rotated sorted array
+
+A sorted array rotated at some pivot. Binary search still works because at least one half is always sorted.
+
+```python
+def search_rotated(nums, target):
+    lo, hi = 0, len(nums) - 1
+    while lo <= hi:
+        mid = lo + (hi - lo) // 2
+        if nums[mid] == target:
+            return mid
+        if nums[lo] <= nums[mid]:      # left half is sorted
+            if nums[lo] <= target < nums[mid]:
+                hi = mid - 1
+            else:
+                lo = mid + 1
+        else:                           # right half is sorted
+            if nums[mid] < target <= nums[hi]:
+                lo = mid + 1
+            else:
+                hi = mid - 1
+    return -1
+```
+
+## When to reach for binary search
+
+| Signal | Variant |
+|---|---|
+| Sorted array, find element | Classic binary search |
+| "Find first/last position of X" | Leftmost/rightmost template |
+| "Minimum speed/capacity/value such that..." | Binary search on answer |
+| Rotated sorted array | Modified binary search with sorted-half check |
+</Body>
+
+<MiniQuiz>
+**Q: Koko needs to eat all banana piles within h hours. You need the minimum eating speed. Why does binary search work here?**
+
+- A) The piles are sorted
+- B) There is a monotonic relationship: if speed k works, all speeds > k also work ✅
+- C) The answer is always a power of 2
+- D) Binary search only works on sorted arrays
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd recognize this as a binary search on answer problem. The key insight is that the feasibility function is monotonic: if eating speed k lets Koko finish in time, any higher speed also works. So I binary search on k from 1 to max(piles). For each candidate speed I check if the total hours needed is within the limit. This gives O(n log m) time where n is the number of piles and m is the max pile size."
+</InterviewExplanation>

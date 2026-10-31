@@ -1,0 +1,256 @@
+---
+slug: auth-nextauth
+title: "Auth Basics with NextAuth: Just Enough for a Paid Product"
+track: full-stack
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Set up NextAuth (Auth.js) with GitHub and Google OAuth providers
+- Store sessions in a database using the Prisma adapter
+- Protect pages and Server Actions by checking the session
+- Understand the session flow: sign-in, JWT/database session, sign-out
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Every paid product needs authentication. NextAuth is the default auth solution in the Next.js ecosystem — it handles OAuth flows, session management, and database persistence. If you've only used Firebase Auth or Clerk, you're missing the foundational understanding of how auth actually works under the hood.
+</WhyThisMatters>
+
+<Body>
+## What NextAuth does
+
+NextAuth (now called Auth.js) handles:
+1. **OAuth sign-in** — redirects to GitHub/Google, receives the callback, exchanges codes for tokens
+2. **Session management** — stores the user's identity in a JWT or database session
+3. **Adapter integration** — syncs user/account/session data to your database via Prisma
+
+You don't write the OAuth dance yourself. You configure providers and callbacks.
+
+## Setup
+
+Install the packages:
+
+```bash
+npm install next-auth @auth/prisma-adapter
+```
+
+Create the auth configuration:
+
+```tsx
+// lib/auth.ts
+import NextAuth from "next-auth";
+import GitHub from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "./prisma";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GitHub({
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    }),
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+  ],
+  callbacks: {
+    session({ session, user }) {
+      // Attach the user ID to the session so we can use it in Server Components
+      session.user.id = user.id;
+      return session;
+    },
+  },
+});
+```
+
+Wire up the API route:
+
+```tsx
+// app/api/auth/[...nextauth]/route.ts
+import { handlers } from "@/lib/auth";
+
+export const { GET, POST } = handlers;
+```
+
+## Prisma schema additions
+
+NextAuth requires specific tables. Add these models to your schema:
+
+```prisma
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+```
+
+## Protecting pages
+
+In a Server Component, call `auth()` to get the session:
+
+```tsx
+// app/dashboard/page.tsx
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+export default async function DashboardPage() {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/api/auth/signin");
+  }
+
+  return <h1>Welcome, {session.user.name}</h1>;
+}
+```
+
+## Protecting Server Actions
+
+Same pattern — check the session before running the mutation:
+
+```tsx
+// app/actions.ts
+"use server";
+
+import { auth } from "@/lib/auth";
+
+export async function saveArticle(articleId: string) {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+
+  await prisma.savedArticle.create({
+    data: { articleId, userId: session.user.id },
+  });
+}
+```
+
+## The session flow
+
+1. User clicks "Sign in with GitHub"
+2. NextAuth redirects to GitHub's OAuth page
+3. User authorizes your app
+4. GitHub redirects back to `/api/auth/callback/github` with an authorization code
+5. NextAuth exchanges the code for an access token
+6. NextAuth creates/updates the `User` and `Account` records in your database
+7. NextAuth creates a session (JWT or database row) and sets a cookie
+8. On subsequent requests, `auth()` reads the cookie and returns the session
+</Body>
+
+<Code>
+```tsx
+// Complete auth setup pattern
+
+// 1. lib/auth.ts — Configuration
+import NextAuth from "next-auth";
+import GitHub from "next-auth/providers/github";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "./prisma";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  providers: [GitHub],
+  callbacks: {
+    session: ({ session, user }) => ({
+      ...session,
+      user: { ...session.user, id: user.id },
+    }),
+  },
+});
+
+// 2. app/api/auth/[...nextauth]/route.ts — Handler
+export { GET, POST } from "@/lib/auth";
+
+// 3. components/AuthButton.tsx — Sign in/out UI
+"use client";
+import { signIn, signOut, useSession } from "next-auth/react";
+
+export function AuthButton() {
+  const { data: session } = useSession();
+  if (session) {
+    return <button onClick={() => signOut()}>Sign out</button>;
+  }
+  return <button onClick={() => signIn("github")}>Sign in</button>;
+}
+
+// 4. Protected page pattern
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+export default async function ProtectedPage() {
+  const session = await auth();
+  if (!session) redirect("/api/auth/signin");
+  return <div>Protected content for {session.user.email}</div>;
+}
+```
+</Code>
+
+<TryItYourself>
+1. Create a GitHub OAuth app at [github.com/settings/developers](https://github.com/settings/developers) — set the callback URL to `http://localhost:3000/api/auth/callback/github`
+2. Add `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` to your `.env`
+3. Add the User/Account/Session models to your Prisma schema and run `npx prisma migrate dev`
+4. Set up `lib/auth.ts` and the API route
+5. Create a protected page that redirects unauthenticated users
+6. Sign in, check Prisma Studio — verify the User and Account records were created
+</TryItYourself>
+
+<CommonMistakes>
+- **Forgetting `onDelete: Cascade` on Account and Session** — if you delete a user, orphaned records break auth
+- **Not adding `session.user.id` in the session callback** — the default session only includes name, email, and image
+- **Checking auth in Client Components instead of Server Components** — use `auth()` on the server; it's faster and doesn't leak session logic to the client
+- **Hardcoding OAuth callback URLs** — use environment-specific URLs; `localhost` for dev, your domain for production
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] NextAuth configured with at least one OAuth provider
+- [ ] Prisma schema includes User, Account, and Session models
+- [ ] Protected at least one page and one Server Action
+- [ ] Successfully signed in and verified database records in Prisma Studio
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: A user signs in with GitHub OAuth. Which NextAuth table stores the GitHub access token?**
+
+- A) User
+- B) Session
+- C) Account — it stores provider-specific tokens and IDs ✅
+- D) The token is only stored in the JWT cookie
+</MiniQuiz>
+
+<InterviewExplanation>
+"I use NextAuth with the Prisma adapter for auth in Next.js apps. It handles the OAuth flow — redirect, callback, token exchange — and syncs user and account data to the database. I protect pages by calling `auth()` in Server Components and redirecting if there's no session. For mutations, I check the session in Server Actions before running any database writes. The key architectural point is that auth checks happen on the server — I never trust the client to determine access."
+</InterviewExplanation>

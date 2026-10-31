@@ -1,0 +1,93 @@
+---
+slug: agent-memory-explained
+title: "Agent Memory Explained: Working, Episodic, Semantic, Procedural"
+summary: "AI agents need more than a context window. Here are the four memory types that give agents continuity across sessions — and how they fit together."
+category: ai-engineering
+tags: ["agents", "memory", "architecture"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1776292091608.gif
+  - references/linkedin/1776339210547.gif
+  - references/linkedin/1779298195342.jpeg
+  - references/linkedin/1779799092887.gif
+relatedLessons:
+  - ai-engineering/agent-memory
+  - ai-engineering/what-is-an-agent
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+A context window is short-term scratch space, not memory. The moment a session ends, a model with only a context window forgets everything. Real agents layer four memory types on top of the model — working, episodic, semantic, and procedural — so they can carry a conversation, recall past events, hold durable facts, and reuse learned procedures. Each type lives in a different store and is retrieved differently, and choosing the right mix is one of the core design decisions in agent engineering.
+</InsightSummary>
+
+<Body>
+## Why a context window is not memory
+
+An LLM is stateless. It only "knows" what is inside the context window you hand it on this call. Anything outside that window — last week's conversation, a fact the user told you yesterday, a workflow the agent figured out an hour ago — is gone unless you deliberately put it back in.
+
+That is fine for a single-turn question. It breaks the instant you want an agent that *persists*: a coding assistant that remembers your project conventions, a support agent that recalls a customer's history, a research agent that builds on yesterday's findings. To get continuity, you build memory *around* the model rather than relying on the window alone.
+
+The standard mental model breaks agent memory into four types. They map loosely onto how human memory is described, and that analogy is genuinely useful for reasoning about them.
+
+## The four memory types
+
+**Working memory (in-context).** This is what is currently in the context window: the system prompt, the available tools, additional context you injected, and the recent reasoning-and-action history of the current task. It is fast and immediate but tiny and temporary — when the window fills, the oldest turns get dropped, and when the session ends it is cleared. Think of it as the agent's "what am I doing right now" buffer.
+
+**Episodic memory (events and past sessions).** This stores *what happened*: previous interactions, completed tasks, the outcome of a tool call, a past conversation with this user. It is typically embedded and stored in a vector database, then retrieved on demand — the agent embeds the current query, runs an approximate-nearest-neighbor search over past episodes, and pulls back the most relevant ones to assemble into context. This is how an agent "remembers" a conversation from three days ago without keeping it permanently in the window.
+
+**Semantic memory (facts and knowledge).** This holds *what the agent knows to be true*: distilled facts, user preferences, domain knowledge, relationships. "This user prefers dark mode," "this customer is on the enterprise plan," "gravity is 9.8 m/s²." Unlike episodic memory, it is not a raw transcript of an event — it is the extracted, structured fact. It is often backed by a key-value store, a structured fact table, or a knowledge graph, and looked up by entity rather than by similarity search over history.
+
+**Procedural memory (skills and how-to).** This encodes *how to do things*: learned workflows, tool sequences, and reusable procedures. An agent that has successfully run an "invoice approval" or "data cleanup" workflow can store that sequence and promote it for reuse, so next time it executes a known recipe instead of re-deriving it. In practice this shows up as prompt registries, tool registries, and skill libraries the agent can match against and execute.
+
+## Hot, warm, and cold tiers
+
+A second useful framing is *how close* each memory is to the model when it runs — borrowed directly from how an operating system pages data between fast and slow storage:
+
+- **Hot — working memory.** In the context window, instantly available, smallest capacity. Like CPU registers or RAM.
+- **Warm — episodic / recall memory.** In a vector store, retrieved per query, larger capacity, a retrieval round-trip away.
+- **Cold — semantic and procedural / archival memory.** Durable knowledge and skills the agent pages in only when a task needs them.
+
+A hierarchical-memory agent treats these like an OS treats storage: it pages relevant items into working memory when needed and evicts them when the window gets tight. Some designs add a **prospective** layer (reminders and scheduled follow-ups — "remember to do X later") and, in multi-agent systems, a **shared** memory layer so several agents work from one consistent source of truth.
+
+## How each type is implemented
+
+The implementations follow directly from the access patterns:
+
+- **Working memory** is just strings assembled into the prompt — prompt structure, available tools, additional context, and reasoning/action history concatenated and sent to the model.
+- **Episodic memory** is an embed-store-retrieve loop: embed each interaction, index the vectors, and run similarity search to pull back relevant past episodes, then assemble them into context and store the new episode after the turn.
+- **Semantic memory** is lookup, not search: extract facts from interactions and write them to a key-value store, structured table, or knowledge graph, then read them back by key/entity. Add relations and references as you go.
+- **Procedural memory** is a skill/tool registry: store successful workflows and tool sequences, match the incoming task to a known procedure, and execute it — promoting runs that worked so the library improves over time.
+
+## Choosing the right memory for your agent
+
+You rarely need all four at full strength. Start from the behavior you want:
+
+- Need a coherent multi-turn conversation? Working memory is enough.
+- Need to recall past sessions or events? Add episodic (vector store).
+- Need durable facts and user preferences across sessions? Add semantic (key-value / knowledge graph).
+- Doing repeated structured workflows? Add procedural (skill library).
+
+The discipline is to add memory because a concrete behavior requires it — not to bolt on a vector database because every architecture diagram has one. Every memory tier you add is another thing to retrieve correctly, keep fresh, and pay for.
+</Body>
+
+<KeyTakeaways>
+- A context window is stateless scratch space; an LLM forgets everything outside it, so persistent agents need memory built around the model.
+- The four types are working (in-context, hot), episodic (past events, retrieved from a vector store), semantic (durable facts, looked up by entity), and procedural (learned skills and workflows).
+- Hot/warm/cold tiers mirror an OS: page relevant memory into the window when needed, evict it when space runs out.
+- Implementation follows access pattern: working = concatenated strings, episodic = embed-and-retrieve, semantic = key-value/graph lookup, procedural = a skill registry.
+- Choose memory by the behavior you need, not by default — every tier adds retrieval, freshness, and cost overhead.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Go deeper on the mechanics in [Agent memory](/ai-engineering/agent-memory).
+- Ground the concept in [What is an agent](/ai-engineering/what-is-an-agent).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) for the full agent curriculum.
+</WhatToDoNext>
+
+<SourceNote />

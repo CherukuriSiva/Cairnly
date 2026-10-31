@@ -81,7 +81,7 @@ the whole corpus). It is a good start; a real BM25 extension is a candidate for 
 
 Before calling the LLM, cairnly checks the **best cosine similarity**. On the real corpus,
 on-topic questions score 0.78-0.85 and an off-topic one ("best pizza in Dubai") scores 0.48.
-Below `MIN_SCORE` (0.55) it refuses instead of letting the model answer from memory.
+Below the knowledge base's `min_score` (0.55, in `kbs.yaml`) it refuses instead of letting the model answer from memory.
 
 The 0.55 is a first guess from a handful of questions. M2 adds a golden set of questions to
 measure it properly.

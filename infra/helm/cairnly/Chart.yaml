@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cairnly
+description: Cited Q&A over your docs - API, web UI, embeddings server and an ingest job.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

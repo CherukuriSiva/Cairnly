@@ -1,0 +1,101 @@
+---
+slug: explain-an-agent-architecture
+title: "How to Explain an Agent Architecture in an Interview"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Describe an agent in a tight 60-second narrative
+- Name the five components an interviewer wants to hear
+- Pre-empt the "why not just a prompt?" follow-up
+- Show you understand the failure modes, not just the happy path
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"Tell me about an agent you built" is now a standard AI interview prompt, and most candidates ramble. A crisp, component-by-component explanation that includes safety rails instantly signals senior-level understanding. The difference between "I used LangChain" and a clear architecture walkthrough is often the difference between a pass and a fail.
+</WhyThisMatters>
+
+<Body>
+## The 60-second structure
+
+Lead with the loop, then the components, then the rails:
+
+1. **The loop** — "It's a ReAct loop: the model produces a Thought, requests an Action, my controller runs it and feeds back an Observation, and it repeats until it emits a final Answer."
+2. **The components** — controller, LLM client, tool registry, memory, reflection.
+3. **The rails** — max-iterations cap, tool registry as a safety barrier, reflection to catch ungrounded answers.
+
+## The five components to name
+
+- **Controller** — orchestrates the loop, parses output, decides action vs answer.
+- **Tool registry** — the vetted set of actions; the safety barrier between model and business logic.
+- **Memory** — the running history of thoughts/actions/observations within the context budget.
+- **LLM client** — the model call, with timeout/retry and cost tracking.
+- **Reflection** — a post-hoc judge that validates the answer against gathered observations.
+
+## Pre-empt the obvious follow-ups
+
+- *"Why an agent and not a single prompt?"* — "When the task needs tools or multiple dependent steps the model can't do in one shot. If a prompt suffices, I use a prompt."
+- *"How do you stop it looping forever / burning money?"* — "Hard max-iterations cap plus per-run cost tracking."
+- *"How do you keep it from hallucinating?"* — "Reflection against the observations it actually collected."
+</Body>
+
+<Code>
+```text
+60-SECOND SCRIPT (rehearse out loud):
+
+"I built a research agent on a ReAct loop. The model emits a Thought and an
+Action — a named tool plus input — and pauses. My controller, not the model,
+executes the tool through a registry and feeds the result back as an
+Observation. It loops until it outputs a final Answer.
+
+Five pieces: a controller that parses output and drives the loop; a tool
+registry that's both the discovery layer and the safety barrier; short-term
+memory holding the thought/action/observation history; an LLM client with
+timeouts, retries, and cost tracking; and a reflection step that checks the
+final answer against the observations it gathered.
+
+Two rails keep it safe: a hard max-iterations cap so it can't loop forever,
+and reflection to catch any claim the observations don't support. I'd only
+use an agent when the task genuinely needs tools or multi-step reasoning —
+otherwise a single prompt is cheaper and more reliable."
+```
+</Code>
+
+<TryItYourself>
+1. Record yourself giving the 60-second script; cut it to under 75 seconds
+2. Draw the loop on a whiteboard from memory in under 90 seconds
+3. Have a friend ask the three follow-ups; answer each in two sentences
+4. Swap in a real project: replace "research agent" with your own tools and task
+5. Practice the "why not a prompt?" answer until it's reflexive
+</TryItYourself>
+
+<CommonMistakes>
+- **Leading with a framework name** ("I used LangChain") instead of the architecture
+- **Describing only the happy path** — interviewers probe failure modes
+- **Forgetting the safety rails** — no max-iterations / no reflection reads as junior
+- **Rambling** — structure beats detail; loop → components → rails
+- **Claiming "agent" for what's really a single prompt** — know the distinction
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Can deliver the 60-second script from memory
+- [ ] Can whiteboard the ReAct loop quickly
+- [ ] Can answer all three standard follow-ups in two sentences each
+- [ ] Have a real project mapped onto the five components
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: An interviewer asks "why use an agent instead of a single prompt?" Best answer?**
+
+- A) "Agents are more advanced and modern"
+- B) "When the task needs tools or multiple dependent steps; otherwise I'd use a prompt" ✅
+- C) "Because LangChain makes it easy"
+- D) "Agents never hallucinate"
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd say: it's a ReAct loop — the model emits a Thought and an Action, my controller executes the tool through a registry and feeds back an Observation, and it loops until a final Answer. The five components are the controller, the tool registry that doubles as a safety barrier, short-term memory, an LLM client with timeouts and cost tracking, and a reflection step. Two rails make it production-safe: a max-iterations cap and reflection against the observations it gathered. And I'd only reach for an agent when the task truly needs tools or multi-step reasoning — otherwise a single prompt is cheaper and more reliable."
+</InterviewExplanation>

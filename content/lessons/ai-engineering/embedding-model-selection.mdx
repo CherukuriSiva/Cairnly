@@ -1,0 +1,112 @@
+---
+slug: embedding-model-selection
+title: "Choosing an Embedding Model (with a Local Fallback)"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Compare hosted (OpenAI) vs local (sentence-transformers) embedding models
+- Build a factory that picks a provider and falls back gracefully
+- Understand why normalizing embeddings matters for cosine similarity
+- Keep query-time and index-time embeddings from drifting apart
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Your embedding model decides retrieval quality, cost, latency, and where your data goes. Picking one is a real architectural decision — and a graceful local fallback means a missing API key (or an outage) downgrades you instead of breaking you. Interviewers probe this because it reveals whether you understand the retrieval layer or just call an API.
+</WhyThisMatters>
+
+<Body>
+## Hosted vs local
+
+- **Hosted (e.g. OpenAI `text-embedding-3-small`)** — high quality, zero ops, but per-call cost and your text leaves your network.
+- **Local (e.g. `all-MiniLM-L6-v2` via sentence-transformers)** — free after setup, private, runs on CPU, but you operate it and quality may be lower.
+
+The right pick depends on data sensitivity, volume, and budget — not on which is "best" in a leaderboard.
+
+## A provider factory with fallback
+
+Don't hardcode one model. A factory selects the provider and falls back to a local model when the API key is missing or the provider is down, so the system degrades instead of failing:
+
+```python
+def get_embeddings_model(provider: str = "openai"):
+    if provider == "openai" and settings.OPENAI_API_KEY:
+        return OpenAIEmbeddings(model="text-embedding-3-small")
+    # fallback: local, private, normalized
+    return HuggingFaceEmbeddings(
+        model_name="all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
+```
+
+## Normalize for cosine similarity
+
+If you compare vectors with cosine similarity (or a dot-product index like FAISS `IndexFlatIP`), the vectors must be **unit length**. Set `normalize_embeddings=True` (or L2-normalize yourself) so dot product *equals* cosine. Forgetting this silently degrades retrieval.
+
+## The cardinal rule: same model both sides
+
+The model that builds the index and the model that embeds queries **must be identical**. Switch one and your query vectors live in a different space than your index — retrieval quietly returns garbage. Re-embed the whole corpus when you change models.
+</Body>
+
+<Code>
+```python
+import numpy as np
+
+class EmbeddingService:
+    def __init__(self, provider: str = "openai"):
+        self.model = get_embeddings_model(provider)
+        self.provider = provider          # record which model built the index
+
+    def embed(self, texts: list[str]) -> np.ndarray:
+        vecs = np.array(self.model.embed_documents(texts), dtype=np.float32)
+        # ensure unit length so dot product == cosine similarity
+        norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+        return vecs / np.clip(norms, 1e-8, None)
+
+    def assert_same_model(self, index_provider: str):
+        if index_provider != self.provider:
+            raise RuntimeError(
+                f"Query model '{self.provider}' != index model '{index_provider}'. Re-embed the corpus."
+            )
+```
+</Code>
+
+<TryItYourself>
+1. Build the factory and confirm it falls back to local when no API key is set
+2. Embed 5 sentences with each provider; compare dimensions and latency
+3. Verify your vectors are unit length after `embed`
+4. Build an index with one model, query with another, and observe the bad results
+5. Add the `assert_same_model` guard and confirm it catches the mismatch
+</TryItYourself>
+
+<CommonMistakes>
+- **Hardcoding one provider** — no fallback means a missing key takes you down
+- **Skipping normalization** — cosine/dot-product indexes need unit vectors
+- **Mismatched query/index models** — vectors land in different spaces; retrieval breaks silently
+- **Choosing by leaderboard alone** — data sensitivity and cost often matter more than a benchmark
+- **Not re-embedding after a model change** — stale index vectors no longer match new queries
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Built a provider factory with a local fallback
+- [ ] Confirmed embeddings are normalized to unit length
+- [ ] Demonstrated the query/index model-mismatch failure
+- [ ] Added a guard asserting the same model on both sides
+- [ ] Can justify a provider choice on data/cost, not just quality
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You swap your embedding model but only re-embed new queries, not the existing index. What happens?**
+
+- A) Slightly better results
+- B) Retrieval quietly breaks — query and index vectors are now in different spaces ✅
+- C) Nothing; embeddings are interchangeable
+- D) The index rebuilds itself automatically
+</MiniQuiz>
+
+<InterviewExplanation>
+"The embedding model sets retrieval quality, cost, latency, and data residency, so I treat it as an architectural choice — hosted like OpenAI for quality with zero ops, or local sentence-transformers for privacy and cost. I wrap it in a factory that falls back to a local model when the API key is missing or the provider is down, so the system degrades instead of breaking. Two rules I never violate: normalize embeddings to unit length so dot product equals cosine, and use the exact same model to build the index and to embed queries — otherwise the vectors live in different spaces and retrieval silently returns garbage. Changing models means re-embedding the whole corpus."
+</InterviewExplanation>

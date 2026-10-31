@@ -1,0 +1,254 @@
+---
+slug: design-lru-cache
+title: "Design an LRU Cache: Hashmap + Doubly-Linked List"
+track: dsa
+tier: medium
+estimatedMinutes: 30
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Understand why LRU cache needs both a hash map and a doubly-linked list
+- Implement get and put in O(1) time
+- Build the doubly-linked list operations: add to head, remove node, move to head
+- Connect this to real-world caching in web servers, databases, and operating systems
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+LRU Cache (LC 146) is one of the most frequently asked design questions in coding interviews. It tests your ability to combine two data structures into one that satisfies multiple constraints simultaneously. The pattern also appears in system design interviews when discussing caching layers, and understanding it deeply shows you can reason about data structure composition.
+</WhyThisMatters>
+
+<Body>
+## The constraints that force the design
+
+An LRU cache needs:
+1. **O(1) lookup by key** &rarr; hash map
+2. **O(1) insertion** &rarr; hash map + linked list
+3. **O(1) eviction of the least recently used item** &rarr; doubly-linked list with tail pointer
+4. **O(1) "move to front" on access** &rarr; doubly-linked list (remove + add to head)
+
+No single data structure provides all four. The combination of a hash map (key &rarr; node pointer) and a doubly-linked list (ordered by recency) does.
+
+## The data structure
+
+```
+HashMap: { key -> Node }
+
+Doubly-Linked List (most recent at head, least recent at tail):
+  HEAD <-> [key3, val3] <-> [key1, val1] <-> [key2, val2] <-> TAIL
+           most recent                       least recent
+```
+
+Sentinel nodes (HEAD and TAIL) simplify edge cases by ensuring every real node has a predecessor and successor.
+
+## Full implementation
+
+```python
+class Node:
+    def __init__(self, key=0, val=0):
+        self.key = key
+        self.val = val
+        self.prev = None
+        self.next = None
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.cache = {}          # key -> Node
+
+        # Sentinel nodes
+        self.head = Node()
+        self.tail = Node()
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+    def _remove(self, node):
+        """Remove a node from the linked list."""
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def _add_to_head(self, node):
+        """Insert a node right after the head sentinel."""
+        node.next = self.head.next
+        node.prev = self.head
+        self.head.next.prev = node
+        self.head.next = node
+
+    def _move_to_head(self, node):
+        """Mark a node as most recently used."""
+        self._remove(node)
+        self._add_to_head(node)
+
+    def get(self, key):
+        if key not in self.cache:
+            return -1
+        node = self.cache[key]
+        self._move_to_head(node)
+        return node.val
+
+    def put(self, key, value):
+        if key in self.cache:
+            node = self.cache[key]
+            node.val = value
+            self._move_to_head(node)
+        else:
+            node = Node(key, value)
+            self.cache[key] = node
+            self._add_to_head(node)
+            if len(self.cache) > self.cap:
+                # Evict LRU (node just before tail sentinel)
+                lru = self.tail.prev
+                self._remove(lru)
+                del self.cache[lru.key]
+```
+
+**Every operation is O(1):** hash map lookup, linked list pointer manipulation, no iteration.
+
+## Tracing through an example
+
+```
+LRUCache(2)
+
+put(1, 1)  -> list: [1]
+put(2, 2)  -> list: [2, 1]
+get(1)     -> returns 1, list: [1, 2]  (1 moved to front)
+put(3, 3)  -> evicts key 2 (LRU), list: [3, 1]
+get(2)     -> returns -1 (evicted)
+put(4, 4)  -> evicts key 1 (LRU), list: [4, 3]
+get(1)     -> returns -1 (evicted)
+get(3)     -> returns 3, list: [3, 4]
+get(4)     -> returns 4, list: [4, 3]
+```
+
+## Why sentinel nodes matter
+
+Without sentinels, `_remove` and `_add_to_head` need special cases for empty lists, single-element lists, and head/tail removal. Sentinels eliminate all of these: every real node always has valid `prev` and `next` pointers.
+
+## Python shortcut: OrderedDict
+
+Python's `collections.OrderedDict` already combines a dict with a doubly-linked list:
+
+```python
+from collections import OrderedDict
+
+class LRUCache(OrderedDict):
+    def __init__(self, capacity):
+        super().__init__()
+        self.cap = capacity
+
+    def get(self, key):
+        if key not in self:
+            return -1
+        self.move_to_end(key)
+        return self[key]
+
+    def put(self, key, value):
+        if key in self:
+            self.move_to_end(key)
+        self[key] = value
+        if len(self) > self.cap:
+            self.popitem(last=False)  # remove oldest
+```
+
+Interviewers usually want the manual implementation first, then appreciate if you mention OrderedDict as a production alternative.
+</Body>
+
+<TryItYourself>
+1. **LC 146 - LRU Cache**: Implement the full version with sentinel nodes. Test with the trace above.
+2. **Extend to LFU**: Think about how you'd modify the design if eviction is based on frequency instead of recency (LC 460).
+3. **Thread safety**: How would you make this cache thread-safe? What would you lock?
+4. **TTL support**: How would you add time-to-live expiration to each entry?
+</TryItYourself>
+
+<Code>
+```python
+class Node:
+    def __init__(self, key=0, val=0):
+        self.key, self.val = key, val
+        self.prev = self.next = None
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.cache = {}
+        self.head, self.tail = Node(), Node()
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+    def _remove(self, node):
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def _add_to_head(self, node):
+        node.next = self.head.next
+        node.prev = self.head
+        self.head.next.prev = node
+        self.head.next = node
+
+    def _move_to_head(self, node):
+        self._remove(node)
+        self._add_to_head(node)
+
+    def get(self, key):
+        if key not in self.cache:
+            return -1
+        node = self.cache[key]
+        self._move_to_head(node)
+        return node.val
+
+    def put(self, key, value):
+        if key in self.cache:
+            node = self.cache[key]
+            node.val = value
+            self._move_to_head(node)
+        else:
+            node = Node(key, value)
+            self.cache[key] = node
+            self._add_to_head(node)
+            if len(self.cache) > self.cap:
+                lru = self.tail.prev
+                self._remove(lru)
+                del self.cache[lru.key]
+
+# --- Test ---
+lru = LRUCache(2)
+lru.put(1, 1)
+lru.put(2, 2)
+print(lru.get(1))   # 1
+lru.put(3, 3)        # evicts key 2
+print(lru.get(2))   # -1
+lru.put(4, 4)        # evicts key 1
+print(lru.get(1))   # -1
+print(lru.get(3))   # 3
+print(lru.get(4))   # 4
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can explain why LRU cache needs both a hash map and a doubly-linked list
+- [ ] I can implement the Node class and LRUCache from scratch
+- [ ] I understand the role of sentinel head/tail nodes
+- [ ] I can trace through a sequence of get/put operations
+- [ ] I can implement it using OrderedDict as a follow-up
+- [ ] I can discuss thread safety and TTL extensions
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Forgetting to store the key in the node**: When evicting, you need to delete the key from the hash map. Without the key stored in the node, you can't find it in the map.
+- **Not updating the value on duplicate put**: If `put(key, newValue)` is called for an existing key, you must update the value AND move the node to the head.
+- **Off-by-one on capacity**: Check `len(self.cache) > self.cap` (strictly greater), not `>=`. The new node is already added before eviction.
+- **Not using sentinel nodes**: Without sentinels, you need special-case code for removing the head, removing the tail, and handling an empty list. Sentinels are worth the two extra node allocations.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: In an LRU cache, when we call `get(key)` for an existing key, what linked-list operation must we perform?**
+
+- A) Remove the node from the list
+- B) Add a new node to the tail
+- C) Move the node to the head (most recently used position) ✅
+- D) No linked-list operation is needed
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd use a hash map for O(1) key lookup and a doubly-linked list to track recency order. The head is most-recently-used, the tail is least-recently-used. On get, I move the accessed node to the head. On put, I add a new node at the head and if over capacity, evict the tail. Sentinel head and tail nodes eliminate edge cases. Each operation manipulates a constant number of pointers, so everything is O(1). I'd also mention that Python's OrderedDict provides this out of the box for production code."
+</InterviewExplanation>

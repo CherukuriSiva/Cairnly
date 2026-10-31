@@ -1,0 +1,109 @@
+# Self-hosted Langfuse v3 for local tracing:
+#   docker compose -f compose.observability.yaml up -d
+# UI: http://localhost:3011  (login admin@cairnly.local / cairnly-local-admin)
+# The keys below are LOCAL DEV DEFAULTS created by Langfuse's headless init; they protect
+# nothing outside your laptop. Never reuse them for a hosted Langfuse.
+#
+# Only the web UI gets a host port (3011); ClickHouse, Redis, MinIO and Postgres stay inside
+# the compose network, so nothing clashes with other stacks on this machine.
+name: cairnly-observability
+
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: postgresql://langfuse:langfuse@lf-postgres:5432/langfuse
+  NEXTAUTH_URL: http://localhost:3011
+  SALT: cairnly-local-salt
+  ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://lf-clickhouse:9000
+  CLICKHOUSE_URL: http://lf-clickhouse:8123
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_PASSWORD: langfuse
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: minio-local-secret
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://lf-minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  REDIS_HOST: lf-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: redis-local-secret
+
+services:
+  langfuse-web:
+    image: langfuse/langfuse:3
+    depends_on: &deps
+      lf-postgres: { condition: service_healthy }
+      lf-clickhouse: { condition: service_healthy }
+      lf-redis: { condition: service_healthy }
+      lf-minio: { condition: service_healthy }
+    ports: ["3011:3000"]
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: cairnly-local-nextauth
+      LANGFUSE_INIT_ORG_ID: cairnly
+      LANGFUSE_INIT_ORG_NAME: cairnly
+      LANGFUSE_INIT_PROJECT_ID: cairnly
+      LANGFUSE_INIT_PROJECT_NAME: cairnly
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-cairnly-local
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-cairnly-local
+      LANGFUSE_INIT_USER_EMAIL: admin@cairnly.local
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: cairnly-local-admin
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    depends_on: *deps
+    environment: *langfuse-env
+
+  lf-postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes: [lf-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 3s
+      retries: 20
+
+  lf-clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    environment:
+      CLICKHOUSE_DB: langfuse
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: langfuse
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes: [lf-clickhouse:/var/lib/clickhouse]
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      retries: 20
+
+  lf-redis:
+    image: redis:7
+    command: --requirepass redis-local-secret
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis-local-secret", "ping"]
+      interval: 3s
+      retries: 20
+
+  lf-minio:
+    image: pgsty/minio:latest
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio-local-secret
+    volumes: [lf-minio:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  lf-postgres:
+  lf-clickhouse:
+  lf-minio:

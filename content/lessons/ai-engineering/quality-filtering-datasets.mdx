@@ -1,0 +1,108 @@
+---
+slug: quality-filtering-datasets
+title: "Quality-Filtering a Training Dataset"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Define concrete quality rules: length bounds, PII, language, degenerate pairs
+- Run a quality pass before *and* after LLM synthesis
+- Quarantine rejects for inspection instead of silently deleting them
+- Track drop rates so a broken filter doesn't gut your dataset
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"More data" is not the goal — *clean* data is. A few hundred degenerate records (empty answers, leaked PII, wrong-language text, question-equals-answer) drag down a fine-tune or poison retrieval. A small set of explicit, logged quality rules is the cheapest quality lever you have, and running it twice — pre and post synthesis — catches both source junk and bad LLM output.
+</WhyThisMatters>
+
+<Body>
+## Make "quality" a list of explicit rules
+
+Vague quality intentions don't filter anything. Encode concrete, testable rules:
+
+- **Length bounds** — instruction too short (< 10 chars) or output too short (< 15) / too long (> 1500) is suspect.
+- **Degenerate pairs** — instruction equal to output is a non-example.
+- **PII** — drop records whose output contains an email or phone number.
+- **Language** — reject text with characters outside your expected script (e.g. Cyrillic in an English corpus).
+
+Each rule is a one-liner; together they remove the obvious bad data.
+
+## Filter twice: pre- and post-synthesis
+
+Run quality filtering on the raw ingested data, *and again* after LLM normalization/synthesis. The first pass cleans the source; the second catches the LLM's own failures — a model can emit an empty rewrite, a too-long ramble, or accidental PII. One pass is not enough.
+
+## Quarantine, don't vanish
+
+Write rejected records to a `debug/rejected.jsonl` rather than dropping them silently. When the drop rate spikes, you can *look* at what got cut and tell "the filter is too strict" from "the source got worse."
+
+## Watch the drop rate
+
+A filter bug (or a bad source) can silently gut your dataset. Log how many records each rule drops, and treat an abnormal drop rate as an alert — the same discipline as the on-topic pass-rate monitor.
+</Body>
+
+<Code>
+```python
+import re
+
+_EMAIL = re.compile(r"[\w.%+\-]+@[\w.\-]+\.[A-Za-z]{2,}")
+_PHONE = re.compile(r"\b(\+?1[\s\-]?)?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}\b")
+
+def quality_filter(records: list[dict]) -> tuple[list[dict], list[dict]]:
+    kept, rejected = [], []
+    for r in records:
+        instr, out = r.get("instruction", ""), r.get("output", "")
+        bad = (
+            len(instr) < 10
+            or not (15 <= len(out) <= 1500)
+            or instr.strip().lower() == out.strip().lower()     # degenerate
+            or _EMAIL.search(out) or _PHONE.search(out)          # PII
+            or any("Ѐ" <= ch <= "ӿ" for ch in out)               # wrong script
+        )
+        (rejected if bad else kept).append(r)
+    if rejected:
+        write_jsonl(rejected, "debug/rejected.jsonl")            # quarantine, don't vanish
+        log.info("quality filter dropped %d/%d (%.1f%%)",
+                 len(rejected), len(records), 100 * len(rejected) / len(records))
+    return kept, rejected
+```
+</Code>
+
+<TryItYourself>
+1. Implement `quality_filter` and run it on a mixed batch
+2. Add records that violate each rule and confirm each is caught
+3. Quarantine rejects to `debug/rejected.jsonl` and inspect them
+4. Run the filter again after a (mock) synthesis step that emits one empty output
+5. Log the drop rate and decide a threshold that should trigger an alert
+</TryItYourself>
+
+<CommonMistakes>
+- **Vague "quality" with no rules** — nothing actually gets filtered
+- **Filtering only before synthesis** — the LLM's own bad outputs slip through
+- **Silently deleting rejects** — you lose the ability to diagnose over-filtering
+- **No drop-rate monitoring** — a filter bug can gut the dataset unnoticed
+- **Over-strict bounds** — too-tight length limits cut valid records; tune against real data
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Encoded explicit length/PII/language/degenerate rules
+- [ ] Ran quality filtering before and after synthesis
+- [ ] Quarantined rejected records for inspection
+- [ ] Logged and thresholded the drop rate
+- [ ] Tuned bounds against real data
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why run the quality filter a second time *after* LLM synthesis/normalization?**
+
+- A) The first pass doesn't actually run
+- B) The LLM can emit its own bad records (empty, too long, PII), which only a post-synthesis pass catches ✅
+- C) To double the dataset size
+- D) Synthesis removes the need for the first pass
+</MiniQuiz>
+
+<InterviewExplanation>
+"Clean data beats more data, so I make 'quality' a list of explicit, testable rules: length bounds, degenerate instruction-equals-output pairs, PII in the output via regex, and wrong-script characters for a single-language corpus. I run the filter twice — once on the raw ingested data to clean the source, and again after LLM normalization and synthesis, because the model itself emits empty rewrites, rambles, or accidental PII. I quarantine rejects to a debug file instead of deleting them silently, so when the drop rate spikes I can look at what got cut and tell an over-strict filter from a degraded source — and I treat an abnormal drop rate as an alert."
+</InterviewExplanation>

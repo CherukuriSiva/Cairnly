@@ -1,0 +1,107 @@
+---
+slug: document-ingestion-pipelines
+title: "Document Ingestion Pipelines (Connectors, OCR, PII)"
+track: ai-systems
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Design the stages of an enterprise ingestion pipeline
+- Handle messy real-world sources: PDFs, scans (OCR), HTML, connectors
+- Sanitize PII and attach access metadata before indexing
+- Make ingestion idempotent and incremental, not a full re-crawl every time
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+RAG quality is decided long before retrieval — at ingestion. Garbage in (broken PDF extraction, no metadata, stale duplicates) means garbage retrieval no matter how good your model is. A robust ingestion pipeline is the unglamorous backbone of every production RAG system and a frequent design-question blind spot.
+</WhyThisMatters>
+
+<Body>
+## The pipeline stages
+
+A document's journey from source to searchable chunk:
+
+1. **Connect** — pull from the source (S3, Google Drive, Confluence, a DB) via a connector.
+2. **Extract** — get text out: parse PDFs, run **OCR** on scans/images, strip HTML boilerplate.
+3. **Normalize** — clean whitespace, fix encoding, drop nav/footers.
+4. **Sanitize** — scrub or tag PII before it's ever embedded.
+5. **Chunk** — split into retrieval-sized pieces, carrying **metadata** (source, tenant, allowed_roles, timestamp).
+6. **Embed & upsert** — write chunks + vectors into the index.
+
+## OCR and messy sources are the norm
+
+Real corpora are scanned contracts, slide decks, and HTML pages — not clean text. Budget for OCR (Tesseract, cloud OCR) and expect extraction to be lossy. Validate that extraction produced *some* text before indexing; an empty extract is a silent quality hole.
+
+## Metadata is set here or never
+
+Access control (RBAC), filtering, and citations all depend on metadata that must be attached **at ingestion**. Tenant, allowed roles, source document, and timestamp ride along with every chunk. You can't bolt this on later.
+
+## Idempotent + incremental
+
+Ingestion runs repeatedly. Key chunks by a stable content hash + source ID so re-ingesting a document **updates** rather than duplicates. Track each source's last-modified time and process only what changed — a full re-crawl every night doesn't scale.
+</Body>
+
+<Code>
+```python
+import hashlib
+
+def ingest_document(doc, embed, index, sanitize_pii) -> int:
+    raw = extract_text(doc)                 # PDF parse / OCR / HTML strip
+    if not raw.strip():
+        log.warning("empty extraction", source=doc.id)   # silent quality hole
+        return 0
+    text = sanitize_pii(normalize(raw))
+    chunks = chunk(text, size=800, overlap=100)
+    records = []
+    for i, c in enumerate(chunks):
+        cid = hashlib.sha256(f"{doc.id}:{i}:{c}".encode()).hexdigest()  # stable id → idempotent
+        records.append({
+            "id": cid, "text": c, "embedding": embed(c),
+            "tenant_id": doc.tenant_id,
+            "allowed_roles": doc.allowed_roles,        # metadata set HERE
+            "source_doc": doc.id, "updated_at": doc.modified_at,
+        })
+    index.upsert(records)                   # upsert = update-or-insert, no dupes
+    return len(records)
+```
+</Code>
+
+<TryItYourself>
+1. Build a connector that lists files from a folder and tracks last-modified
+2. Add a PDF parser and an OCR path for image-only PDFs
+3. Attach tenant + allowed_roles metadata to every chunk
+4. Re-ingest an unchanged doc and confirm `upsert` produces no duplicates
+5. Change one doc and confirm only its chunks are re-embedded
+</TryItYourself>
+
+<CommonMistakes>
+- **Assuming clean text** — real sources need OCR and lossy extraction handling
+- **Not validating extraction** — empty/garbled extracts silently degrade retrieval
+- **Attaching metadata too late** — RBAC and citations need it at ingestion
+- **Full re-crawl every run** — track last-modified and process incrementally
+- **Insert instead of upsert** — re-ingestion duplicates chunks and skews retrieval
+- **No PII scrub before embedding** — PII ends up in your vector store
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Built a connector with incremental (last-modified) tracking
+- [ ] Handled PDF + OCR extraction with empty-extract validation
+- [ ] Attached access + source metadata to every chunk
+- [ ] Made re-ingestion idempotent via stable IDs + upsert
+- [ ] Scrubbed PII before embedding
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: When must you attach a chunk's tenant and allowed-roles metadata?**
+
+- A) After retrieval, before generation
+- B) At ingestion, when the chunk is created and embedded ✅
+- C) Only when a permission error occurs
+- D) In the LLM system prompt
+</MiniQuiz>
+
+<InterviewExplanation>
+"RAG quality is decided at ingestion, not retrieval. My pipeline connects to the source, extracts text — parsing PDFs, running OCR on scans, stripping HTML — then normalizes, scrubs PII, chunks, and embeds. Two things make it production-grade. First, metadata is set here or never: tenant, allowed roles, source, and timestamp ride along with every chunk because RBAC, filtering, and citations all depend on them. Second, it's idempotent and incremental — I key chunks by a stable content hash and upsert, and track each source's last-modified time so I reprocess only what changed instead of re-crawling everything nightly. And I always validate that extraction produced text, since an empty extract is a silent quality hole."
+</InterviewExplanation>

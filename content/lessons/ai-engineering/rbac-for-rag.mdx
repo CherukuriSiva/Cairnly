@@ -1,0 +1,114 @@
+---
+slug: rbac-for-rag
+title: "RBAC for RAG: Chunk-Level Access Control"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why RAG breaks naive access control
+- Attach access metadata (allowed roles, tenant) to every chunk
+- Enforce permissions inside the retrieval query, not after generation
+- Avoid the leak where the LLM summarizes a document the user can't see
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+The classic enterprise RAG disaster: an employee asks "what's the CEO's salary?" and the assistant cheerfully retrieves it from an HR doc and answers — because retrieval ignored permissions. In a multi-tenant or role-based system, access control has to live at the *chunk* level and be enforced *before* the LLM ever sees the content. This is the most common enterprise-RAG design question.
+</WhyThisMatters>
+
+<Body>
+## Why RAG breaks access control
+
+Traditional apps check "can this user open this document?" at the document boundary. RAG shreds documents into chunks and retrieves them by similarity — there is no document-open event to gate. If you don't carry permissions down to the chunk, retrieval will happily surface a chunk from a file the user can't access.
+
+## Tag every chunk with access metadata
+
+When you ingest and chunk a document, copy its access control onto each chunk:
+
+```python
+chunk = {
+    "text": "...",
+    "embedding": [...],
+    "tenant_id": "acme",
+    "allowed_roles": ["hr", "exec"],   # who may retrieve this chunk
+    "source_doc": "comp-2026.pdf",
+}
+```
+
+## Enforce in the query (pre-filter), not after
+
+The only safe place to enforce access is **inside the retrieval query** as a metadata filter, so forbidden chunks are never returned:
+
+```python
+results = index.query(
+    vector=embed(query),
+    top_k=5,
+    filter={"tenant_id": user.tenant_id,
+            "allowed_roles": {"$in": user.roles}},
+)
+```
+
+Filtering *after* retrieval is unsafe: the forbidden text already entered your process, and one bug leaks it. Pre-filtering means the model literally never sees it.
+
+## The summarization leak
+
+Even with citations hidden, an LLM that *received* a forbidden chunk can leak its content in a summary. That's why enforcement must happen before generation — never "retrieve everything, then redact."
+</Body>
+
+<Code>
+```python
+def secure_retrieve(index, query: str, user) -> list[dict]:
+    """Retrieve only chunks this user's tenant + roles are allowed to see."""
+    acl_filter = {
+        "tenant_id": user.tenant_id,                 # tenant isolation
+        "allowed_roles": {"$in": user.roles},        # role-based access
+    }
+    return index.query(vector=embed(query), top_k=5, filter=acl_filter)
+
+def answer_with_rbac(index, query: str, user, llm) -> str:
+    chunks = secure_retrieve(index, query, user)
+    if not chunks:
+        return "I couldn't find anything you have access to on that."
+    context = "\n".join(c["text"] for c in chunks)
+    return llm(build_prompt(query, context))         # model only ever sees allowed text
+```
+</Code>
+
+<TryItYourself>
+1. Add `tenant_id` and `allowed_roles` to your chunk schema
+2. Ingest two docs with different `allowed_roles` and embed them
+3. Query as a user *with* the role and a user *without*; confirm different results
+4. Try the "after-the-fact redaction" approach and explain why pre-filtering is safer
+5. Add a tenant boundary and confirm Tenant A never retrieves Tenant B's chunks
+</TryItYourself>
+
+<CommonMistakes>
+- **Document-level checks only** — chunks lose their parent's permissions
+- **Filtering after retrieval** — the forbidden text already entered your process
+- **Forgetting tenant isolation** — role checks alone don't separate customers
+- **Trusting the LLM to "not mention" forbidden content** — it leaks via summaries
+- **Not re-applying ACLs on re-index** — permission changes must propagate to chunks
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Added access metadata to the chunk schema
+- [ ] Enforced tenant + role filtering inside the retrieval query
+- [ ] Verified two users with different roles get different results
+- [ ] Confirmed cross-tenant isolation
+- [ ] Can explain why pre-filtering beats post-redaction
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Where must role/tenant access control be enforced in a RAG pipeline?**
+
+- A) In the LLM's system prompt ("don't reveal restricted info")
+- B) As a metadata filter inside the retrieval query, before the LLM sees anything ✅
+- C) By redacting the answer after generation
+- D) At the UI layer only
+</MiniQuiz>
+
+<InterviewExplanation>
+"RAG breaks naive access control because it retrieves chunks by similarity — there's no document-open event to gate. So I push permissions down to the chunk: every chunk carries its tenant and allowed roles as metadata. I enforce that inside the retrieval query as a pre-filter, so forbidden chunks are never returned. Filtering after retrieval is unsafe because the text already entered the process, and the model can leak it in a summary even if I hide the citation. Tenant isolation plus role filtering at query time is the only design that actually holds."
+</InterviewExplanation>

@@ -1,0 +1,99 @@
+---
+slug: system-design-enterprise-rag
+title: "System Design: Enterprise RAG Walkthrough"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Drive a 30-minute "design an enterprise RAG system" interview
+- Sequence the components: ingestion → index → retrieval → guardrails → generation → observability
+- Raise the enterprise concerns interviewers are listening for (RBAC, audit, drift, HA)
+- Defend the trade-offs you choose instead of just naming components
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+"Design a RAG system for a bank's internal knowledge base" is a top AI system-design question in 2026. Candidates who only know the happy-path pipeline stall the moment the interviewer adds "now make it multi-tenant and compliant." Knowing the enterprise layer — access control, auditability, monitoring, failover — is what gets you the senior offer.
+</WhyThisMatters>
+
+<Body>
+## Drive the flow, don't list boxes
+
+Walk it as a request's journey and name a trade-off at each stage.
+
+**1. Ingestion.** Source connectors → parse/OCR → PII sanitization → recursive chunking with metadata (tenant, allowed_roles, source, timestamp). *Trade-off:* chunk size vs context completeness.
+
+**2. Index.** Embed chunks into a vector DB that supports metadata filtering and multi-tenant namespaces. *Trade-off:* managed (Pinecone) vs self-hosted (Milvus) — operability vs control.
+
+**3. Retrieval with RBAC.** Embed the query, retrieve top-k **filtered by the user's tenant + roles** so forbidden chunks never return. Enforcement is pre-filter, never post-redaction.
+
+**4. Guardrails (input).** Sanitize, detect prompt injection (direct *and* indirect via retrieved content), redact PII.
+
+**5. Generation.** Build a grounded prompt with numbered citations; the model answers only from context.
+
+**6. Guardrails (output).** Verify groundedness / citations; refuse or disclaim on failure.
+
+**7. Observability + ops.** Audit log per request (who/what/retrieved-ids/guardrails/outcome), drift monitoring on query embeddings, semantic cache for latency, and provider fallback/circuit breakers for HA.
+
+## The enterprise checklist interviewers want
+
+Multi-tenancy, chunk-level RBAC, compliance audit trail, monitoring/drift, high availability, and cost controls. Mention these unprompted — that's the senior signal.
+</Body>
+
+<Code>
+```text
+WHITEBOARD ORDER (say it in this sequence):
+
+  Connectors → Parse/OCR → PII scrub → Chunk(+metadata)
+        → Embed → Vector DB (multi-tenant, metadata filter)
+  Query → [Input guardrails] → Retrieve (RBAC pre-filter)
+        → Grounded prompt → LLM → [Output guardrails: citations/groundedness]
+        → Response
+  Cross-cutting: Audit log | Drift monitor | Semantic cache | Provider fallback
+
+ONE-LINER TO OPEN:
+"I'll walk the request's journey and call out a trade-off and an enterprise
+concern at each stage — ingestion, indexing, retrieval with RBAC, guardrails,
+generation, and observability."
+```
+</Code>
+
+<TryItYourself>
+1. Whiteboard the full flow from memory in under 4 minutes
+2. For each stage, state one trade-off out loud
+3. Have a friend inject "now make it multi-tenant" mid-design and adapt without restarting
+4. Add the cross-cutting concerns (audit, drift, cache, fallback) as a closing sweep
+5. Time a full 20-minute mock and trim any stage that ran long
+</TryItYourself>
+
+<CommonMistakes>
+- **Listing boxes with no trade-offs** — naming components isn't design
+- **Forgetting RBAC and multi-tenancy** — the #1 enterprise gap
+- **Post-redaction instead of pre-filtering** — leaks forbidden content
+- **Ignoring observability** — no audit/drift/monitoring reads as a prototype, not a system
+- **No failover story** — enterprises ask about HA and provider outages
+- **Skipping cost** — caching and model tiering should appear
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Can whiteboard the end-to-end flow quickly
+- [ ] State a trade-off at each stage
+- [ ] Include chunk-level RBAC and multi-tenancy unprompted
+- [ ] Cover audit, drift, caching, and failover as cross-cutting concerns
+- [ ] Completed a timed 20-minute mock
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Mid-interview, the interviewer says "this serves three banks from one deployment." What must your design already handle?**
+
+- A) A larger embedding model
+- B) Multi-tenant isolation + chunk-level RBAC enforced at retrieval ✅
+- C) A faster GPU
+- D) More frequent re-training
+</MiniQuiz>
+
+<InterviewExplanation>
+"I drive it as a request's journey and name a trade-off at each stage: ingestion with PII scrubbing and metadata-tagged chunking, an index in a multi-tenant vector DB, retrieval that pre-filters by the user's tenant and roles so forbidden chunks never return, input guardrails for injection and PII, grounded generation with citations, and output guardrails that verify groundedness. Then I sweep the cross-cutting concerns interviewers are listening for — an audit trail per request, drift monitoring on query embeddings, a semantic cache for latency, and provider fallback for high availability. Raising RBAC, multi-tenancy, and auditability unprompted is the senior signal."
+</InterviewExplanation>

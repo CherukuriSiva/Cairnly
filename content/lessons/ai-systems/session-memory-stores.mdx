@@ -1,0 +1,110 @@
+---
+slug: session-memory-stores
+title: "Session Memory Stores: Redis-Backed Conversations"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Scope conversation memory by `session_id` across requests
+- Back session state to Redis/Postgres instead of process memory
+- Keep history within a token budget (windowing / summarization)
+- Set TTLs and isolate sessions so memory doesn't leak or grow forever
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A chatbot that forgets the previous turn is broken; one that keeps memory in a process dict breaks the moment you run two workers or restart. Session memory backed by a shared store is what makes multi-turn chat work in a real, horizontally-scaled deployment — and it ties directly to the stateless-workers and scaling lessons.
+</WhyThisMatters>
+
+<Body>
+## Memory is keyed by session, not by process
+
+Each conversation has a `session_id`. Memory is the message history for that session, and it must be retrievable by *any* worker handling the next request. The naive version — a module-level `dict` keyed by session — works in a demo and fails in production: a second worker doesn't see it, and a restart wipes it.
+
+```python
+# demo only — process-local, lost on restart, invisible to other workers
+_memory_store: dict[str, AgentMemory] = {}
+def get_memory(session_id): ...
+```
+
+## Back it to a shared store
+
+Move session history to **Redis** (fast, TTL-native) or Postgres (durable, queryable). Now any stateless worker can load the session, append the turn, and save it — exactly what horizontal scaling requires. This is the production upgrade of the agent-memory lesson.
+
+## Stay in the token budget
+
+History grows every turn but the context window is finite. Return a **windowed** view (last N messages), and for long sessions summarize older turns. Don't dump the whole transcript into every prompt — pin the system context and keep recent turns.
+
+## TTLs and isolation
+
+Set a **TTL** on session keys so abandoned conversations expire instead of growing your store forever. Namespace keys by session (and tenant) so one user's memory can never bleed into another's. Store timestamps with messages for ordering and debugging.
+</Body>
+
+<Code>
+```python
+import json, time
+from pydantic import BaseModel
+
+class Message(BaseModel):
+    role: str
+    content: str
+    timestamp: float
+
+class RedisSessionMemory:
+    """Session history in Redis — shared across workers, TTL-bounded."""
+    def __init__(self, redis, session_id: str, ttl_seconds: int = 3600):
+        self.r, self.key, self.ttl = redis, f"sess:{session_id}", ttl_seconds
+
+    def add_message(self, role: str, content: str):
+        msg = Message(role=role, content=content, timestamp=time.time())
+        self.r.rpush(self.key, msg.model_dump_json())
+        self.r.expire(self.key, self.ttl)            # refresh TTL on activity
+
+    def get_context(self, window: int = 10) -> str:
+        raw = self.r.lrange(self.key, -window, -1)   # last N turns
+        msgs = [Message(**json.loads(x)) for x in raw]
+        return "\n".join(f"{m.role}: {m.content}" for m in msgs)
+
+    def clear(self):
+        self.r.delete(self.key)
+```
+</Code>
+
+<TryItYourself>
+1. Start with the in-memory `dict` store and run two workers — observe the miss
+2. Reimplement with Redis and confirm both workers see the same session
+3. Add a TTL and verify an idle session expires
+4. Return only the last N turns and measure prompt token growth vs full history
+5. Namespace keys by tenant and confirm cross-tenant isolation
+</TryItYourself>
+
+<CommonMistakes>
+- **Process-local memory dict** — invisible to other workers, lost on restart
+- **No TTL** — abandoned sessions grow the store without bound
+- **Dumping full history into every prompt** — blows the context budget and cost
+- **No tenant/session namespacing** — memory can leak across users
+- **Storing without timestamps** — you lose ordering and debuggability
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Scoped memory by `session_id`
+- [ ] Backed session state to Redis (shared across workers)
+- [ ] Returned a windowed context within a token budget
+- [ ] Set a TTL so idle sessions expire
+- [ ] Namespaced/isolated sessions by tenant
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Your chat memory lives in a module-level dict. You scale to 3 workers and conversations start "forgetting." Why?**
+
+- A) The context window shrank
+- B) Each worker has its own dict; a follow-up routed to a different worker sees no history ✅
+- C) Redis is misconfigured
+- D) The TTL is too long
+</MiniQuiz>
+
+<InterviewExplanation>
+"Conversation memory is keyed by session_id and must be retrievable by any worker handling the next turn. A module-level dict works in a demo but fails in production — a second worker doesn't see it and a restart wipes it — so I back session state to a shared store, Redis for speed and native TTLs or Postgres for durability. Any stateless worker can then load the session, append the turn, and save it, which is exactly what horizontal scaling needs. I keep history in the token budget with a rolling window and summarization, set a TTL so abandoned sessions expire instead of growing forever, and namespace keys by session and tenant so memory can't leak across users."
+</InterviewExplanation>

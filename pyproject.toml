@@ -8,6 +8,7 @@ dependencies = [
     "anthropic>=2.3.0",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
+    "langfuse>=3.9,<4",
     "pgvector>=0.5.1",
     "psycopg[binary]>=3.3.6",
     "pyyaml>=6.0.3",
@@ -16,6 +17,12 @@ dependencies = [
 
 [project.scripts]
 cairnly = "cairnly.cli:main"
+
+[project.optional-dependencies]
+rerank = [
+    "sentence-transformers>=5",
+    "torch>=2.4",
+]
 
 [dependency-groups]
 dev = [
@@ -39,3 +46,13 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+# The reranker needs PyTorch. On Linux (Docker, CI) use the CPU-only build: the default
+# wheel bundles ~3 GB of CUDA libraries that a CPU container never uses.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

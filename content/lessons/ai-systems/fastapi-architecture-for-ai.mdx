@@ -1,0 +1,122 @@
+---
+slug: fastapi-architecture-for-ai
+title: "FastAPI Architecture for AI Services"
+track: ai-systems
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Structure an AI backend into routers, endpoints, and a core layer
+- Split concerns: chat, documents, health into separate endpoint modules
+- Centralize config and a typed settings object
+- Compose middleware, lifespan, and routers in a clean `main.py`
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A real AI backend has chat, document ingestion, health, governance, and MLOps concerns. Crammed into one file it rots fast. A clean FastAPI layout — routers, endpoint modules, a core layer — lets a team add features without collisions, and "how would you structure this service?" is a common interview question.
+</WhyThisMatters>
+
+<Body>
+## The layered layout
+
+A maintainable AI backend separates concerns into directories:
+
+- **`api/router.py`** — the top-level router that mounts each feature router under a prefix.
+- **`api/endpoints/`** — one module per concern: `chat.py`, `documents.py`, `health.py`.
+- **`core/`** — cross-cutting infrastructure: `config.py` (typed settings), `logger.py`, `errors.py`.
+- **`ai/`** — the domain logic: `rag/`, `agent/`, `governance/`, `mlops/`.
+
+Routes are thin; the real work lives in `ai/` and is called from the endpoints.
+
+## Mount routers under prefixes
+
+The top-level router composes feature routers, each with a prefix and tags. Adding a feature is adding a module and one `include_router` line — no edits to existing endpoints:
+
+```python
+from fastapi import APIRouter
+from app.api.endpoints import health, documents, chat
+
+api_router = APIRouter()
+api_router.include_router(health.router,    prefix="/health",    tags=["health"])
+api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+api_router.include_router(chat.router,      prefix="/chat",      tags=["chat"])
+```
+
+## Centralize configuration
+
+A single typed `Settings` object (Pydantic `BaseSettings`) reads environment variables once and is imported everywhere. No scattered `os.getenv` calls, and missing/mistyped config fails loudly at startup.
+
+## `main.py` composes the app
+
+`main.py` stays small: create the app with a lifespan (load models once), attach middleware (logging, CORS), and include the router. It's the wiring, not the logic.
+</Body>
+
+<Code>
+```python
+# app/core/config.py
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    OPENAI_API_KEY: str | None = None
+    VECTOR_DB_URL: str = "http://localhost:6333"
+    MAX_BUDGET_USD: float = 50.0
+    class Config:
+        env_file = ".env"
+
+settings = Settings()   # read once, import everywhere
+
+# main.py
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from app.api.router import api_router
+from app.core.logger import logging_middleware
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_models()          # once, before traffic
+    yield
+
+app = FastAPI(title="AI Service", lifespan=lifespan)
+app.middleware("http")(logging_middleware)
+app.include_router(api_router, prefix="/api/v1")   # everything mounts here
+```
+</Code>
+
+<TryItYourself>
+1. Scaffold the `api/`, `core/`, `ai/` layout
+2. Create `health.py`, `documents.py`, `chat.py` endpoint modules and mount them
+3. Add a typed `Settings` and read one var from `.env`
+4. Wire `main.py` with lifespan + logging middleware + the router
+5. Add a new `feedback` endpoint as a module and confirm it's one `include_router` line
+</TryItYourself>
+
+<CommonMistakes>
+- **Everything in one `main.py`** — unmaintainable as features grow
+- **Scattered `os.getenv`** — centralize in a typed settings object
+- **Fat route handlers** — keep routes thin; put logic in `ai/`
+- **Loading models per request** — do it once in lifespan
+- **No API versioning prefix** — `/api/v1` lets you evolve without breaking clients
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Separated routers, endpoint modules, and a core layer
+- [ ] Mounted feature routers under prefixes
+- [ ] Centralized config in a typed Settings object
+- [ ] Composed `main.py` with lifespan + middleware + router
+- [ ] Added a new endpoint with a single `include_router` line
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Where should the actual RAG/agent logic live in a well-structured FastAPI AI service?**
+
+- A) Inside the route handlers in `api/endpoints/`
+- B) In an `ai/` domain layer, called by thin endpoint handlers ✅
+- C) In `main.py`
+- D) In the config file
+</MiniQuiz>
+
+<InterviewExplanation>
+"I structure an AI backend in layers: a top-level router that mounts feature routers under prefixes, an endpoints directory with one module per concern — chat, documents, health — a core layer for config, logging, and errors, and an ai layer holding the RAG, agent, governance, and MLOps logic. Routes stay thin and call into ai. Config is a single typed Settings object read once from the environment, so there are no scattered getenv calls and bad config fails loudly at startup. main.py is just wiring — create the app with a lifespan that loads models once, attach middleware, include the router under an /api/v1 prefix. Adding a feature is then a new module plus one include_router line, with no edits to existing endpoints."
+</InterviewExplanation>

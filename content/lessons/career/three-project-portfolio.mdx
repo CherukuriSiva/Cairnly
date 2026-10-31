@@ -1,0 +1,198 @@
+---
+slug: three-project-portfolio
+title: "The 3-Project Portfolio: How to Choose and Present"
+track: career
+tier: medium
+estimatedMinutes: 25
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Select 3 projects that tell a coherent portfolio story
+- Apply the Range-Depth-Recency framework to project selection
+- Structure each project's GitHub README and presentation for maximum recruiter impact
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Freshers either have too few projects (one college assignment) or too many weak ones (10 tutorial repos). Neither works. The strongest portfolios have exactly 3 projects that show range, depth, and recent activity. Three is enough to demonstrate breadth; few enough that each one is polished. Hiring managers at Indian product companies consistently say they would rather see 3 excellent projects than 8 mediocre ones.
+</WhyThisMatters>
+
+<Body>
+## The Range-Depth-Recency framework
+
+Your 3 projects should cover three axes:
+
+### 1. Range — show you can work across domains
+
+Do not make all 3 projects the same type. Pick from different categories:
+
+| Slot | Purpose | Example types |
+|---|---|---|
+| Project 1 | Your strongest, most complete project | Full-stack app, AI pipeline, CLI tool |
+| Project 2 | Shows a different skill | If P1 is frontend-heavy, P2 should be backend/infra/AI |
+| Project 3 | Shows initiative or specialization | Open-source contribution, research tool, dev tool, domain-specific app |
+
+### 2. Depth — at least one project should go beyond the obvious
+
+"Depth" means you went past the tutorial:
+- You wrote tests
+- You handled edge cases and errors
+- You optimized performance
+- You wrote documentation
+- You made a non-obvious architecture decision
+
+### 3. Recency — at least one project should have commits from the last 3 months
+
+Stale profiles signal that you stopped learning. Keep at least one project active.
+
+## Common portfolio archetypes for Indian CS students in 2026
+
+### The "AI + Full-Stack" portfolio (most versatile)
+1. **Full-stack web app** — React/Next.js + Python/Node backend + PostgreSQL. Shows you can build a complete product.
+2. **AI/ML project** — RAG pipeline, fine-tuned classifier, or LLM-powered tool. Shows you understand the AI stack.
+3. **Open-source contribution or developer tool** — CLI tool, VS Code extension, or meaningful PR to an established project. Shows you can work in existing codebases.
+
+### The "Backend + Systems" portfolio (for infrastructure roles)
+1. **API-heavy backend** — multi-tenant system, payment integration, real-time features.
+2. **Systems project** — custom cache, job queue, or distributed service with performance benchmarks.
+3. **DevOps/tooling** — CI/CD pipeline, monitoring setup, or infrastructure-as-code project.
+
+### The "Full-Stack Specialist" portfolio (for product companies)
+1. **Complete SaaS app** — auth, billing, multi-tenancy, deployed and live.
+2. **UI-rich project** — dashboard, data visualization, or complex form-heavy app showing frontend depth.
+3. **Side project with real users** — even 10 users signals product thinking.
+
+## The project README template
+
+Every portfolio project needs a README that a recruiter can scan in 60 seconds:
+
+```markdown
+# Project Name
+
+One-sentence description of what this does and why.
+
+## Demo
+
+[Link to live demo] or [Screenshot/GIF]
+
+## What I Built
+
+2-3 sentences explaining the project. Focus on the problem
+it solves, not just the tech used.
+
+## Architecture
+
+- **Frontend:** React, Tailwind CSS
+- **Backend:** FastAPI, PostgreSQL
+- **AI/ML:** sentence-transformers, FAISS
+- **Infra:** Docker, GitHub Actions CI/CD
+
+[Optional: architecture diagram]
+
+## Key Technical Decisions
+
+1. **Chose PostgreSQL over MongoDB** because the data is
+   relational (users, orders, products with foreign keys).
+2. **Used FAISS locally instead of Pinecone** to keep the
+   project free and self-contained for reviewers.
+3. **Implemented rate limiting at the API gateway level**
+   rather than per-endpoint to reduce middleware complexity.
+
+## How to Run
+
+\`\`\`bash
+git clone https://github.com/you/project.git
+cd project
+cp .env.example .env        # fill in your API keys
+docker compose up            # or: npm install && npm run dev
+\`\`\`
+
+## Test
+
+\`\`\`bash
+npm test                     # or: pytest
+\`\`\`
+```
+
+## What to cut from your portfolio
+
+Remove these from your pinned/featured repos:
+
+- **Tutorial follow-alongs** — even if you modified them slightly
+- **College assignments** — unless yours went significantly beyond the requirements
+- **Half-finished projects** — a broken demo is worse than no demo
+- **"Awesome list" forks** — forking a curated list is not a project
+- **Projects with no README** — if you cannot be bothered to explain it, why should the recruiter bother to open it
+
+## Presenting your portfolio in interviews
+
+When asked "Walk me through a project," use this 2-minute structure:
+
+1. **Problem (15s):** What problem does this solve? Why did you build it?
+2. **Architecture (30s):** High-level system design. Draw it if there is a whiteboard.
+3. **Hardest part (45s):** The most technically challenging decision or problem you solved.
+4. **Result (15s):** What works, what you measured, what you would do differently.
+5. **Invite questions (15s):** "Happy to go deeper on any part — the retrieval pipeline was the most interesting piece."
+</Body>
+
+<Code>
+```markdown
+## Portfolio selection worksheet
+
+List your projects and score each 1-5:
+
+| Project | Completeness | Technical Depth | Uniqueness | Recency | Total |
+|---------|-------------|-----------------|------------|---------|-------|
+|         |      /5     |       /5        |     /5     |   /5    |  /20  |
+|         |      /5     |       /5        |     /5     |   /5    |  /20  |
+|         |      /5     |       /5        |     /5     |   /5    |  /20  |
+|         |      /5     |       /5        |     /5     |   /5    |  /20  |
+|         |      /5     |       /5        |     /5     |   /5    |  /20  |
+
+Pick your top 3 by total score.
+Then check: do they show range (different tech/domain)?
+If two are too similar, swap the lower-scoring one for a
+different-category project even if its total score is lower.
+```
+</Code>
+
+<TryItYourself>
+1. List every project you have built (including incomplete ones)
+2. Score each project using the worksheet above
+3. Select your top 3 using the Range-Depth-Recency framework
+4. For each of the 3 projects, write or update the README using the template
+5. Pin these 3 on your GitHub profile and verify each has:
+   - A clear one-sentence description
+   - A "How to Run" section that actually works (test it from a fresh clone)
+   - At least one screenshot or demo link
+</TryItYourself>
+
+<CommonMistakes>
+- **Three projects in the same domain** — three React CRUD apps show you know one thing, not three. Diversify across backend, AI, frontend, or DevOps.
+- **Listing a project with zero tests** — even 5 unit tests signal that you understand testing. Projects with zero tests signal tutorial-quality work.
+- **README says "work in progress"** — if it is not finished, do not feature it. Finish it or replace it with something complete.
+- **No "How to Run" instructions** — if a recruiter clones your repo and cannot run it in 5 minutes, they will not try harder. Test your setup instructions from scratch.
+- **Identical commit messages** — "initial commit," "update," "fix" repeated 20 times suggests you do not care about craft. Clean up the history or at least use meaningful messages going forward.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: A student has 5 projects: (1) React to-do app, (2) React e-commerce app, (3) RAG pipeline, (4) Express REST API, (5) contributed a PR to an open-source CLI tool. Which 3 should they pin?**
+
+- A) 1, 2, 3 — the most complete projects
+- B) 2, 3, 5 — shows range across full-stack, AI, and open-source ✅
+- C) 1, 3, 4 — one from each technology
+- D) 3, 4, 5 — skip all frontend projects
+</MiniQuiz>
+
+<InterviewExplanation>
+"My portfolio has three projects chosen for range: a full-stack multi-tenant SaaS app showing I can build complete products, a RAG pipeline showing AI engineering skills, and a PR I contributed to an open-source project showing I can work in existing codebases. Each has a clean README with setup instructions, architecture notes, and my key technical decisions."
+</InterviewExplanation>
+
+<CompletionChecklist>
+- [ ] Selected 3 projects using the Range-Depth-Recency framework
+- [ ] Each project has an updated README following the template
+- [ ] All 3 projects can be cloned and run from scratch (tested it yourself)
+- [ ] The 3 projects are pinned on your GitHub profile
+- [ ] At least one project has commits from the last 3 months
+- [ ] Can explain each project in 2 minutes using the Problem-Architecture-Hardest Part-Result structure
+</CompletionChecklist>

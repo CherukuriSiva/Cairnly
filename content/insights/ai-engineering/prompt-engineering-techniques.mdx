@@ -1,0 +1,96 @@
+---
+slug: prompt-engineering-techniques
+title: "Prompt Engineering Techniques That Actually Work"
+summary: "Zero-shot, few-shot, chain-of-thought, role prompting — here is a practical map of the techniques that improve LLM output, with weak vs strong examples."
+category: ai-engineering
+tags: ["prompt-engineering", "llm", "fundamentals"]
+audience: ["beginners", "cs-students"]
+depth: short
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1779708336024.pdf
+relatedLessons:
+  - ai-engineering/prompt-engineering-patterns
+  - ai-engineering/understanding-hallucinations
+relatedRoadmaps:
+  - ai-engineer-technical-path
+  - ai-era-beginner-readiness
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Prompt engineering is not magic words — it is a small set of reliable techniques for telling a model exactly what you want. Zero-shot for simple tasks, few-shot to show the format, role and instruction prompting to set expertise and constraints, chain-of-thought for multi-step problems, and output formatting plus delimiters to get usable, structured results. Each is simple on its own; knowing which to reach for is the actual skill. The throughline: prompt engineering is not just about getting an answer, it is about getting a *usable* one.
+</InsightSummary>
+
+<Body>
+## Zero-shot
+
+Just ask, with no examples. Best for well-defined, simple tasks — quick answers, summaries, explanations, and rewriting. Example: *"Summarize this article in 3 lines."* If the task is unambiguous, zero-shot is the cheapest path and usually enough.
+
+## Few-shot
+
+Give a handful of input→output examples before the real task, so the model infers the pattern and format. Example:
+
+```
+Input: Apple  -> Output: Fruit
+Input: Carrot -> Output: Vegetable
+Input: Mango  -> Output:
+```
+
+Two to five examples is the sweet spot. Reach for few-shot when you need a specific output *format* or labeling scheme that is hard to describe in words but easy to demonstrate.
+
+## Role prompting
+
+Give the model a clear identity. Example: *"Act as a senior AI architect and explain RAG architecture for enterprise systems."* It works because the role controls tone, expertise, depth, and output style in one short phrase — far more efficient than spelling out each of those separately.
+
+## Instruction prompting
+
+Tell the model clearly and specifically what to do. The difference between weak and strong is precision:
+
+- **Weak:** *"Write a LinkedIn post."*
+- **Strong:** *"Write a professional LinkedIn post under 150 words for startup founders. Use a confident tone, short paragraphs, and end with a question."*
+
+The strong version constrains length, audience, tone, and structure — leaving far less room for the model to guess wrong. Add background with **context injection** (*"The user is a beginner in Python. Explain loops using simple examples."*); more useful context yields more relevant output.
+
+## Chain-of-thought (CoT)
+
+Ask the model to reason systematically instead of jumping to an answer — "think step by step," or lay out the steps explicitly:
+
+```
+Analyze this bug step by step:
+1. Identify the issue
+2. Find the root cause
+3. Suggest the fix
+```
+
+Best for multi-step problems: debugging, math, logic, system design, planning, and root-cause analysis. One practical note for professional use: ask for *concise* reasoning steps rather than long hidden thinking — you want the model to reason, not ramble.
+
+## Output formatting and delimiters
+
+Control the *shape* of the answer so it is easy to consume downstream:
+
+- **Output formatting:** *"Return the answer in a table," "Give the output in JSON," "Use bullet points only."* Structured outputs are far easier to plug into APIs, automation, reports, and workflows.
+- **Delimiters:** wrap input data in clear markers (e.g. triple quotes) to separate your *instructions* from the *data* you are operating on: *"Summarize the text inside triple quotes."* This prevents the model from confusing your instruction with the content — clean separation improves accuracy, especially on documents, transcripts, code, and emails.
+
+## Weak vs strong, in one line
+
+The pattern behind every technique is the same: a weak prompt leaves the model guessing; a strong prompt removes the guesswork. *"Write something about AI"* invites a generic essay; *"Explain RAG to a non-technical manager in 5 bullet points, each under 15 words"* gets you exactly what you can use. Prompt engineering is not only about answers — it is about usable answers.
+</Body>
+
+<KeyTakeaways>
+- Zero-shot (no examples) suits simple, well-defined tasks; few-shot (2–5 examples) teaches the model an output format you can't easily describe.
+- Role prompting sets tone, expertise, and depth in one phrase; instruction prompting and context injection remove ambiguity by stating constraints and background explicitly.
+- Chain-of-thought makes the model reason step by step for multi-step problems — but ask for concise reasoning in professional use.
+- Output formatting (tables, JSON, bullets) and delimiters (separating instructions from data) turn raw answers into usable, accurate ones.
+- The unifying rule: weak prompts make the model guess; strong, specific prompts remove the guesswork.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Go deeper with [Prompt engineering patterns](/ai-engineering/prompt-engineering-patterns).
+- Understand the failure mode prompting can't fix in [Understanding hallucinations](/ai-engineering/understanding-hallucinations).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) or the [AI-era beginner readiness](/roadmap/ai-era-beginner-readiness) roadmap.
+</WhatToDoNext>
+
+<SourceNote />

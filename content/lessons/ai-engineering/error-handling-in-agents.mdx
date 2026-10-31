@@ -1,0 +1,110 @@
+---
+slug: error-handling-in-agents
+title: "Error Handling in Autonomous Agents"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Design a typed exception hierarchy for agent failures
+- Decide which errors the agent recovers from vs which it surfaces
+- Turn tool failures into observations the agent can react to
+- Add timeouts and retries around the flaky parts (LLM + external tools)
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Autonomous agents fail in ways scripts don't: the LLM returns malformed output, a tool times out, the loop never converges. If every failure is a bare `Exception`, you can't tell "retryable network blip" from "agent is stuck." A typed error model with clear recovery rules is what makes an agent dependable enough to run unattended.
+</WhyThisMatters>
+
+<Body>
+## Name your failures
+
+A flat `except Exception` tells you nothing. Define a small hierarchy so each failure has a meaning and a recovery policy:
+
+```python
+class AgentError(Exception): ...
+class MaxIterationsReachedError(AgentError): ...   # loop didn't converge
+class ToolExecutionError(AgentError):              # a specific tool failed
+    def __init__(self, tool_name, reason):
+        super().__init__(f"Tool '{tool_name}' failed: {reason}")
+        self.tool_name = tool_name
+class LLMProviderError(AgentError): ...            # API down / timeout
+class ParsingError(AgentError): ...                # couldn't parse the output
+```
+
+## Recover vs surface
+
+Not every error should crash the run:
+
+- **ParsingError / ToolExecutionError** → *recover inside the loop*. Feed the failure back as an observation ("Tool X failed: timeout") so the agent can try a different approach.
+- **LLMProviderError** → *retry with backoff*; if it persists, surface it.
+- **MaxIterationsReachedError** → *surface* with a clear message; the agent genuinely couldn't finish.
+
+## Flaky boundaries get timeouts + retries
+
+The two unreliable boundaries are the LLM API and external tools. Wrap both with a timeout and a bounded retry/backoff. Retry transient errors only — never retry a `ParsingError`, since the same input will fail the same way.
+</Body>
+
+<Code>
+```python
+import time
+
+def with_retries(fn, retries: int = 3, base_delay: float = 0.5):
+    """Retry transient provider/tool errors with exponential backoff."""
+    for attempt in range(retries):
+        try:
+            return fn()
+        except LLMProviderError as e:
+            if attempt == retries - 1:
+                raise
+            time.sleep(base_delay * (2 ** attempt))   # 0.5s, 1s, 2s
+
+def safe_tool_step(registry, name: str, arg: str, memory) -> None:
+    """Tool failures become observations, not crashes."""
+    try:
+        obs = registry.execute(name, arg)
+    except ToolExecutionError as e:
+        obs = f"Tool error ({e.tool_name}): {e}. Try a different approach."
+    memory.add_message("user", f"Observation: {obs}")
+```
+</Code>
+
+<TryItYourself>
+1. Add the exception hierarchy to your agent
+2. Make a tool raise `ToolExecutionError` and confirm it becomes an observation the agent reacts to
+3. Simulate an `LLMProviderError` and verify `with_retries` backs off then succeeds
+4. Hit the iteration cap and confirm `MaxIterationsReachedError` surfaces cleanly
+5. Confirm a `ParsingError` is NOT retried (same input would fail again)
+</TryItYourself>
+
+<CommonMistakes>
+- **One bare `except Exception`** — you can't apply different recovery to different failures
+- **Retrying non-transient errors** — retrying a ParsingError just wastes calls
+- **Crashing on tool failure** — feed it back as an observation so the agent can adapt
+- **No timeout on the LLM call** — one hung request stalls the whole agent
+- **Infinite retries** — always bound retries and back off
+- **Swallowing errors silently** — log them; an unattended agent needs a trail
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Defined a typed `AgentError` hierarchy
+- [ ] Converted tool failures into observations
+- [ ] Added bounded retries with backoff around the LLM call
+- [ ] Surfaced `MaxIterationsReachedError` clearly
+- [ ] Confirmed non-transient errors aren't retried
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: A tool times out mid-run. What's the best default behavior for an autonomous agent?**
+
+- A) Crash the whole run immediately
+- B) Return the failure as an observation so the agent can try another approach ✅
+- C) Silently skip it and continue as if it succeeded
+- D) Retry forever until it works
+</MiniQuiz>
+
+<InterviewExplanation>
+"I give agents a typed exception hierarchy — parsing errors, tool execution errors, provider errors, max-iterations — because each needs a different policy. Parsing and tool failures I recover from inside the loop by feeding them back as observations, so the agent can adapt. Provider errors I retry with bounded exponential backoff, then surface if they persist. Max-iterations I surface immediately, because the agent genuinely couldn't converge. The flaky boundaries are the LLM API and external tools, so I wrap both in timeouts and bounded retries — but I never retry a parsing error, since the same input fails the same way."
+</InterviewExplanation>

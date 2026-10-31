@@ -1,0 +1,76 @@
+---
+slug: llm-cost-optimization
+title: "LLM Cost Optimization: 12 Levers That Work"
+summary: "LLM API costs can spiral fast. Here are the 12 most effective techniques — from model selection and token reduction to caching, batching, and tiered routing."
+category: ai-engineering
+tags: ["cost", "optimization", "production", "llm"]
+audience: ["working-pros", "cs-students"]
+depth: medium
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1778922904899.gif
+relatedLessons:
+  - ai-engineering/cost-and-latency
+  - ai-systems/semantic-caching
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+LLM bills scale with usage, and a product that works in a demo can become unaffordable at real traffic. The good news is that cost is engineerable: a handful of levers — right-sizing the model, trimming tokens on both ends, caching, batching, and routing by complexity — routinely cut spend by large multiples without hurting quality. Some are quick wins you ship in an afternoon; others are structural changes that pay off at scale. This piece walks through twelve levers, grouped so you know which to reach for first.
+</InsightSummary>
+
+<Body>
+## Why cost matters
+
+Token-based pricing means every request has a marginal cost, and unlike a fixed server bill, that cost grows with every user and every retry. Teams routinely discover that an unoptimized prompt — bloated context, a frontier model on a trivial task, no caching — costs ten times what a careful one does for the same output. Controlling spend is not a finance chore; it is what lets an AI feature survive contact with production traffic.
+
+## The 12 levers
+
+**1. Right-size the model.** The biggest single lever. Use the smallest, cheapest model that meets your quality bar, and reserve the powerful (expensive) model for genuinely hard tasks. Evaluate model families for price-performance, not just headline benchmarks.
+
+**2. Reduce input tokens.** You pay for everything you send. Strip unnecessary examples, repeated boilerplate, and irrelevant context; summarize long conversation history instead of replaying it; compress retrieved context before it goes in. Input is usually where the waste lives.
+
+**3. Reduce output tokens.** Set strict max-output limits, and ask for bullet points or structured responses instead of long prose. Shorter, more focused outputs are cheaper and often more useful.
+
+**4. Prompt caching.** Major providers let you cache a stable prefix (system prompt, instructions, few-shot examples) so repeated requests reuse it at a steep discount. Near-free to adopt if your prompts share a common head.
+
+**5. Semantic caching.** Go beyond exact-match: embed incoming queries and return a cached response when a new query is semantically close to a previous one. This avoids regenerating answers to questions you have effectively already answered.
+
+**6. Request batching.** Combine multiple prompts into a single efficient call where the workload allows. Batching reduces per-request overhead and improves throughput, especially for offline or bulk jobs.
+
+**7. Tiered / two-step routing.** Use a cheap model first for filtering, drafting, or simple cases, and escalate only the hard cases to a stronger, more expensive model. Most traffic is easy; do not pay frontier prices for it.
+
+**8. Local or smaller models for simple tasks.** Classification, extraction, and routing often run fine on small or quantized models you host yourself (e.g. via Ollama). Offloading the easy, high-volume work moves it off per-token billing entirely.
+
+**9. Streaming.** Streaming tokens does not lower cost, but it dramatically improves perceived latency — worth listing because it changes whether users tolerate a cheaper, slower model, which indirectly protects your model-selection savings.
+
+**10. Token counting before calls.** Count tokens before you send so you can enforce budgets, trim context that exceeds a threshold, and catch a runaway prompt before it bills you. Measurement precedes control.
+
+**11. Rate limiting per user.** Cap requests per user to stop a single client — or an abusive one — from generating an unbounded bill, and to keep cost predictable as you grow.
+
+**12. Monitoring and alerts on cost spikes.** Track token consumption, request counts, and spend at the feature and prompt level. Alert on anomalies so a regression or attack does not quietly run up the bill for a week before anyone notices.
+
+## Quick wins vs. structural changes
+
+If you need savings this week, reach for the quick wins: right-size the model, trim input and output tokens, turn on prompt caching, and add cost monitoring. These require little architecture change and often deliver the largest early reduction. The structural levers — semantic caching, tiered routing, batching pipelines, and self-hosted small models — take real engineering but compound as volume grows. Start with measurement (lever 10 and 12) so every later change can be judged against real numbers rather than guesses.
+</Body>
+
+<KeyTakeaways>
+- LLM cost scales with usage; an unoptimized request can cost many times an optimized one for the same output.
+- The largest lever is right-sizing the model — cheap model for simple tasks, powerful only for hard ones.
+- Cut tokens on both ends: compress and summarize input, and constrain output length and format.
+- Caching (prompt-prefix and semantic), batching, and tiered routing are the structural wins that compound at scale.
+- Always measure first — token counting, per-user rate limits, and cost monitoring with alerts make every other optimization verifiable.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Go deeper on the cost-latency trade-off in [Cost and latency](/ai-engineering/cost-and-latency).
+- Implement query reuse with [Semantic caching](/ai-systems/semantic-caching).
+- Put these levers into a real system via the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

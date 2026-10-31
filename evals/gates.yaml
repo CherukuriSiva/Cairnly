@@ -1,0 +1,9 @@
+# Eval gate: `cairnly eval --kb <name> --gate evals/gates.yaml` exits 1 when a metric is worse
+# than its limit, which fails CI. Plain metric names are minimums; *_rate names are maximums.
+# Limits sit a little below the measured baseline (docs/LEARN-M2.md), so a real regression
+# fails the build but normal noise does not.
+
+lessons:            # CI runs this on the public lessons (11 quiz questions, so noisy)
+  recall@5: 0.80    # with reranker: 0.91 public / 0.94 all 127
+  mrr: 0.70         # with reranker: 0.78 public / 0.87 all
+  false_refusal_rate: 0.10

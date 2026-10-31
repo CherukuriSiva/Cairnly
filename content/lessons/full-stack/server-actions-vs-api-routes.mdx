@@ -1,0 +1,95 @@
+---
+slug: server-actions-vs-api-routes
+title: "Server Actions vs API Routes: When to Pick Which"
+track: full-stack
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Define Server Actions and API Routes and explain how each works
+- Choose the right approach for a given use case
+- Identify when you must use an API Route over a Server Action
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Next.js gives you two ways to run server-side logic from the client. Picking wrong leads to unnecessary complexity. Interviewers test whether you understand the tradeoff — not just that both exist, but *when* each is the better choice.
+</WhyThisMatters>
+
+<Body>
+## Server Actions
+
+A Server Action is a function marked with `"use server"` that runs on the server but can be called directly from a Client Component or a `<form>` action. Next.js handles the network request under the hood — you never write a `fetch()` call.
+
+```tsx
+// app/actions.ts
+"use server";
+
+import { prisma } from "@/lib/prisma";
+
+export async function saveArticle(articleId: string) {
+  await prisma.savedArticle.create({
+    data: { articleId, userId: getCurrentUserId() },
+  });
+}
+```
+
+```tsx
+// components/SaveButton.tsx
+"use client";
+import { saveArticle } from "@/app/actions";
+
+export function SaveButton({ articleId }: { articleId: string }) {
+  return (
+    <form action={saveArticle.bind(null, articleId)}>
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+```
+
+**Advantages:** No boilerplate fetch code, automatic request/response handling, works with progressive enhancement (forms submit even without JS), tight integration with `revalidatePath`.
+
+## API Routes
+
+An API Route is an HTTP endpoint you define in `app/api/`. It receives a standard `Request` and returns a `Response`. External clients — mobile apps, webhooks, third-party services — can call it.
+
+```tsx
+// app/api/articles/route.ts
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const articles = await prisma.article.findMany();
+  return NextResponse.json(articles);
+}
+```
+
+**Advantages:** Standard HTTP semantics, callable from any client, supports streaming, can set custom headers and status codes.
+
+## When to pick which
+
+| Scenario | Use |
+|----------|-----|
+| Form submission from your own UI | Server Action |
+| Mutation triggered by a button click | Server Action |
+| External webhook (Stripe, GitHub) | API Route |
+| Mobile app or third-party consumer | API Route |
+| Need custom HTTP headers or status codes | API Route |
+| Real-time streaming response | API Route |
+
+**Rule of thumb:** If only your Next.js app calls it, use a Server Action. If anything outside your app calls it, use an API Route.
+</Body>
+
+<MiniQuiz>
+**Q: Stripe sends a webhook to your app after a payment succeeds. Should this endpoint be a Server Action or an API Route?**
+
+- A) Server Action — it's a server-side mutation
+- B) API Route — external services need a standard HTTP endpoint ✅
+- C) Either works — Next.js handles both the same way
+</MiniQuiz>
+
+<InterviewExplanation>
+"Server Actions let me write server-side mutations as plain async functions and call them directly from React components — Next.js manages the RPC layer. I use them for in-app form submissions and mutations because there's no fetch boilerplate and they integrate with revalidation. I use API Routes when I need a real HTTP endpoint — for webhooks from Stripe, public APIs consumed by mobile clients, or when I need fine control over headers and status codes."
+</InterviewExplanation>

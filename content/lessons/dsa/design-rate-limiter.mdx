@@ -1,0 +1,262 @@
+---
+slug: design-rate-limiter
+title: "Design a Rate Limiter: Token Bucket and Sliding Window"
+track: dsa
+tier: medium
+estimatedMinutes: 30
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Understand four rate limiting algorithms: fixed window, sliding window log, sliding window counter, and token bucket
+- Implement each algorithm in Python with clear trade-offs
+- Analyze time and space complexity for each approach
+- Connect rate limiting to system design interviews (API gateways, DDoS protection)
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Rate limiting sits at the intersection of data structures and system design. It appears in coding interviews as an algorithm problem and in system design rounds as an infrastructure question. Understanding the algorithmic foundations (sliding windows, token buckets) lets you discuss trade-offs with precision rather than hand-waving.
+</WhyThisMatters>
+
+<Body>
+## The problem
+
+Allow at most `max_requests` requests per `window_seconds` for each user. Reject requests that exceed the limit.
+
+## Algorithm 1: Fixed Window Counter
+
+Divide time into fixed windows. Count requests in the current window.
+
+```python
+import time
+
+class FixedWindowLimiter:
+    def __init__(self, max_requests, window_seconds):
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self.counts = {}  # user_id -> (window_start, count)
+
+    def allow(self, user_id):
+        now = time.time()
+        window_start = now // self.window * self.window
+
+        if user_id not in self.counts or self.counts[user_id][0] != window_start:
+            self.counts[user_id] = (window_start, 0)
+
+        _, count = self.counts[user_id]
+        if count < self.max_requests:
+            self.counts[user_id] = (window_start, count + 1)
+            return True
+        return False
+```
+
+**Pros:** Simple, O(1) time and space per user.
+**Cons:** Burst at window boundaries. A user could make `max_requests` at 0:59 and `max_requests` at 1:00, doubling the effective rate in a 1-second span.
+
+## Algorithm 2: Sliding Window Log
+
+Store the timestamp of every request. Count requests within the last `window_seconds`.
+
+```python
+from collections import deque
+
+class SlidingWindowLogLimiter:
+    def __init__(self, max_requests, window_seconds):
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self.logs = {}  # user_id -> deque of timestamps
+
+    def allow(self, user_id):
+        now = time.time()
+        if user_id not in self.logs:
+            self.logs[user_id] = deque()
+
+        log = self.logs[user_id]
+        # Remove timestamps outside the window
+        while log and log[0] <= now - self.window:
+            log.popleft()
+
+        if len(log) < self.max_requests:
+            log.append(now)
+            return True
+        return False
+```
+
+**Pros:** No boundary burst problem. Exact count.
+**Cons:** O(max_requests) space per user to store timestamps.
+
+## Algorithm 3: Sliding Window Counter (Hybrid)
+
+Approximate the sliding window using weighted counts from the current and previous fixed windows.
+
+```python
+class SlidingWindowCounterLimiter:
+    def __init__(self, max_requests, window_seconds):
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self.counters = {}  # user_id -> {window_start: count}
+
+    def allow(self, user_id):
+        now = time.time()
+        current_window = now // self.window * self.window
+        prev_window = current_window - self.window
+        elapsed = now - current_window  # seconds into current window
+        weight = elapsed / self.window  # fraction of current window elapsed
+
+        if user_id not in self.counters:
+            self.counters[user_id] = {}
+
+        prev_count = self.counters[user_id].get(prev_window, 0)
+        curr_count = self.counters[user_id].get(current_window, 0)
+
+        # Weighted estimate
+        estimated = prev_count * (1 - weight) + curr_count
+        if estimated < self.max_requests:
+            self.counters[user_id][current_window] = curr_count + 1
+            # Clean up old windows
+            self.counters[user_id].pop(prev_window - self.window, None)
+            return True
+        return False
+```
+
+**Pros:** O(1) space per user (only two counters). Smooths the boundary burst problem.
+**Cons:** Approximate, not exact.
+
+## Algorithm 4: Token Bucket
+
+A bucket holds up to `max_tokens` tokens. Tokens are added at a fixed rate. Each request consumes one token.
+
+```python
+class TokenBucketLimiter:
+    def __init__(self, max_tokens, refill_rate):
+        """
+        max_tokens: burst capacity
+        refill_rate: tokens added per second
+        """
+        self.max_tokens = max_tokens
+        self.refill_rate = refill_rate
+        self.buckets = {}  # user_id -> (tokens, last_refill_time)
+
+    def allow(self, user_id):
+        now = time.time()
+        if user_id not in self.buckets:
+            self.buckets[user_id] = (self.max_tokens, now)
+
+        tokens, last_time = self.buckets[user_id]
+        # Add tokens based on elapsed time
+        elapsed = now - last_time
+        tokens = min(self.max_tokens, tokens + elapsed * self.refill_rate)
+
+        if tokens >= 1:
+            self.buckets[user_id] = (tokens - 1, now)
+            return True
+        self.buckets[user_id] = (tokens, now)
+        return False
+```
+
+**Pros:** Allows controlled bursts up to `max_tokens`. Smooth rate limiting. O(1) time and space per user.
+**Cons:** Two parameters to tune (bucket size and refill rate).
+
+## Comparison table
+
+| Algorithm | Space per user | Boundary burst? | Exact? |
+|---|---|---|---|
+| Fixed Window | O(1) | Yes | Yes (within window) |
+| Sliding Window Log | O(max_requests) | No | Yes |
+| Sliding Window Counter | O(1) | Minimal | Approximate |
+| Token Bucket | O(1) | Controlled | N/A (different model) |
+
+## When each is used in practice
+
+- **Fixed Window**: Simple APIs with loose limits
+- **Sliding Window Log**: When exact accuracy matters (billing, compliance)
+- **Sliding Window Counter**: Most API gateways (good balance)
+- **Token Bucket**: AWS, Stripe, most cloud APIs (allows bursts within bounds)
+</Body>
+
+<TryItYourself>
+1. Implement the Token Bucket rate limiter and test it with a burst of 10 requests followed by a steady stream.
+2. Simulate the Fixed Window boundary burst: send `max_requests` at time 59 and `max_requests` at time 60. Verify the sliding window approaches handle this correctly.
+3. Add a `remaining()` method to each limiter that returns how many requests are left in the current window.
+4. **Extension**: How would you make these distributed across multiple servers? What changes?
+</TryItYourself>
+
+<Code>
+```python
+import time
+from collections import deque
+
+# --- Token Bucket ---
+class TokenBucket:
+    def __init__(self, capacity, refill_rate):
+        self.capacity = capacity
+        self.refill_rate = refill_rate
+        self.tokens = capacity
+        self.last_time = time.time()
+
+    def allow(self):
+        now = time.time()
+        self.tokens = min(self.capacity, self.tokens + (now - self.last_time) * self.refill_rate)
+        self.last_time = now
+        if self.tokens >= 1:
+            self.tokens -= 1
+            return True
+        return False
+
+# --- Sliding Window Log ---
+class SlidingWindowLog:
+    def __init__(self, max_requests, window_seconds):
+        self.max = max_requests
+        self.window = window_seconds
+        self.log = deque()
+
+    def allow(self):
+        now = time.time()
+        while self.log and self.log[0] <= now - self.window:
+            self.log.popleft()
+        if len(self.log) < self.max:
+            self.log.append(now)
+            return True
+        return False
+
+# --- Demo ---
+print("=== Token Bucket (capacity=3, refill=1/sec) ===")
+tb = TokenBucket(3, 1)
+for i in range(5):
+    print(f"  Request {i+1}: {'allowed' if tb.allow() else 'DENIED'}")
+
+print("\n=== Sliding Window Log (max=3, window=2s) ===")
+sw = SlidingWindowLog(3, 2)
+for i in range(5):
+    print(f"  Request {i+1}: {'allowed' if sw.allow() else 'DENIED'}")
+```
+</Code>
+
+<CompletionChecklist>
+- [ ] I can implement a fixed window rate limiter
+- [ ] I can implement a sliding window log rate limiter
+- [ ] I can implement a token bucket rate limiter
+- [ ] I understand the trade-offs between exact vs. approximate, space vs. accuracy
+- [ ] I can explain the boundary burst problem and which algorithms avoid it
+- [ ] I can discuss how to make rate limiting distributed (Redis + Lua scripts)
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Forgetting to refill tokens based on elapsed time**: The token bucket must add `elapsed * refill_rate` tokens at each check, not at fixed intervals. Otherwise the bucket drains and never recovers.
+- **Not capping tokens at max capacity**: After refilling, always `min(max_tokens, ...)`. Without this, tokens accumulate beyond the burst limit.
+- **Using floating-point timestamps for exact comparisons**: Use `<=` instead of `<` when pruning old entries, and be aware of floating-point precision issues in production. In real systems, use integer milliseconds.
+- **Not cleaning up old entries**: In the sliding window log, old timestamps pile up if you forget to prune. The deque.popleft() cleanup is essential.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: A user makes 100 requests at 11:59:59 and 100 requests at 12:00:01 with a limit of 100/minute. Which algorithm would allow all 200 requests?**
+
+- A) Sliding Window Log (it would block the second batch)
+- B) Fixed Window Counter (the boundary resets at 12:00:00, so both batches fit within their respective windows) ✅
+- C) Token Bucket (it has no concept of windows)
+- D) All algorithms would block the second batch
+</MiniQuiz>
+
+<InterviewExplanation>
+"I'd start by discussing four approaches with their trade-offs. Fixed window is simplest but has boundary burst issues. Sliding window log is exact but stores every timestamp. Sliding window counter approximates the count using weighted previous/current window counts with O(1) space. Token bucket allows controlled bursts and is what most cloud APIs use. For distributed rate limiting, I'd use Redis with atomic Lua scripts to ensure consistency across servers. I'd choose the algorithm based on whether the system prioritizes simplicity, accuracy, or burst tolerance."
+</InterviewExplanation>

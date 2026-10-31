@@ -1,0 +1,103 @@
+---
+slug: train-val-test-splitting
+title: "Train/Val/Test Splitting Without Leakage"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain what each split is for (train / validation / test)
+- Stratify by record kind so every split has the right mix
+- Make splits reproducible with a fixed seed
+- Prevent the two classic leaks: duplicates across splits and fitting on test
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Your eval numbers are only meaningful if the test set is truly unseen. A leaky split — duplicates straddling train and test, or tuning on the test set — produces inflated scores that collapse in production. Splitting correctly (stratified, seeded, dedup-first) is what makes your evaluation trustworthy, and it's a classic interview trap.
+</WhyThisMatters>
+
+<Body>
+## Three splits, three jobs
+
+- **Train** — what the model learns from.
+- **Validation** — what you tune against (hyperparameters, early stopping). The model never trains on it, but *you* look at it.
+- **Test** — touched **once**, at the end, to report a number. Look at it during development and it's no longer a test set.
+
+## Stratify by kind
+
+A random split can starve a split of a rare class — e.g. all your refusal examples land in train, so test can't measure refusal at all. **Stratified** splitting partitions each kind (QA / refusal / multi-turn) separately and applies the train/val/test fractions within each, so every split mirrors the overall mix.
+
+## Seed it for reproducibility
+
+Shuffle with a fixed seed so the split is identical across runs. Without it, "the model improved" might just be a luckier split. Reproducible splits make comparisons real.
+
+## The two leaks
+
+1. **Duplicate leakage** — a near-duplicate of a test item sits in train, so the model "memorized" the answer. Fix: **dedup the whole corpus before splitting** (the dedup lesson).
+2. **Test contamination** — you peeked at test to pick a threshold or prompt. Fix: discipline — tune on validation, freeze test until the final report.
+</Body>
+
+<Code>
+```python
+import random
+
+def assign_splits(records: list[dict], train=0.8, val=0.1, seed=42) -> list[dict]:
+    """Stratified, reproducible split by record 'kind'."""
+    by_kind: dict[str, list[dict]] = {}
+    for r in records:
+        by_kind.setdefault(r.get("kind", "qa"), []).append(r)
+
+    result = []
+    for _kind, recs in by_kind.items():
+        random.seed(seed)                       # reproducible per kind
+        random.shuffle(recs)
+        n, n_tr = len(recs), int(len(recs) * train)
+        n_va = int(len(recs) * val)
+        for i, r in enumerate(recs):
+            r["split"] = "train" if i < n_tr else "val" if i < n_tr + n_va else "test"
+        result.extend(recs)
+
+    random.seed(seed)
+    random.shuffle(result)                      # mix kinds back together
+    return result
+```
+</Code>
+
+<TryItYourself>
+1. Build records of two kinds (qa, refusal) and run `assign_splits`
+2. Confirm each split contains both kinds in roughly the right proportion
+3. Run it twice with the same seed and diff the assignments — identical
+4. Plant a near-duplicate across train/test and show why dedup must come first
+5. Compute per-split counts and verify test is never used during tuning
+</TryItYourself>
+
+<CommonMistakes>
+- **Random (non-stratified) split** — a rare class can vanish from a split
+- **No fixed seed** — splits change run to run; comparisons become noise
+- **Splitting before dedup** — near-duplicates leak test answers into train
+- **Peeking at test during development** — silently contaminates your headline metric
+- **Tuning on test instead of validation** — inflated, non-reproducible results
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Split data into train/val/test with clear roles
+- [ ] Stratified by record kind
+- [ ] Used a fixed seed and verified reproducibility
+- [ ] Deduped before splitting to avoid leakage
+- [ ] Kept test frozen until final evaluation
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You get 0.95 F1 on test but 0.70 in production. The split deduped nothing. Likely cause?**
+
+- A) The model is simply great
+- B) Duplicate leakage — near-duplicates of test items were in train, so the score is inflated ✅
+- C) The test set is too large
+- D) Validation was too small
+</MiniQuiz>
+
+<InterviewExplanation>
+"Three splits, three jobs: train is what the model learns, validation is what I tune against, and test is touched once at the end — peek at it and it's no longer a test set. I stratify by record kind so a rare class like refusals doesn't all land in one split, and I shuffle with a fixed seed so the split is reproducible and 'the model improved' isn't just a luckier split. The two leaks I guard against are duplicate leakage — which I prevent by deduping the whole corpus before splitting — and test contamination, which is pure discipline: tune on validation, freeze test until the final report."
+</InterviewExplanation>

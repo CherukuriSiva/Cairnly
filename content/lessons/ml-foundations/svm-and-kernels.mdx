@@ -1,0 +1,115 @@
+---
+slug: svm-and-kernels
+title: "Support Vector Machines: Maximum Margin and the Kernel Trick"
+track: ml-foundations
+tier: short
+estimatedMinutes: 20
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain the maximum-margin hyperplane and support vectors
+- Describe what the kernel trick does without computing high-dimensional dot products
+- Know when SVMs outperform random forests and when they don't
+- Implement an SVM classifier with an RBF kernel and tune C and gamma
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+SVMs dominated ML benchmarks before deep learning arrived. They're still used in production for text classification, bioinformatics, and any problem where you have more features than samples. The kernel trick is a concept that appears in graduate ML interviews and in understanding why neural networks work — it's worth understanding deeply even if you use SVMs rarely.
+</WhyThisMatters>
+
+<Body>
+## The maximum-margin hyperplane
+
+For a binary classification problem with linearly separable classes, there are infinitely many hyperplanes that perfectly separate the classes. SVM finds the one that maximises the **margin** — the gap between the hyperplane and the nearest training points from each class.
+
+Those nearest points are called **support vectors** — they're the only training examples that matter. You could delete all other training points and the decision boundary wouldn't change.
+
+```python
+from sklearn.svm import SVC
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report
+
+X, y = make_classification(
+    n_samples=1000, n_features=20, n_informative=15, random_state=42
+)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Always scale — SVM is highly sensitive to feature magnitude
+scaler = StandardScaler()
+X_train_s = scaler.fit_transform(X_train)
+X_test_s  = scaler.transform(X_test)
+
+# RBF kernel — the standard choice for non-linear problems
+svm = SVC(kernel="rbf", C=1.0, gamma="scale", probability=True)
+svm.fit(X_train_s, y_train)
+
+print(classification_report(y_test, svm.predict(X_test_s)))
+print(f"Support vectors per class: {svm.n_support_}")
+```
+
+## The kernel trick
+
+Most real-world classification problems are not linearly separable. SVMs handle this through the **kernel trick**: instead of transforming data into a high-dimensional space explicitly (which is computationally expensive), a kernel function computes the *dot product in that high-dimensional space directly* from the original features.
+
+The most common kernels:
+
+| Kernel | `kernel=` | Use case |
+|---|---|---|
+| Linear | `"linear"` | Linearly separable problems, high-dimensional text |
+| RBF (Gaussian) | `"rbf"` | Non-linear problems with moderate dimensions |
+| Polynomial | `"poly"` | Image recognition, specific domains |
+
+The **C parameter** controls the bias-variance tradeoff:
+- Low C: wide margin, more misclassifications tolerated (high bias, low variance)
+- High C: narrow margin, tries to classify every training point correctly (low bias, high variance)
+
+The **gamma parameter** (for RBF kernel) controls how far each training point's influence reaches:
+- Low gamma: large radius, smooth decision boundary
+- High gamma: small radius, complex wiggly boundary (can overfit)
+
+```python
+from sklearn.model_selection import GridSearchCV
+
+param_grid = {
+    "C":     [0.1, 1, 10, 100],
+    "gamma": ["scale", "auto", 0.01, 0.001],
+}
+grid_search = GridSearchCV(
+    SVC(kernel="rbf"), param_grid, cv=5, scoring="f1", n_jobs=-1
+)
+grid_search.fit(X_train_s, y_train)
+
+print(f"Best params: {grid_search.best_params_}")
+print(f"Best CV F1: {grid_search.best_score_:.3f}")
+```
+
+## When to use SVMs
+
+**SVMs win when:**
+- You have more features than samples (text, genomics — `kernel="linear"` or `LinearSVC`)
+- The decision boundary is genuinely non-linear but the dataset is small (RBF kernel)
+- You need a strong theoretical guarantee on the margin
+
+**SVMs lose when:**
+- Dataset is large (> 100k rows) — training is O(n²) to O(n³) in time
+- You need probability calibration — SVM outputs are scores, not probabilities (use `probability=True` but know it adds cost via Platt scaling)
+- Mixed feature types (numeric + categorical) — gradient boosting handles these better
+</Body>
+
+<MiniQuiz>
+**Q: Your SVM with `C=0.1` underfits the training data. You increase `C` to 100 and the training accuracy improves but test accuracy drops. What happened?**
+
+- A) The kernel changed from RBF to linear
+- B) High C penalises margin violations so strongly that the model memorises training noise — classic high-variance overfitting ✅
+- C) Gamma should be reduced to compensate for the high C value
+- D) The dataset is linearly separable and RBF kernel is wrong for it
+</MiniQuiz>
+
+<InterviewExplanation>
+"SVMs find the hyperplane that maximises the margin between classes. Support vectors are the training points closest to the boundary — only they define the decision surface. The kernel trick lets SVMs find non-linear boundaries by implicitly mapping data to a higher-dimensional space where linear separation is possible, without actually computing those high-dimensional coordinates. I'd use an SVM with a linear kernel for high-dimensional sparse text data, an RBF kernel for small non-linear tabular datasets, and gradient boosting for everything else at scale. The two critical parameters are C — which controls how much to penalise margin violations — and gamma for RBF, which controls the decision boundary's smoothness."
+</InterviewExplanation>

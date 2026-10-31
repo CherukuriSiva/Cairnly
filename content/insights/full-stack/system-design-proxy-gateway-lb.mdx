@@ -1,0 +1,69 @@
+---
+slug: system-design-proxy-gateway-lb
+title: "Reverse Proxy, API Gateway, Load Balancer: What Each Does"
+summary: "Three infrastructure pieces that every backend uses but many engineers conflate. Here is what each does, when you need it, and how they combine in AI systems."
+category: full-stack
+tags: ["system-design", "networking", "infrastructure", "api-gateway"]
+audience: ["cs-students", "working-pros"]
+depth: short
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1780206768443.gif
+relatedLessons:
+  - ai-systems/horizontal-scaling-ai-services
+  - ai-systems/load-testing-ai-services
+relatedRoadmaps:
+  - ai-engineer-technical-path
+  - fullstack-dev-to-ai-engineer
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Reverse proxy, API gateway, and load balancer sound interchangeable and are constantly conflated — but they solve different problems. A reverse proxy sits in front of servers and hides them, handling SSL and static content. A load balancer spreads traffic across many instances and checks their health. An API gateway is the smart front door for many services, doing auth, rate-limiting, and routing in one place. In practice they stack together, and in AI systems the load-balancing layer gets smarter — routing by query complexity and model cost instead of plain round-robin. Being able to tell all three apart is a standard system-design interview expectation.
+</InsightSummary>
+
+<Body>
+## Reverse proxy
+
+A reverse proxy sits in front of your backend servers and forwards client requests to them, so clients never talk to the servers directly. That indirection buys you several things: it **hides backend topology** (clients see one address, not your server fleet), handles **SSL/TLS termination** so your app servers do not each manage certificates, and can serve **static files** and cache responses. Nginx and Caddy are common choices. Think of it as the polite receptionist who takes every request at the door.
+
+## Load balancer
+
+A load balancer **distributes incoming traffic across multiple instances** of a service so no single one is overwhelmed, and it runs **health checks** to stop sending traffic to instances that are down. It is the mechanism behind horizontal scaling: add more instances, and the load balancer spreads work across them. Strategies range from round-robin to least-connections to latency-aware. AWS ALB and an Nginx upstream block are typical examples. Its single job: keep traffic evenly spread and away from unhealthy servers.
+
+## API gateway
+
+An API gateway is the **single, smart entry point in front of many services**. Beyond routing a request to the right service, it centralizes cross-cutting concerns so each service does not reimplement them: **authentication and authorization**, **rate limiting**, request/response transformation, and observability. Kong and AWS API Gateway are common implementations. Where a reverse proxy is "forward this to a backend," a gateway is "authenticate, rate-limit, then route to the correct one of many backends, and log it."
+
+## How they combine in AI systems
+
+These are layers, not competitors. A typical request path looks like:
+
+```
+Client → Load Balancer → API Gateway → Reverse Proxy → Services
+```
+
+The load balancer spreads traffic across gateway instances, the gateway authenticates and routes, and a reverse proxy fronts each service group. In **AI systems specifically**, the load-balancing layer gets smarter. Plain round-robin assumes every request costs the same — but AI requests do not: a short classification and a long, multi-tool agent run are wildly different in cost and latency. AI-aware load balancing routes by **query complexity, context length, and model cost**, sending cheap requests to cheap capacity and reserving expensive model instances for the requests that need them. The gateway is also where you enforce per-user rate limits and token budgets that keep LLM spend predictable.
+
+## What to know for interviews
+
+The expectation is simple but frequently missed: be able to **distinguish all three** and **describe where each sits** in the request path. Reverse proxy hides and fronts servers (SSL, static, caching); load balancer distributes and health-checks across instances; API gateway is the smart single entry point doing auth, rate-limiting, and routing across many services. If you can place them in the right order and explain why an AI system's load balancing is cost-aware rather than naive, you have answered the question well.
+</Body>
+
+<KeyTakeaways>
+- The three are layers with different jobs, not interchangeable: reverse proxy fronts and hides servers, load balancer distributes traffic, API gateway is the smart single entry point.
+- Reverse proxy handles SSL termination, static files, caching, and topology hiding (Nginx, Caddy).
+- Load balancer spreads traffic across instances and health-checks them — the basis of horizontal scaling (AWS ALB, Nginx upstream).
+- API gateway centralizes auth, rate-limiting, and routing across many services (Kong, AWS API Gateway); typical stack is Load Balancer → API Gateway → Reverse Proxy → Services.
+- In AI systems, load balancing becomes cost-aware — routing by query complexity, context length, and model cost rather than plain round-robin.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Apply the load-balancing layer in [Horizontal scaling for AI services](/ai-systems/horizontal-scaling-ai-services).
+- Verify your setup holds up with [Load testing AI services](/ai-systems/load-testing-ai-services).
+- Build the full picture via the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

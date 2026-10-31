@@ -1,0 +1,95 @@
+---
+slug: choosing-an-agent-framework
+title: "Picking an Agent Framework in 2026"
+summary: "LangChain, LangGraph, CrewAI, and others — each is optimized for a different thing. Here is how to choose without framework-chasing."
+category: ai-engineering
+tags: ["langchain", "langgraph", "crewai", "frameworks", "agents"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1779417450323.jpeg
+  - references/linkedin/1777724398693.jpeg
+  - references/linkedin/1777734670605.jpeg
+  - references/linkedin/1778322106016.jpeg
+  - references/linkedin/1779475263660.jpeg
+relatedLessons:
+  - ai-engineering/the-react-loop
+  - ai-engineering/what-is-an-agent
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+There is no single "best" agent framework — each is optimized for a different shape of problem. LangChain gives you composable building blocks for LLM apps. LangGraph gives you a runtime for stateful, branching, looping workflows. CrewAI gives you role-based multi-agent teams. The trap is framework-chasing: picking a tool before you have a working agent. The honest path is to start with the bare minimum, understand what the framework would do for you, and adopt one only when your complexity actually justifies it.
+</InsightSummary>
+
+<Body>
+## Why use a framework at all
+
+You can build an agent with nothing but an LLM API and a loop. Frameworks earn their place by handling the repetitive plumbing: tool routing, prompt and template management, memory, retrieval, streaming, checkpointing, and recovery. They also give you an ecosystem — document loaders, vector-store integrations, output parsers, evaluation, and observability — so you are not reinventing each piece. The cost is a learning curve and an abstraction layer between you and the model. That trade is worth it when your app is complex enough that the plumbing dominates the work, and not worth it when it isn't.
+
+A useful way to see the landscape is as three layers that work together: a building-blocks framework, a runtime engine, and (optionally) a batteries-included agent harness on top.
+
+## LangChain: the building blocks
+
+LangChain is the orchestration layer for LLM-powered apps and the most widely used framework for building them. It is the "building blocks" layer: models, prompts, chains, tools, memory, retrievers, output parsers, and document loaders, composed into pipelines. Its expression language (LCEL) makes chains easy to declare and supports fast, streaming execution.
+
+- **Best for:** composable LLM pipelines, RAG apps, chatbots, copilots, and rapid prototyping where you want lots of pre-built integrations.
+- **Core components to know:** models, prompts, chains (LCEL), agents, tools, memory, document loaders, text splitters, embeddings, vector stores, retrievers, and RAG pipelines.
+- **Ecosystem:** a huge community, broad integrations, and production-ready scaling — plus LangSmith for observability and evaluation.
+
+A reasonable learning order is Python → APIs → RAG → LangChain → LangGraph → CrewAI → MCP → vector DB → deployment → monitoring.
+
+## LangGraph: the runtime engine
+
+LangGraph is the runtime engine for complex, stateful agents. Where a plain chain runs straight through, LangGraph models your agent as a graph with explicit state, conditional routing, cycles (loops), and built-in support for human-in-the-loop and recovery. It is the engine your agent *runs on* when behavior is non-linear.
+
+- **Best for:** complex, stateful, multi-step agents with branching and loops, and production-grade reliability (retry/recover, durable workflows).
+- **Key features:** state management, memory, conditional routing, cyclic workflows, streaming, checkpointing/persistence, human approval, and error handling.
+- **Used in:** enterprise AI, copilots, and support systems where the workflow is more than a single pass.
+
+LangChain and LangGraph share an ecosystem — LangSmith ties both together for tracing, evaluation, and monitoring — and many production stacks layer a batteries-included harness on top that adds planning (to-do lists), a virtual file system, subagents, long-term memory, skills, permissions, and human approval.
+
+## CrewAI: role-based agent teams
+
+CrewAI is built for multi-agent collaboration. Instead of one agent doing everything, you define roles (researcher, writer, reviewer) that work as a team, with easy setup and an emphasis on division of labor.
+
+- **Best for:** role-based, division-of-labor multi-agent systems — automation, research, marketing, and similar workflows where distinct specialists hand work between each other.
+- **Key features:** role-based agents, simple setup, and teamwork primitives.
+
+## The wider field
+
+The ecosystem is large, and several other frameworks are worth knowing by their niche: the OpenAI Agents SDK (tool calling, handoffs, sessions, tracing for OpenAI-native apps), Microsoft AutoGen (autonomous agents and research, agent conversation with code execution), Semantic Kernel (.NET / enterprise, plugins and planners), LlamaIndex (RAG, document and knowledge agents, strong data connectors), PydanticAI (type-safe, structured outputs), Agno (lightweight, fast MVPs), and Google ADK (Gemini ecosystem, multi-agent). You do not need to learn them all — recognize which problem each is shaped for so you can pick deliberately.
+
+## The honest verdict
+
+Start *without* a framework. Build a small agent with a raw LLM API and a loop so you understand what an agent actually is — context in, tool calls, output, repeat. Then notice where the pain is: if you are hand-writing memory, retrieval, and tool routing, reach for LangChain. If your control flow has real branching and loops and needs to be reliable, move to LangGraph. If you genuinely need a team of specialized agents, adopt CrewAI. Let the complexity pull you up the stack — don't pick the heaviest tool first and then look for a problem to justify it.
+</Body>
+
+<CommonMistakes>
+- **Choosing a framework before you have a working agent.** The biggest mistake is picking LangGraph or CrewAI on day one. Build a bare-bones agent first so you understand what the framework is abstracting away — then adopt the one that removes *your* actual pain.
+- **Framework-chasing.** Switching tools every time a new one trends wastes the time you should spend on retrieval quality, prompts, and evals — the things that actually move output quality.
+- **Reaching for multi-agent (CrewAI) too early.** Role-based teams shine for genuine division of labor; for a single well-scoped task they add coordination overhead with no benefit.
+- **Ignoring observability.** Whatever framework you pick, wire in tracing and evaluation (e.g. LangSmith) from the start — debugging an agent without visibility into its steps is guesswork.
+- **Treating the framework as the skill.** The durable skills are agent design, RAG, tool calling, memory, and evaluation. Frameworks change; those concepts transfer across all of them.
+</CommonMistakes>
+
+<KeyTakeaways>
+- Frameworks earn their place by handling plumbing — tool routing, memory, retrieval, streaming, checkpointing — plus a broad integration ecosystem; the cost is a learning curve and abstraction.
+- LangChain is the building-blocks layer (best for composable LLM/RAG pipelines and prototyping); LangGraph is the runtime engine (best for stateful, branching, looping, production-grade agents); CrewAI is for role-based multi-agent teams.
+- LangChain and LangGraph share an ecosystem, with LangSmith providing observability and evaluation across both.
+- Know the wider field (OpenAI Agents SDK, AutoGen, Semantic Kernel, LlamaIndex, and others) by the niche each fits, not by memorizing all of them.
+- The honest path: start without a framework, then let real complexity pull you up the stack — never pick the heaviest tool before you have a working agent.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Understand the loop a framework wraps with [The ReAct loop](/ai-engineering/the-react-loop).
+- Solidify the fundamentals in [What is an agent](/ai-engineering/what-is-an-agent).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) to put a framework to work on a real system.
+</WhatToDoNext>
+
+<SourceNote />

@@ -1,0 +1,183 @@
+---
+slug: decision-trees-and-random-forests
+title: "Decision Trees and Random Forests: From Single Tree to Ensemble"
+track: ml-foundations
+tier: medium
+estimatedMinutes: 35
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Explain how a decision tree splits data using Gini impurity or entropy
+- Identify the overfitting problem with unpruned trees and how to fix it
+- Describe how a random forest reduces variance through bagging and feature subsampling
+- Implement a random forest classifier and read feature importances
+- Choose the right hyperparameters for max_depth, n_estimators, and min_samples_split
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Random forests are the go-to model for tabular data competitions and production systems. They handle mixed feature types (numeric + categorical), require minimal preprocessing, are robust to outliers, and produce built-in feature importances that business stakeholders can understand. Interviewers ask about them constantly — especially why they outperform single trees and how to tune them.
+</WhyThisMatters>
+
+<Body>
+## How a decision tree works
+
+A decision tree recursively splits the training data by asking binary questions: "Is `age > 35`? Is `income < 50000`?" At each node, it finds the split that minimises impurity in the child nodes.
+
+**Gini impurity** measures how often a randomly chosen element would be misclassified if labelled according to the node's distribution:
+
+```
+Gini(node) = 1 - Σ pᵢ²
+```
+
+A pure node (all one class) has Gini = 0. A perfectly mixed node (50/50 binary split) has Gini = 0.5. The tree chooses the feature and threshold that minimise the weighted average Gini of the two child nodes.
+
+```python
+from sklearn.tree import DecisionTreeClassifier, export_text
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import load_breast_cancer
+import pandas as pd
+
+X, y = load_breast_cancer(return_X_y=True, as_frame=True)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Shallow tree — interpretable
+tree = DecisionTreeClassifier(max_depth=3, random_state=42)
+tree.fit(X_train, y_train)
+
+print(export_text(tree, feature_names=list(X.columns)))
+print(f"\nTest accuracy: {tree.score(X_test, y_test):.3f}")
+```
+
+## The overfitting problem
+
+A tree with no depth limit will grow until every leaf is pure — memorising the training data perfectly. On the test set, performance collapses because the tree has learned noise, not signal.
+
+```python
+# Deep tree: perfect train accuracy, poor test accuracy
+deep_tree = DecisionTreeClassifier(max_depth=None, random_state=42)
+deep_tree.fit(X_train, y_train)
+print(f"Deep tree: train={deep_tree.score(X_train, y_train):.3f}, "
+      f"test={deep_tree.score(X_test, y_test):.3f}")
+
+# Shallow tree: balanced
+shallow_tree = DecisionTreeClassifier(max_depth=4, random_state=42)
+shallow_tree.fit(X_train, y_train)
+print(f"Shallow tree: train={shallow_tree.score(X_train, y_train):.3f}, "
+      f"test={shallow_tree.score(X_test, y_test):.3f}")
+```
+
+The fix: either constrain depth (`max_depth`), require minimum samples per split (`min_samples_split`), or use a random forest.
+
+## Random forests: bagging + feature subsampling
+
+A random forest trains many trees on **bootstrap samples** (sampling the training data with replacement) and averages their predictions. This is called **bagging** (Bootstrap AGGregatING). Because each tree sees a different random sample, the trees make different errors — when you average them, errors cancel out and variance drops dramatically.
+
+Random forests add a second source of randomness: **feature subsampling**. At each split, only a random subset of features (`max_features`, default `sqrt(n_features)`) is considered. This decorrelates the trees further — if one very dominant feature always wins the root split, all trees look alike and averaging doesn't help much.
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+import matplotlib.pyplot as plt
+import numpy as np
+
+rf = RandomForestClassifier(
+    n_estimators=200,     # number of trees — more is better until returns diminish
+    max_depth=None,       # trees grow until min_samples_leaf stops them
+    min_samples_leaf=2,   # require at least 2 samples per leaf — prevents single-row leaves
+    max_features="sqrt",  # consider sqrt(n_features) features per split
+    random_state=42,
+    n_jobs=-1             # use all CPU cores
+)
+rf.fit(X_train, y_train)
+print(f"Random forest: train={rf.score(X_train, y_train):.3f}, "
+      f"test={rf.score(X_test, y_test):.3f}")
+
+# Feature importances — mean Gini decrease across all trees
+importances = pd.Series(rf.feature_importances_, index=X.columns)
+top10 = importances.nlargest(10)
+top10.plot(kind="barh", figsize=(8, 5), title="Top 10 Feature Importances")
+plt.tight_layout()
+plt.savefig("feature_importances.png")
+```
+
+**Hyperparameter guide:**
+
+| Parameter | Default | Rule of thumb |
+|---|---|---|
+| `n_estimators` | 100 | Start at 200; increase if OOB error still falling |
+| `max_depth` | None | Leave unconstrained; control via `min_samples_leaf` |
+| `min_samples_leaf` | 1 | Use 2–5 for noisy data to prevent over-splitting |
+| `max_features` | "sqrt" | "sqrt" for classification, "log2" for very wide datasets |
+| `class_weight` | None | Set to "balanced" for imbalanced classes |
+</Body>
+
+<Code>
+```python
+# Full random forest pipeline with out-of-bag evaluation
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import classification_report
+from sklearn.datasets import load_breast_cancer
+import pandas as pd
+
+X, y = load_breast_cancer(return_X_y=True, as_frame=True)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+rf = RandomForestClassifier(
+    n_estimators=200,
+    min_samples_leaf=2,
+    max_features="sqrt",
+    oob_score=True,   # free validation using out-of-bag samples
+    random_state=42,
+    n_jobs=-1,
+)
+rf.fit(X_train, y_train)
+
+print(f"OOB accuracy (free validation): {rf.oob_score_:.3f}")
+print(f"Test accuracy: {rf.score(X_test, y_test):.3f}")
+print("\n" + classification_report(y_test, rf.predict(X_test)))
+
+# Cross-validation for more stable estimate
+cv_scores = cross_val_score(rf, X_train, y_train, cv=5, scoring="f1", n_jobs=-1)
+print(f"CV F1: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+```
+</Code>
+
+<TryItYourself>
+1. Load the `titanic` dataset from seaborn: `sns.load_dataset("titanic")`.
+2. Drop rows with missing `age`, encode `sex` as 0/1, select features: `pclass`, `sex`, `age`, `sibsp`, `parch`, `fare`.
+3. Train a `DecisionTreeClassifier(max_depth=3)` and a `RandomForestClassifier(n_estimators=100)`.
+4. Compare their train vs test accuracy. Which generalises better?
+5. Print the top-5 feature importances from the random forest. Push to GitHub.
+</TryItYourself>
+
+<CommonMistakes>
+- **Leaving `max_depth=None` on a single decision tree** — it will memorise training data. Only leave it unconstrained inside a random forest, where variance is controlled by averaging.
+- **Using mean-decrease-impurity feature importances on high-cardinality features** — features with many unique values (e.g., raw IDs, zip codes) get inflated importance scores. Use `permutation_importance` from sklearn for a more reliable ranking.
+- **Treating OOB score as a replacement for a held-out test set** — OOB gives a free validation estimate, but the final evaluation should still use a truly held-out test set to avoid any form of selection bias.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: Why does a random forest generalise better than a single deep decision tree, even though each individual tree in the forest may overfit?**
+
+- A) Random forests use deeper trees that capture more information
+- B) Each tree overfits in a slightly different way due to bootstrap sampling and feature subsampling — averaging their predictions cancels out individual errors ✅
+- C) Random forests use Gini impurity which is more accurate than entropy
+- D) Random forests automatically prune trees using cross-validation
+</MiniQuiz>
+
+<InterviewExplanation>
+"A decision tree splits data recursively by minimising Gini impurity or entropy at each node. A single unpruned tree memorises training data — it has low bias but very high variance. A random forest fixes the variance problem through bagging: each tree trains on a bootstrap sample and sees a random subset of features at each split. The trees overfit in different directions, so their errors cancel when averaged. In practice I start with `n_estimators=200`, `min_samples_leaf=2`, `oob_score=True`, and inspect feature importances to validate the model makes domain sense before tuning further."
+</InterviewExplanation>
+
+<CompletionChecklist>
+- [ ] Trained a decision tree and demonstrated overfitting by comparing train vs test accuracy
+- [ ] Trained a random forest and verified it generalises better than the single tree
+- [ ] Extracted and plotted feature importances
+- [ ] Used `oob_score=True` and understood what OOB error means
+- [ ] Pushed results to GitHub
+</CompletionChecklist>

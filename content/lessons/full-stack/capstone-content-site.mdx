@@ -1,0 +1,264 @@
+---
+slug: capstone-content-site
+title: "Capstone: Ship Your Own Next.js Content Site to Vercel"
+track: full-stack
+tier: medium
+estimatedMinutes: 90
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Build a complete content site from scratch using every skill from the track
+- Design a schema, implement auth and payments, and deploy to production
+- Make deliberate architectural decisions and document your reasoning
+- Ship a portfolio project that demonstrates real full-stack competence
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Individual lessons teach skills. This capstone proves you can combine them into a working product. Recruiters don't read lesson certificates — they click a live URL and look at a GitHub repo. This is the project you'll walk through in interviews and link from your resume.
+</WhyThisMatters>
+
+<Body>
+## What you're building
+
+A content site on a topic you care about. It could be:
+- A tech news aggregator (like the layoffs tracker)
+- A recipe site with free and premium tiers
+- A study guide site for a college course
+- A local events directory
+
+The specific topic doesn't matter. What matters is that you use every layer of the stack.
+
+## Requirements
+
+Your site must include:
+
+### Data layer
+- [ ] Prisma schema with at least 4 models and 2 relationships
+- [ ] CUIDs for IDs, slugs for URLs, timestamps on mutable models
+- [ ] At least one enum (e.g., access tier, category)
+- [ ] Seed script to populate initial data
+
+### Pages and routing
+- [ ] Home page with a listing of content items
+- [ ] Dynamic detail page (`/[slug]`) for individual items
+- [ ] At least one filtered/sorted listing (by category, date, or tag)
+- [ ] 404 page using `notFound()`
+
+### SEO
+- [ ] `generateMetadata` on every dynamic page
+- [ ] Open Graph tags for social previews
+- [ ] `sitemap.ts` generating URLs from the database
+
+### Auth
+- [ ] NextAuth with at least one OAuth provider
+- [ ] Protected page that requires sign-in
+- [ ] User-specific data (saved items, preferences)
+
+### Payments
+- [ ] Stripe Checkout for premium access
+- [ ] Webhook handler that updates the database
+- [ ] Content gating based on payment status
+
+### UI
+- [ ] Reusable components: card, badge, page shell
+- [ ] `cn()` utility with `clsx` + `tailwind-merge`
+- [ ] Responsive layout (works on mobile and desktop)
+- [ ] Loading skeletons for async content
+
+### Deployment
+- [ ] Deployed to Vercel with a live URL
+- [ ] Environment variables configured properly
+- [ ] Production database with migrations applied
+- [ ] README with setup instructions
+
+## Recommended order of operations
+
+1. **Schema first** — design your Prisma models based on your content domain
+2. **Seed data** — write a seed script so you have content to display
+3. **Pages and components** — build the listing and detail pages
+4. **SEO** — add `generateMetadata` and `sitemap.ts`
+5. **Auth** — integrate NextAuth and protect a page
+6. **Payments** — add Stripe Checkout and content gating
+7. **Polish** — responsive design, loading states, error pages
+8. **Deploy** — push to Vercel, configure env vars, test live
+9. **README** — document what you built and how to run it
+
+## The seed script
+
+Every content site needs sample data. Create a seed script:
+
+```tsx
+// prisma/seed.ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  await prisma.category.createMany({
+    data: [
+      { name: "Analysis", slug: "analysis" },
+      { name: "Breaking News", slug: "breaking-news" },
+      { name: "Opinion", slug: "opinion" },
+    ],
+  });
+
+  await prisma.article.create({
+    data: {
+      title: "Tech Layoffs Hit Record Highs in Q1 2026",
+      slug: "tech-layoffs-q1-2026",
+      body: "An in-depth analysis of the layoff trends...",
+      excerpt: "Q1 2026 saw the highest tech layoffs since the pandemic era.",
+      accessTier: "FREE",
+      categoryId: (await prisma.category.findFirst({ where: { slug: "analysis" } }))!.id,
+      authorId: "seed-author-id",
+    },
+  });
+
+  console.log("Seeded database");
+}
+
+main().catch(console.error).finally(() => prisma.$disconnect());
+```
+
+Add to `package.json`:
+
+```json
+{
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
+```
+
+Run with `npx prisma db seed`.
+
+## What "done" looks like
+
+Your site is done when:
+1. A stranger can visit the URL, browse content, sign in, and (test) pay for premium access
+2. The GitHub repo has a clear README and clean code
+3. You can walk through the architecture in a 5-minute interview explanation
+4. Google can index every public page (check with View Source)
+
+## Grading yourself
+
+| Criteria | Points |
+|----------|--------|
+| Schema design (4+ models, relations, enums) | 20 |
+| Dynamic pages with SEO metadata | 15 |
+| Auth flow works end-to-end | 15 |
+| Stripe payment and content gating | 20 |
+| Reusable components with `cn()` | 10 |
+| Deployed to Vercel with live URL | 10 |
+| Clean code and README | 10 |
+</Body>
+
+<Code>
+```tsx
+// Project structure for your capstone
+//
+// my-content-site/
+// ├── app/
+// │   ├── layout.tsx
+// │   ├── page.tsx                   ← Home / listing page
+// │   ├── [slug]/
+// │   │   └── page.tsx              ← Dynamic detail page
+// │   ├── api/
+// │   │   ├── auth/[...nextauth]/route.ts
+// │   │   └── webhooks/stripe/route.ts
+// │   ├── actions.ts                ← Server Actions
+// │   ├── sitemap.ts                ← Dynamic sitemap
+// │   └── not-found.tsx             ← 404 page
+// ├── components/
+// │   ├── Card.tsx
+// │   ├── Badge.tsx
+// │   ├── PageShell.tsx
+// │   ├── AuthButton.tsx
+// │   └── BuyButton.tsx
+// ├── lib/
+// │   ├── prisma.ts
+// │   ├── auth.ts
+// │   └── cn.ts
+// ├── prisma/
+// │   ├── schema.prisma
+// │   └── seed.ts
+// ├── .env.example                  ← Template (no secrets)
+// └── README.md
+```
+
+```tsx
+// Seed script pattern
+// prisma/seed.ts
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+
+async function main() {
+  // Clear existing data (idempotent seeding)
+  await prisma.article.deleteMany();
+  await prisma.category.deleteMany();
+
+  const categories = await Promise.all([
+    prisma.category.create({ data: { name: "Analysis", slug: "analysis" } }),
+    prisma.category.create({ data: { name: "News", slug: "news" } }),
+  ]);
+
+  await prisma.article.createMany({
+    data: Array.from({ length: 10 }, (_, i) => ({
+      title: `Sample Article ${i + 1}`,
+      slug: `sample-article-${i + 1}`,
+      body: `Content for article ${i + 1}...`,
+      categoryId: categories[i % 2].id,
+      accessTier: i < 7 ? "FREE" : "PREMIUM",
+    })),
+  });
+
+  console.log("Database seeded successfully");
+}
+
+main().finally(() => prisma.$disconnect());
+```
+</Code>
+
+<TryItYourself>
+1. Pick your content topic and write down 5 user stories (e.g., "As a visitor, I can browse articles by category")
+2. Design your Prisma schema — draw the ERD on paper first
+3. Build the data layer: schema, migration, seed script
+4. Build pages one at a time: listing, then detail, then filtered view
+5. Add SEO, auth, and payments in that order
+6. Deploy to Vercel after each major milestone (not just at the end)
+7. Write a README that explains the architecture
+8. Share the live URL with a friend or mentor for review
+</TryItYourself>
+
+<CommonMistakes>
+- **Building the UI before the schema** — the schema is the foundation; everything else depends on it
+- **Deploying only at the end** — deploy early and often; catching env var issues on day 1 is better than day 7
+- **Skipping the seed script** — without sample data, your site looks empty and broken
+- **Not writing a README** — recruiters and interviewers check the repo first; a missing README suggests the project is a throwaway
+- **Overscoping** — a polished site with 4 models beats a broken site with 12; ship something complete
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Prisma schema with 4+ models and meaningful relationships
+- [ ] Dynamic pages with `generateMetadata` and `sitemap.ts`
+- [ ] NextAuth integration with a working sign-in flow
+- [ ] Stripe Checkout with webhook handler and content gating
+- [ ] Reusable Tailwind components with `cn()` utility
+- [ ] Deployed to Vercel with a live, accessible URL
+- [ ] GitHub repo has a clear README
+- [ ] Can explain the architecture in a 5-minute walkthrough
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You're building your capstone and your Prisma seed script fails on Vercel. What's the most likely reason?**
+
+- A) Vercel doesn't support seed scripts
+- B) The seed script should only run locally or in CI, not during the production build ✅
+- C) Prisma doesn't work on Vercel
+- D) You need to use MongoDB instead of PostgreSQL
+</MiniQuiz>
+
+<InterviewExplanation>
+"For my capstone, I built a [topic] content site from scratch. I designed a PostgreSQL schema with Prisma — [N] models with one-to-many and many-to-many relationships, enum-based access tiers, and soft deletes. The frontend uses Next.js App Router with Server Components for data fetching and SEO, plus Client Components for interactivity. I added GitHub OAuth with NextAuth and Stripe Checkout for premium content gating. The webhook handler verifies Stripe signatures and updates the database. It's deployed on Vercel with preview deployments for every PR."
+</InterviewExplanation>

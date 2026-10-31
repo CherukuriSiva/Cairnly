@@ -1,0 +1,93 @@
+---
+slug: genai-project-structure
+title: "GenAI Project Structure: How to Organize Your AI Codebase"
+summary: "A clean folder structure for GenAI and agentic projects — separating config, data, core LLM logic, RAG pipeline, and tests so your code stays maintainable as it grows."
+category: ai-engineering
+tags: ["project-structure", "architecture", "best-practices"]
+audience: ["cs-students", "beginners"]
+depth: short
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1776420125415.gif
+  - references/linkedin/1778211734805.gif
+  - references/linkedin/1778238090299.jpeg
+relatedLessons:
+  - ai-engineering/build-a-rag-pipeline
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+GenAI projects rot faster than ordinary code. Experiments pile up, model IDs and thresholds get hard-coded in ten places, and swapping a provider means a painful rewrite. A deliberate folder structure prevents that: pull every constant into `config/`, keep your data and indexes out of `src/`, put a thin provider-agnostic LLM client in `core/`, and give RAG, agents, and tools their own homes. You do not need this on day one — a single notebook is fine for a throwaway prototype — but the moment a project becomes something you will keep, structure is what keeps it maintainable.
+</InsightSummary>
+
+<Body>
+## Why structure matters in AI projects
+
+AI codebases sprawl in ways normal apps do not. You try three chunking strategies, two embedding models, and five prompt variants — and unless there is a place for each concern, that experimentation leaks into one giant file. Three problems follow. **Reproducibility** suffers because the settings that produced a good result are scattered or lost. **Swapping components** becomes risky because provider calls and prompt strings are tangled into business logic. And **onboarding** (including future-you) slows to a crawl because nothing signals where retrieval ends and agent logic begins. A predictable layout fixes all three by giving every concern one obvious home.
+
+## The recommended layout
+
+A structure that scales from a serious side project to a production service looks like this:
+
+```
+generative_ai_project/
+  config/          # all constants: model IDs, thresholds, logging
+    model_config.yaml
+    logging_config.yaml
+  data/            # never mixed into source code
+    cache/         # cached responses and intermediates
+    embeddings/    # generated vector embeddings
+    vectordb/      # vector database indexes (FAISS, Chroma, etc.)
+  src/
+    core/          # LLM client abstractions
+      base_llm.py        # common interface for all providers
+      claude_client.py   # one file per provider
+      model_factory.py   # picks the right client at runtime
+    rag/           # retrieval pipeline
+      embedder.py
+      retriever.py
+      indexer.py
+    agents/        # planning and decision logic
+    tools/         # tool/function definitions the agent can call
+    processing/    # chunking, tokenizing, cleaning
+  tests/
+    unit/          # function-level tests
+    integration/   # end-to-end tests
+  Dockerfile
+  Makefile
+  requirements.txt
+```
+
+The shape matters more than the exact names: configuration, data, and source are physically separated, and within `src/` each capability (core, rag, agents, tools) is isolated so you can reason about one without the others.
+
+## Centralized config: one place for every knob
+
+The single highest-leverage move is to put every constant in `config/` — model IDs, temperature, top-k for retrieval, chunk size, similarity thresholds, timeouts, and logging levels. When all of that lives in `model_config.yaml` instead of being sprinkled through your code, two things become easy: you can tune behavior without touching logic, and you can reproduce a run by saving the config that produced it. Hard-coded constants are the quiet reason AI projects become impossible to debug.
+
+## Core LLM abstraction: swap providers without a rewrite
+
+Define a thin `base_llm` interface — `generate()`, `embed()`, maybe `stream()` — and implement it once per provider (`claude_client.py`, and so on). A small `model_factory` reads the config and hands back the right client. Your agents and RAG pipeline call the *interface*, never a vendor SDK directly. The payoff: switching providers, A/B-testing models, or routing cheap-vs-powerful becomes a config change, not a refactor — because the rest of the codebase never knew which provider it was talking to.
+
+## When to add structure vs. keeping it flat
+
+Do not impose this on an afternoon experiment — a single script or notebook is the right tool for proving an idea. Add structure when the project crosses a line: you are sharing it, deploying it, putting it in a portfolio, or you have started copy-pasting the same setup between files. A useful rule of thumb: the first time you find yourself hunting for "where did I set that threshold," it is time to create `config/`. Grow the layout to match the project's seriousness, not all at once and not never.
+</Body>
+
+<KeyTakeaways>
+- AI projects sprawl through experimentation; a deliberate layout protects reproducibility, component-swapping, and onboarding.
+- Physically separate `config/`, `data/`, and `src/`; inside `src/`, isolate `core/`, `rag/`, `agents/`, and `tools/`.
+- Centralize every constant — model IDs, thresholds, chunk size, logging — in `config/` so you can tune and reproduce without touching logic.
+- Put a thin provider-agnostic LLM interface in `core/` so swapping models is a config change, not a rewrite.
+- Match structure to the project's seriousness: a notebook for prototypes, the full layout once it is something you will keep.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Apply this layout to a real pipeline in [Build a RAG pipeline](/ai-engineering/build-a-rag-pipeline).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) to build a portfolio project on top of this structure.
+</WhatToDoNext>
+
+<SourceNote />

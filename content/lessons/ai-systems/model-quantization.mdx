@@ -1,0 +1,96 @@
+---
+slug: model-quantization
+title: "Model Quantization: FP32 → INT8 & Micro-Batching"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain what quantization does and why it cuts cost and latency
+- Compare FP32, FP16/BF16, and INT8 at a practical level
+- Understand the accuracy trade-off and how to measure it
+- Use dynamic micro-batching to raise throughput
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Inference is the recurring cost of an AI product. A model in full FP32 precision is often paying for accuracy it doesn't need. Quantization can shrink a model ~4× and speed it up with minor accuracy loss — the most direct lever on inference cost, and a common interview topic.
+</WhyThisMatters>
+
+<Body>
+## What quantization is
+
+Models store weights as numbers. Quantization stores them with **fewer bits** — FP32 (32-bit) → INT8 (8-bit) is 4× smaller. Smaller weights mean less memory bandwidth, which is what inference is usually bottlenecked on, so it's also faster.
+
+## The precision ladder
+
+- **FP32** — full precision; the training default; biggest and slowest.
+- **FP16 / BF16** — half precision; ~2× smaller, widely used for serving with negligible accuracy loss.
+- **INT8** — 8-bit integers; ~4× smaller, fastest; needs a *calibration* step and risks more accuracy loss.
+
+Lower precision = cheaper and faster, but accuracy can degrade — so you must measure.
+
+## Measure the trade-off, don't assume it
+
+Quantization is only a win if quality holds. Run your **eval harness** on the quantized model and compare to the FP32 baseline. If F1 drops within your tolerance, ship it; if it falls off a cliff, step back up the ladder (e.g. INT8 → FP16).
+
+## Micro-batching for throughput
+
+Even quantized, serving one request at a time wastes the accelerator. **Dynamic micro-batching** collects requests that arrive within a few milliseconds and runs them as one batch — big throughput gains for a tiny added latency. Tune the batch window against your latency budget.
+</Body>
+
+<Code>
+```python
+import torch
+
+# Dynamic (post-training) INT8 quantization for a PyTorch model — one call:
+quantized = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+
+# Gate the swap on an eval comparison, not vibes:
+def accept_quantized(fp32_model, int8_model, harness, tolerance: float = 0.01) -> bool:
+    base = harness.run_factuality_model(fp32_model)["mean_f1"]
+    quant = harness.run_factuality_model(int8_model)["mean_f1"]
+    print(f"FP32 F1={base:.3f}  INT8 F1={quant:.3f}  Δ={base - quant:.3f}")
+    return (base - quant) <= tolerance   # ship only if accuracy loss is within budget
+```
+</Code>
+
+<TryItYourself>
+1. Quantize a small model with `quantize_dynamic` and compare file sizes
+2. Benchmark latency: FP32 vs INT8 on the same inputs
+3. Run your eval harness on both and record the accuracy delta
+4. Decide ship/no-ship against a 1% tolerance
+5. Add micro-batching with a 5ms window and measure throughput gain
+</TryItYourself>
+
+<CommonMistakes>
+- **Quantizing without measuring accuracy** — you may ship a quietly worse model
+- **Jumping straight to INT8** — try FP16/BF16 first; often free quality
+- **Ignoring calibration for static INT8** — uncalibrated INT8 can tank accuracy
+- **Micro-batch window too large** — throughput up, but latency budget blown
+- **Assuming smaller is always faster** — gains depend on the hardware and bottleneck
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Quantized a model to INT8 and compared size
+- [ ] Benchmarked latency FP32 vs INT8
+- [ ] Compared accuracy on the eval harness
+- [ ] Made a ship/no-ship decision against a tolerance
+- [ ] Added micro-batching and measured throughput
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You quantize a model to INT8 and it's 3× faster — what must you check before shipping it?**
+
+- A) The file extension
+- B) That accuracy on your eval set stayed within tolerance vs the FP32 baseline ✅
+- C) The number of layers
+- D) Nothing — faster is always better
+</MiniQuiz>
+
+<InterviewExplanation>
+"Quantization stores model weights in fewer bits — FP32 to INT8 is 4× smaller — which cuts memory bandwidth, the usual inference bottleneck, so it's cheaper and faster. I treat precision as a ladder: FP16 or BF16 first because it's often free quality, then INT8 for the biggest win but with a calibration step and more accuracy risk. The discipline is measuring — I run my eval harness on the quantized model against the FP32 baseline and only ship if the accuracy drop is within tolerance. On top of that I use dynamic micro-batching to raise throughput, tuning the batch window against my latency budget."
+</InterviewExplanation>

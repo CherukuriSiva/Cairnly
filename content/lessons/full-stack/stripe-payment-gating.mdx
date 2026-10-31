@@ -1,0 +1,273 @@
+---
+slug: stripe-payment-gating
+title: "Stripe Payment Integration: Gating Paid Pages"
+track: full-stack
+tier: medium
+estimatedMinutes: 35
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Create a Stripe Checkout session to accept one-time payments
+- Handle Stripe webhooks to confirm payment completion
+- Gate premium content based on payment status stored in your database
+- Understand the full payment flow: checkout, webhook, database update, access check
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+If you're building a content site, you need to charge for it. Stripe is the industry standard for payments. Interviewers at SaaS companies expect you to explain the webhook-based payment flow — the "how do you know someone paid?" question trips up most junior developers.
+</WhyThisMatters>
+
+<Body>
+## The payment flow
+
+The flow involves your frontend, your backend, and Stripe's servers:
+
+1. User clicks "Buy access" on your site
+2. Your Server Action creates a Stripe Checkout session
+3. User is redirected to Stripe's hosted checkout page
+4. User enters payment info and pays
+5. Stripe redirects user back to your success URL
+6. **Separately**, Stripe sends a webhook to your API route
+7. Your webhook handler verifies the event and updates the database
+8. Future page loads check the database for payment status
+
+**Critical insight:** Never trust the redirect. The user could bookmark the success URL or the redirect could fail. The webhook is the only reliable signal that payment succeeded.
+
+## Step 1: Create a Checkout session
+
+```tsx
+// app/actions.ts
+"use server";
+
+import Stripe from "stripe";
+import { auth } from "@/lib/auth";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export async function createCheckoutSession() {
+  const session = await auth();
+  if (!session?.user?.email) throw new Error("Not authenticated");
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: session.user.email,
+    line_items: [
+      {
+        price: process.env.STRIPE_PRICE_ID!, // Created in Stripe Dashboard
+        quantity: 1,
+      },
+    ],
+    success_url: `${process.env.NEXT_PUBLIC_URL}/payment/success`,
+    cancel_url: `${process.env.NEXT_PUBLIC_URL}/payment/cancel`,
+    metadata: {
+      userId: session.user.id, // Attach your user ID for the webhook
+    },
+  });
+
+  return checkoutSession.url;
+}
+```
+
+## Step 2: Handle the webhook
+
+Stripe sends a POST request to your API route when payment events occur:
+
+```tsx
+// app/api/webhooks/stripe/route.ts
+import Stripe from "stripe";
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export async function POST(req: Request) {
+  const body = await req.text();
+  const signature = req.headers.get("stripe-signature")!;
+
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session.metadata?.userId;
+
+    if (userId) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { hasPaidAccess: true, paidAt: new Date() },
+      });
+    }
+  }
+
+  return NextResponse.json({ received: true });
+}
+```
+
+**Key security step:** `constructEvent` verifies the webhook signature. Without this, anyone could POST fake events to your endpoint.
+
+## Step 3: Gate content
+
+Now check the user's payment status when rendering premium pages:
+
+```tsx
+// app/articles/[slug]/page.tsx
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+
+export default async function ArticlePage({ params }: { params: { slug: string } }) {
+  const article = await prisma.article.findUnique({
+    where: { slug: params.slug },
+  });
+
+  if (!article) return notFound();
+
+  if (article.accessTier === "PREMIUM") {
+    const session = await auth();
+    if (!session?.user) redirect("/api/auth/signin");
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { hasPaidAccess: true },
+    });
+
+    if (!user?.hasPaidAccess) {
+      redirect("/pricing");
+    }
+  }
+
+  return (
+    <article>
+      <h1>{article.title}</h1>
+      <div>{article.body}</div>
+    </article>
+  );
+}
+```
+
+## Prisma schema addition
+
+Add payment fields to the User model:
+
+```prisma
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  hasPaidAccess Boolean   @default(false)
+  paidAt        DateTime?
+  stripeCustomerId String? @unique
+  // ... other NextAuth fields
+}
+```
+
+## Testing webhooks locally
+
+Stripe can't reach `localhost`, so use the Stripe CLI to forward webhooks:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# Copy the webhook signing secret to your .env
+```
+</Body>
+
+<Code>
+```tsx
+// Complete Stripe integration pattern
+
+// 1. Server Action — create checkout
+"use server";
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export async function createCheckoutSession() {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const checkout = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: session.user.email!,
+    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    success_url: `${process.env.NEXT_PUBLIC_URL}/payment/success`,
+    cancel_url: `${process.env.NEXT_PUBLIC_URL}/pricing`,
+    metadata: { userId: session.user.id },
+  });
+
+  return checkout.url;
+}
+
+// 2. Client Component — buy button
+"use client";
+import { createCheckoutSession } from "@/app/actions";
+
+export function BuyButton() {
+  const handleClick = async () => {
+    const url = await createCheckoutSession();
+    if (url) window.location.href = url;
+  };
+
+  return <button onClick={handleClick}>Buy Premium Access</button>;
+}
+
+// 3. Webhook — verify and update DB
+// (see Body section for full implementation)
+
+// 4. Access check — gate content
+export async function hasAccess(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { hasPaidAccess: true },
+  });
+  return user?.hasPaidAccess ?? false;
+}
+```
+</Code>
+
+<TryItYourself>
+1. Create a Stripe account and get your test API keys from the Stripe Dashboard
+2. Create a product and price in Stripe Dashboard (use test mode)
+3. Install the Stripe SDK: `npm install stripe`
+4. Implement the checkout Server Action and the webhook API route
+5. Install the Stripe CLI and run `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+6. Complete a test payment using card number `4242 4242 4242 4242`
+7. Check Prisma Studio — verify `hasPaidAccess` is `true` for your user
+</TryItYourself>
+
+<CommonMistakes>
+- **Trusting the success redirect instead of the webhook** — the redirect can fail or be faked; only the webhook is a reliable payment confirmation
+- **Forgetting to verify the webhook signature** — without `constructEvent`, attackers can send fake payment events
+- **Using `req.json()` instead of `req.text()` for the webhook body** — Stripe signature verification requires the raw body string
+- **Not storing `userId` in checkout session metadata** — without it, the webhook handler can't link the payment to your user
+- **Testing with live mode keys** — always use test mode keys during development; Stripe provides test card numbers
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Stripe test keys configured in `.env`
+- [ ] Checkout session creation works — user is redirected to Stripe
+- [ ] Webhook handler verifies signature and updates database
+- [ ] Premium pages check `hasPaidAccess` before rendering
+- [ ] Completed a test payment end-to-end
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: After a user completes payment on Stripe's checkout page, what's the most reliable way to update their access in your database?**
+
+- A) Check the success redirect URL for a payment ID
+- B) Poll the Stripe API on a timer
+- C) Handle the `checkout.session.completed` webhook event ✅
+- D) Use `localStorage` to track payment status
+</MiniQuiz>
+
+<InterviewExplanation>
+"For payments, I create a Stripe Checkout session from a Server Action with the user's ID in the metadata. After payment, Stripe sends a webhook to my API route. The handler verifies the signature with `constructEvent` to prevent spoofing, then extracts the user ID from metadata and updates the database. For content gating, I check the user's payment status in the Server Component before rendering premium content. The key insight is never trusting the client-side redirect — only the webhook is a reliable payment signal."
+</InterviewExplanation>

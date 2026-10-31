@@ -1,0 +1,125 @@
+---
+slug: model-fallback-and-circuit-breakers
+title: "Model Fallback & Circuit Breakers for HA"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Design primary → secondary → tertiary provider routing
+- Implement a circuit breaker so a failing provider is skipped fast
+- Choose fallback behavior: cheaper model, cached answer, or graceful refusal
+- Avoid retry storms that turn a blip into an outage
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Your AI feature is only as available as the model behind it — and third-party LLM APIs *do* have outages, rate limits, and latency spikes. Without fallback and circuit breakers, one provider hiccup takes your product down and racks up retries. High availability is the difference between "the AI is flaky" and "the AI just works."
+</WhyThisMatters>
+
+<Body>
+## Tiered provider routing
+
+Don't bet the product on one model endpoint. Define an ordered list:
+
+1. **Primary** — your best/cheapest-for-quality model.
+2. **Secondary** — a different provider or region (avoids correlated outages).
+3. **Tertiary** — a smaller/cheaper model, or a cached/templated response.
+
+On failure, fall through the tiers. Crossing *providers* matters: two regions of the same vendor can fail together.
+
+## Circuit breakers: fail fast, recover gracefully
+
+Hammering a down provider wastes time and money. A **circuit breaker** has three states:
+
+- **Closed** — normal; requests flow. Count failures.
+- **Open** — after N failures, *stop trying* for a cooldown and skip straight to the fallback. This is the key move: fail fast instead of timing out on every call.
+- **Half-open** — after cooldown, let one trial request through; success closes the circuit, failure re-opens it.
+
+## Pick the fallback behavior deliberately
+
+- **Degrade quality** — route to a cheaper model (answer, but simpler).
+- **Serve cache** — return a semantically cached answer if one exists.
+- **Graceful refusal** — "the assistant is temporarily unavailable" beats a spinner forever.
+
+## Don't create a retry storm
+
+Bounded retries with backoff and jitter only. Unbounded retries against a struggling provider turn a brief blip into a self-inflicted outage.
+</Body>
+
+<Code>
+```python
+import time
+
+class CircuitBreaker:
+    def __init__(self, threshold: int = 5, cooldown: float = 30.0):
+        self.threshold, self.cooldown = threshold, cooldown
+        self.failures, self.opened_at = 0, None
+
+    def allow(self) -> bool:
+        if self.opened_at is None:
+            return True                              # closed
+        if time.monotonic() - self.opened_at >= self.cooldown:
+            return True                              # half-open: allow a trial
+        return False                                 # open: skip to fallback
+
+    def record(self, ok: bool):
+        if ok:
+            self.failures, self.opened_at = 0, None
+        else:
+            self.failures += 1
+            if self.failures >= self.threshold:
+                self.opened_at = time.monotonic()    # trip the breaker
+
+def generate_ha(query: str, providers: list) -> str:
+    """Fall through tiers, skipping providers whose breaker is open."""
+    for provider in providers:                       # primary -> secondary -> tertiary
+        if not provider.breaker.allow():
+            continue
+        try:
+            answer = provider.call(query)
+            provider.breaker.record(True)
+            return answer
+        except Exception:
+            provider.breaker.record(False)
+    return "The assistant is temporarily unavailable. Please try again shortly."
+```
+</Code>
+
+<TryItYourself>
+1. Implement `CircuitBreaker` and unit-test the closed→open→half-open transitions
+2. Wire `generate_ha` over a primary that you force to fail and a working secondary
+3. Trip the primary's breaker and confirm later calls skip it instantly (no timeout)
+4. Add a cached-answer tier before the final refusal
+5. Add bounded retries with jitter and confirm there's no retry storm
+</TryItYourself>
+
+<CommonMistakes>
+- **Single provider, no fallback** — one outage = your outage
+- **No circuit breaker** — you keep timing out on a down provider
+- **Fallback to the same vendor's other region only** — correlated failures
+- **Unbounded retries** — a retry storm amplifies the incident
+- **Silent fallback** — log tier changes; you need to know you're degraded
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented a three-state circuit breaker
+- [ ] Built tiered primary→secondary→tertiary routing
+- [ ] Confirmed an open breaker skips a dead provider fast
+- [ ] Added a cache tier and a graceful refusal
+- [ ] Used bounded retries with backoff + jitter
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: What does the "open" state of a circuit breaker do for you?**
+
+- A) Sends more requests to recover faster
+- B) Stops calling the failing provider for a cooldown and skips straight to the fallback ✅
+- C) Logs the error and retries immediately
+- D) Switches to a bigger model
+</MiniQuiz>
+
+<InterviewExplanation>
+"For high availability I never bet on one model endpoint — I route primary, secondary, tertiary, crossing providers so a single vendor outage doesn't take everything down. Each provider gets a circuit breaker: after N failures it opens and I skip that provider for a cooldown instead of timing out on every call, then half-open lets one trial request decide whether to recover. The fallback behavior is deliberate — degrade to a cheaper model, serve a semantically cached answer, or give a graceful 'temporarily unavailable' message. And I bound retries with backoff and jitter, because unbounded retries turn a brief blip into a self-inflicted outage."
+</InterviewExplanation>

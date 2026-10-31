@@ -1,0 +1,55 @@
+---
+slug: what-is-mlops
+title: "What Is MLOps and Why AI Engineers Need It"
+track: ai-systems
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Define MLOps in one sentence and how it differs from DevOps
+- Name the lifecycle: train → track → register → serve → monitor → retrain
+- Understand why "the model works in the notebook" is the *start*, not the end
+- Recognize where AI engineers touch MLOps in a RAG/LLM app
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A model in a notebook earns nothing. The value is in a model that's served reliably, monitored for drift, and retrained when the world changes — and that's MLOps. Even if you mostly build LLM apps, you'll own serving, monitoring, and cost, so the vocabulary and lifecycle are interview and on-the-job essentials.
+</WhyThisMatters>
+
+<Body>
+## MLOps in one sentence
+
+MLOps is the practice of taking models from notebook to production *and keeping them healthy there* — reproducibly, observably, and automatically. It's DevOps with two extra problems: **data** changes, and **model quality silently degrades** even when the code doesn't.
+
+## The lifecycle
+
+1. **Train** — produce a model from data, reproducibly.
+2. **Track** — log params, metrics, and artifacts for every run (so you can compare and roll back).
+3. **Register** — promote a chosen run's model into a registry with a version.
+4. **Serve** — load the registered model behind an API.
+5. **Monitor** — watch latency, errors, and *drift* (the data shifting under you).
+6. **Retrain** — when drift or new data warrants, loop back to step 1.
+
+## Why DevOps isn't enough
+
+In DevOps, the same code gives the same behavior. In ML, the *code* can be frozen while accuracy quietly rots because real-world inputs drifted away from the training distribution. That extra failure mode — silent quality decay — is the whole reason MLOps exists.
+
+## Where LLM engineers touch it
+
+Even pure RAG apps need the serving, monitoring, cost-tracking, and fallback halves of MLOps. You may not train a model, but you'll absolutely operate one.
+</Body>
+
+<MiniQuiz>
+**Q: What failure mode does MLOps address that classic DevOps does not?**
+
+- A) Servers crashing under load
+- B) Model quality silently degrading as real-world data drifts, even with unchanged code ✅
+- C) Merge conflicts in Git
+- D) Slow CI pipelines
+</MiniQuiz>
+
+<InterviewExplanation>
+"MLOps is getting models from notebook to production and keeping them healthy — reproducibly, observably, automatically. It's DevOps plus two problems DevOps doesn't have: the data changes, and model quality can silently degrade even when the code is frozen, because real inputs drift away from the training distribution. The lifecycle is train, track, register, serve, monitor, retrain. Even as an LLM engineer who isn't training models, I own the serving, monitoring, cost, and fallback parts — so the lifecycle vocabulary matters."
+</InterviewExplanation>

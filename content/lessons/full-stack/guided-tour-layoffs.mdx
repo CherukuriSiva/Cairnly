@@ -1,0 +1,197 @@
+---
+slug: guided-tour-layoffs
+title: "Reading the Layoffs Project: A Guided Tour of a Real Next.js App"
+track: full-stack
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Navigate a production Next.js App Router codebase confidently
+- Identify key architectural decisions: routing, data fetching, component boundaries
+- Trace a request from URL to rendered page through server and client layers
+- Read a Prisma schema and understand the data model behind a real app
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+In your first job, you won't build apps from scratch — you'll read existing codebases. The ability to open a repo you've never seen and quickly map its structure is an underrated career skill. This lesson trains that skill on the layoffs-tracker project you'll extend throughout the track.
+</WhyThisMatters>
+
+<Body>
+## The project at a glance
+
+The layoffs-tracker is a Next.js App Router application that aggregates tech layoff data. Users can browse companies, view layoff reports, read analysis articles, and (if paid) access premium content. It uses:
+
+- **Next.js 14+ App Router** for routing and rendering
+- **Prisma + PostgreSQL** for the database
+- **NextAuth** for authentication
+- **Stripe** for payments
+- **Tailwind CSS** for styling
+- **Vercel** for deployment
+
+## Directory walkthrough
+
+```
+layoffs-tracker/
+├── app/
+│   ├── layout.tsx          ← Root layout (wraps every page)
+│   ├── page.tsx            ← Home page (/)
+│   ├── articles/
+│   │   ├── page.tsx        ← Article listing (/articles)
+│   │   └── [slug]/
+│   │       └── page.tsx    ← Single article (/articles/some-slug)
+│   ├── companies/
+│   │   └── page.tsx        ← Company listing (/companies)
+│   ├── api/
+│   │   ├── webhooks/
+│   │   │   └── stripe/route.ts  ← Stripe webhook handler
+│   │   └── auth/[...nextauth]/route.ts
+│   └── actions.ts          ← Server Actions
+├── components/
+│   ├── ArticleCard.tsx     ← Server Component
+│   ├── SaveButton.tsx      ← Client Component ("use client")
+│   └── Navbar.tsx          ← Client Component (uses usePathname)
+├── lib/
+│   ├── prisma.ts           ← Singleton Prisma client
+│   └── auth.ts             ← NextAuth config
+├── prisma/
+│   └── schema.prisma       ← Data model
+└── .env                    ← Environment variables
+```
+
+## Tracing a request: `/articles/big-tech-layoffs-2026`
+
+Let's follow what happens when a user visits this URL:
+
+**Step 1: Routing.** Next.js matches `/articles/[slug]/page.tsx`. The `slug` param is `"big-tech-layoffs-2026"`.
+
+**Step 2: Server Component renders.** The page is a Server Component. It calls Prisma directly:
+
+```tsx
+const article = await prisma.article.findUnique({
+  where: { slug: params.slug },
+  include: { tags: true, layoffs: { include: { company: true } } },
+});
+```
+
+**Step 3: Access check.** If the article is premium, the server checks if the user has a paid subscription. If not, it redirects to the paywall.
+
+**Step 4: HTML response.** The server renders the full HTML — article title, body, related layoff data — and sends it to the browser. No loading spinner needed because data fetching happened on the server.
+
+**Step 5: Hydration.** Client Components like `SaveButton` and `ShareButton` hydrate — their JavaScript loads and attaches event handlers.
+
+## Reading the Prisma schema
+
+The schema tells you the domain model before you read a single line of application code:
+
+```prisma
+model Company {
+  id       String   @id @default(cuid())
+  name     String   @unique
+  layoffs  Layoff[]
+}
+
+model Layoff {
+  id         String   @id @default(cuid())
+  company    Company  @relation(fields: [companyId], references: [id])
+  companyId  String
+  headcount  Int
+  reportedAt DateTime
+  article    Article? @relation(fields: [articleId], references: [id])
+  articleId  String?
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  body        String
+  isPremium   Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  layoffs     Layoff[]
+  tags        Tag[]
+}
+```
+
+From this schema alone you can infer: a company can have multiple layoffs, each layoff can be linked to an article, articles can be premium, and articles have tags for categorization.
+
+## The singleton pattern for Prisma
+
+In `lib/prisma.ts`, the project creates one Prisma client instance and reuses it:
+
+```tsx
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
+
+This prevents creating a new database connection on every hot reload in development. In production, there's only one process, so it's simpler — but the pattern is needed for dev.
+</Body>
+
+<Code>
+```tsx
+// Trace exercise: identify which components are Server vs Client
+// app/articles/[slug]/page.tsx — SERVER (no "use client", fetches from DB)
+import { prisma } from "@/lib/prisma";
+import { SaveButton } from "@/components/SaveButton";
+import { TagList } from "@/components/TagList";
+
+export default async function ArticlePage({ params }: { params: { slug: string } }) {
+  const article = await prisma.article.findUnique({
+    where: { slug: params.slug },
+    include: { tags: true },
+  });
+
+  if (!article) return notFound();
+
+  return (
+    <article className="max-w-3xl mx-auto p-6">
+      <h1 className="text-3xl font-bold">{article.title}</h1>
+      <TagList tags={article.tags} />       {/* Server Component — just renders props */}
+      <div className="prose">{article.body}</div>
+      <SaveButton articleId={article.id} /> {/* Client Component — needs onClick */}
+    </article>
+  );
+}
+```
+</Code>
+
+<TryItYourself>
+1. Clone the layoffs-tracker reference repo
+2. Open the `prisma/schema.prisma` — before reading any code, sketch the entity relationships on paper
+3. Pick any page in `app/` and trace the request: what data does it fetch? Which components are server vs client?
+4. Open `lib/prisma.ts` and explain the singleton pattern to yourself out loud
+5. Find the Stripe webhook handler — what events does it listen for? What database writes does it make?
+</TryItYourself>
+
+<CommonMistakes>
+- **Skipping the schema** — always read `schema.prisma` before the application code; it's the fastest way to understand the domain
+- **Assuming every component with JSX is a Client Component** — in App Router, Server Components also return JSX
+- **Ignoring the `lib/` folder** — shared utilities like the Prisma singleton and auth config are critical infrastructure
+- **Not tracing the full request path** — understanding routing → data fetch → render → hydration is essential for debugging
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Can draw the entity relationship diagram from the Prisma schema
+- [ ] Traced at least 2 different routes through the codebase
+- [ ] Identified all Client Components and explained why each needs "use client"
+- [ ] Found and understood the Prisma singleton pattern
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You open a Next.js page file and see `const data = await prisma.article.findMany()` in the component body. What can you conclude?**
+
+- A) This is a Client Component using an API route
+- B) This is a Server Component — only server code can call Prisma directly in the component body ✅
+- C) This will cause a runtime error
+- D) This is a middleware function
+</MiniQuiz>
+
+<InterviewExplanation>
+"When I join a new codebase, I start with the data model — the Prisma schema tells me the domain entities and relationships before I read any application code. Then I trace a couple of key routes: which page file handles the URL, what data it fetches, and where the server/client boundary sits. This layoffs-tracker app is a clean example — Server Components fetch Prisma data directly, Client Components handle interactivity, and the API routes exist only for external consumers like Stripe webhooks."
+</InterviewExplanation>

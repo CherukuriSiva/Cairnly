@@ -1,0 +1,122 @@
+---
+slug: cost-tracking-and-telemetry
+title: "Cost Tracking & Telemetry for AI Apps"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Estimate per-request cost from token counts and a pricing map
+- Track cumulative spend across a session or a day
+- Log interaction telemetry (tokens, latency, model version) without storing PII
+- Set budget guardrails that cut off runaway spend
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+LLM cost is usage-based and unbounded by default — a loop bug or a viral spike can turn a $50/day app into a $5,000 surprise overnight. Per-request cost estimation plus a running budget is the control that prevents that. And cost-per-interaction telemetry is exactly what product and finance ask you for. This is the unglamorous discipline that keeps AI features profitable.
+</WhyThisMatters>
+
+<Body>
+## Estimate cost where the tokens are
+
+Cost is a function of tokens and a per-model rate. Count tokens with `tiktoken`, multiply by the model's rate, and you have a per-request estimate before or right after the call:
+
+```python
+import tiktoken
+
+class TokenCostEstimator:
+    def __init__(self, model_name: str = "gpt-3.5-turbo"):
+        try:
+            self.enc = tiktoken.encoding_for_model(model_name)
+        except KeyError:
+            self.enc = tiktoken.get_encoding("cl100k_base")
+    def count_tokens(self, text: str) -> int:
+        return len(self.enc.encode(text))
+    def estimate_cost(self, tokens: int, cost_per_1k: float = 0.002) -> float:
+        return (tokens / 1000) * cost_per_1k
+```
+
+Track input and output separately when their rates differ.
+
+## Telemetry: log the interaction, not the content
+
+For every call, emit a structured event: an interaction ID, session ID, model version, token count, and latency — but **not** the raw query/response (that's PII). This feeds cost dashboards and per-feature cost attribution.
+
+## Budget guardrails
+
+Estimation is observability; a **budget cap** is control. Keep a running total per session (or per tenant, per day) and refuse or downgrade once it crosses a ceiling. This is the backstop that turns a runaway loop into a graceful "limit reached" instead of an invoice shock.
+
+## Aggregate and attribute
+
+Roll per-request costs up by feature, tenant, or model. That's how you answer "which feature is eating the budget?" and where caching or a cheaper model pays off.
+</Body>
+
+<Code>
+```python
+import uuid
+
+class CostBudget:
+    """Per-session running spend with a hard ceiling."""
+    def __init__(self, limit_usd: float):
+        self.limit, self.spent = limit_usd, 0.0
+    def charge(self, cost: float) -> bool:
+        if self.spent + cost > self.limit:
+            return False                      # refuse before overspending
+        self.spent += cost
+        return True
+
+def tracked_call(query: str, est: TokenCostEstimator, budget: CostBudget, llm, logger, session_id: str):
+    in_tokens = est.count_tokens(query)
+    if not budget.charge(est.estimate_cost(in_tokens)):
+        return {"error": "budget limit reached"}      # graceful cutoff
+    t0 = time.time()
+    answer = llm(query)
+    out_tokens = est.count_tokens(answer)
+    budget.charge(est.estimate_cost(out_tokens))
+    logger.info("ai_interaction",                     # telemetry, no raw content
+                interaction_id=str(uuid.uuid4()), session_id=session_id,
+                model_version="gpt-3.5-turbo", tokens=in_tokens + out_tokens,
+                latency_ms=round((time.time() - t0) * 1000, 2),
+                est_cost=est.estimate_cost(in_tokens + out_tokens))
+    return {"answer": answer}
+```
+</Code>
+
+<TryItYourself>
+1. Implement `TokenCostEstimator` and estimate cost for 5 prompts
+2. Track input vs output tokens separately with different rates
+3. Add `CostBudget` and confirm it refuses the call past the ceiling
+4. Emit interaction telemetry and aggregate daily spend from the logs
+5. Attribute cost by "feature" tag and find the most expensive one
+</TryItYourself>
+
+<CommonMistakes>
+- **No budget cap** — a loop or spike runs up an unbounded bill
+- **Logging raw query/response** — that's PII; log tokens and IDs instead
+- **One rate for input and output** — output is usually pricier; track separately
+- **Estimating but never aggregating** — you need cost-per-feature to act
+- **Charging only after the call** — check the budget *before* expensive generation
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Estimated per-request cost from token counts
+- [ ] Tracked input/output tokens with separate rates
+- [ ] Enforced a running budget cap with graceful cutoff
+- [ ] Emitted PII-free interaction telemetry
+- [ ] Aggregated and attributed cost by feature/tenant
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: What's the difference between cost *telemetry* and a cost *budget*?**
+
+- A) They're the same thing
+- B) Telemetry observes spend; a budget cap controls it by refusing/downgrading past a ceiling ✅
+- C) Telemetry is for training; budgets are for inference
+- D) A budget stores tokens; telemetry stores money
+</MiniQuiz>
+
+<InterviewExplanation>
+"LLM cost is usage-based and unbounded by default, so I both observe and control it. Observability is per-request estimation — count tokens with tiktoken, multiply by the model's rate, tracking input and output separately since output is pricier — plus interaction telemetry: an event with interaction ID, session, model version, tokens, and latency, but never the raw query or response, which is PII. Control is a running budget cap per session or tenant that refuses or downgrades once spend crosses a ceiling, checked before the expensive generation call. Then I aggregate cost by feature or tenant so I can answer which feature is eating the budget and where caching or a cheaper model pays off."
+</InterviewExplanation>

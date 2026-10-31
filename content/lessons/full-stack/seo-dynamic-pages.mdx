@@ -1,0 +1,219 @@
+---
+slug: seo-dynamic-pages
+title: "SEO-Friendly Dynamic Article Pages with generateMetadata"
+track: full-stack
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Use `generateMetadata` to create dynamic `<title>` and `<meta>` tags per page
+- Implement Open Graph and Twitter Card metadata for rich social previews
+- Generate a dynamic sitemap with `sitemap.ts`
+- Understand how SSR and Server Components help SEO in Next.js
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A content site that doesn't rank on Google is invisible. SEO is the difference between 0 and 10,000 organic visitors per month. Interviewers at content companies always ask how you'd make dynamic pages SEO-friendly — and `generateMetadata` is the modern answer in Next.js.
+</WhyThisMatters>
+
+<Body>
+## Why Next.js is good for SEO
+
+Traditional React SPAs render a blank `<div id="root">` and fill it with JavaScript. Search engine crawlers see an empty page. Next.js App Router solves this with **Server Components** — the HTML is fully rendered on the server before it reaches the browser (or the crawler).
+
+But fully-rendered HTML isn't enough. You also need:
+1. Unique `<title>` and `<meta description>` per page
+2. Open Graph tags for social media previews
+3. A sitemap so Google discovers all your pages
+4. Canonical URLs to avoid duplicate content penalties
+
+## `generateMetadata` — dynamic metadata per page
+
+In App Router, export a `generateMetadata` function from any `page.tsx` or `layout.tsx`. It runs on the server and returns a `Metadata` object:
+
+```tsx
+// app/articles/[slug]/page.tsx
+import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const article = await prisma.article.findUnique({
+    where: { slug: params.slug },
+  });
+
+  if (!article) return { title: "Not Found" };
+
+  return {
+    title: article.title,
+    description: article.excerpt || article.body.slice(0, 160),
+    openGraph: {
+      title: article.title,
+      description: article.excerpt || article.body.slice(0, 160),
+      type: "article",
+      publishedTime: article.publishedAt.toISOString(),
+      url: `https://layoffs-tracker.com/articles/${article.slug}`,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: article.excerpt || article.body.slice(0, 160),
+    },
+  };
+}
+```
+
+Next.js automatically deduplicates the Prisma query — if both `generateMetadata` and the page component call `findUnique` with the same args, Prisma only queries the database once.
+
+## Open Graph and Twitter Cards
+
+When someone shares your URL on Slack, Twitter, or LinkedIn, these platforms read Open Graph tags to build a preview card:
+
+```html
+<!-- What the server renders in <head> -->
+<meta property="og:title" content="Big Tech Layoffs 2026: A Complete Analysis" />
+<meta property="og:description" content="An in-depth look at layoff trends..." />
+<meta property="og:type" content="article" />
+<meta property="og:image" content="https://layoffs-tracker.com/og/big-tech-layoffs.png" />
+```
+
+Without these tags, shared links show a bare URL with no preview — drastically reducing click-through rates.
+
+## Dynamic sitemap
+
+A sitemap tells Google every URL on your site. In App Router, create `app/sitemap.ts`:
+
+```tsx
+// app/sitemap.ts
+import { prisma } from "@/lib/prisma";
+import type { MetadataRoute } from "next";
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const articles = await prisma.article.findMany({
+    where: { isDeleted: false },
+    select: { slug: true, updatedAt: true },
+  });
+
+  const articleUrls = articles.map((article) => ({
+    url: `https://layoffs-tracker.com/articles/${article.slug}`,
+    lastModified: article.updatedAt,
+    changeFrequency: "weekly" as const,
+    priority: 0.8,
+  }));
+
+  return [
+    { url: "https://layoffs-tracker.com", lastModified: new Date(), priority: 1.0 },
+    { url: "https://layoffs-tracker.com/companies", lastModified: new Date(), priority: 0.9 },
+    ...articleUrls,
+  ];
+}
+```
+
+This generates `/sitemap.xml` dynamically from your database.
+
+## Static vs dynamic metadata
+
+For pages where metadata doesn't depend on data, export a static `metadata` object instead:
+
+```tsx
+// app/about/page.tsx
+export const metadata = {
+  title: "About | Layoffs Tracker",
+  description: "Learn about our mission to track and analyze tech layoffs.",
+};
+```
+
+Use `generateMetadata` (function) for dynamic pages. Use `metadata` (object) for static pages. Don't mix both in the same file.
+</Body>
+
+<Code>
+```tsx
+// Complete pattern: dynamic page with SEO metadata
+// app/articles/[slug]/page.tsx
+
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+
+// 1. Dynamic metadata for SEO
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const article = await prisma.article.findUnique({
+    where: { slug: params.slug },
+    select: { title: true, excerpt: true, slug: true, publishedAt: true },
+  });
+
+  if (!article) return { title: "Not Found" };
+
+  const description = article.excerpt || "Read the latest layoff analysis.";
+
+  return {
+    title: `${article.title} | Layoffs Tracker`,
+    description,
+    openGraph: {
+      title: article.title,
+      description,
+      type: "article",
+      publishedTime: article.publishedAt.toISOString(),
+    },
+    alternates: {
+      canonical: `/articles/${article.slug}`,  // Prevent duplicate content
+    },
+  };
+}
+
+// 2. Page component — also a Server Component
+export default async function ArticlePage({ params }: { params: { slug: string } }) {
+  const article = await prisma.article.findUnique({
+    where: { slug: params.slug },
+    include: { tags: true, author: true },
+  });
+
+  if (!article) notFound();
+
+  return (
+    <article>
+      <h1>{article.title}</h1>
+      <p>By {article.author.name}</p>
+      <div dangerouslySetInnerHTML={{ __html: article.body }} />
+    </article>
+  );
+}
+```
+</Code>
+
+<TryItYourself>
+1. Add `generateMetadata` to an existing dynamic page in your project
+2. Inspect the page source (View Source, not DevTools) — verify the `<title>` and `<meta>` tags are in the HTML
+3. Test your Open Graph tags with [opengraph.xyz](https://opengraph.xyz) — paste your deployed URL
+4. Create `app/sitemap.ts` that pulls slugs from your database
+5. Visit `/sitemap.xml` in your browser — confirm all article URLs are listed
+6. Submit your sitemap URL to Google Search Console
+</TryItYourself>
+
+<CommonMistakes>
+- **Forgetting the `description` meta tag** — Google shows it in search results; without it, Google picks a random snippet
+- **Hardcoding the site URL** — use environment variables or Next.js `metadataBase` so it works in preview and production
+- **Using `generateMetadata` for static pages** — unnecessary overhead; use the static `metadata` export instead
+- **Not setting canonical URLs** — if the same article is reachable at `/articles/slug` and `/preview/slug`, Google penalizes you for duplicate content
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Every dynamic page has `generateMetadata` with title, description, and Open Graph tags
+- [ ] Static pages use the `metadata` export instead
+- [ ] `app/sitemap.ts` generates a sitemap from the database
+- [ ] Verified metadata renders in page source (not just DevTools)
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You deploy a Next.js content site but shared links on Slack show no preview card. What's most likely missing?**
+
+- A) The page isn't server-rendered
+- B) Open Graph meta tags are missing from `generateMetadata` ✅
+- C) The page loads too slowly
+- D) Slack doesn't support link previews for Next.js
+</MiniQuiz>
+
+<InterviewExplanation>
+"In Next.js App Router, I use `generateMetadata` to set per-page title, description, and Open Graph tags from database content. Since Server Components render full HTML on the server, search engines and social media crawlers get the complete content without executing JavaScript. I also generate a dynamic sitemap from the database using `app/sitemap.ts` and set canonical URLs to prevent duplicate content penalties. For static pages, I use the simpler `metadata` export."
+</InterviewExplanation>

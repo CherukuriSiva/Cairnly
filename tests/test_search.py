@@ -38,3 +38,39 @@ def test_empty_keyword_query_falls_back_to_vector_only(conn, tmp_path, fake_embe
     result = search(conn, "the a of", embedder=lambda q: fake_vector("x"))  # only stop words
 
     assert [h.title for h in result.hits] == ["A"]
+
+
+@pytest.mark.db
+def test_kb_filter_limits_results_to_one_knowledge_base(conn, tmp_path, fake_embedder):
+    (tmp_path / "x.md").write_text("---\ntitle: Fusion\n---\n\n## RRF\nrank fusion\n")
+    ingest_folder(conn, tmp_path, "lessons", fake_embedder)
+    ingest_folder(conn, tmp_path, "papers", fake_embedder)
+
+    hits = search(conn, "rank fusion", kb="papers", embedder=lambda q: fake_vector("x")).hits
+
+    paths = conn.execute("SELECT c.id, d.source FROM chunks c JOIN documents d "
+                         "ON d.id = c.document_id").fetchall()
+    sources = dict(paths)
+    assert hits and all(sources[h.chunk_id] == "papers" for h in hits)
+
+
+def _lesson(root, track: str, slug: str, heading: str) -> None:
+    folder = root / "lessons" / track
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{slug}.mdx").write_text(
+        f"---\nslug: {slug}\ntitle: {slug}\ntrack: {track}\n---\n\n"
+        f"<Body>\n## {heading}\nrank fusion merges ranked lists.\n</Body>\n")
+
+
+@pytest.mark.db
+def test_track_filter_and_page_urls(conn, tmp_path, fake_embedder):
+    _lesson(tmp_path, "ai-engineering", "hybrid", "Rank fusion")
+    _lesson(tmp_path, "dsa", "merging", "Merge lists")
+    ingest_folder(conn, tmp_path, "lessons", fake_embedder)
+
+    everything = search(conn, "rank fusion", embedder=lambda q: fake_vector("x"))
+    assert {h.url for h in everything.hits} == {
+        "/ai-engineering/hybrid#rank-fusion", "/dsa/merging#merge-lists"}
+
+    scoped = search(conn, "rank fusion", track="dsa", embedder=lambda q: fake_vector("x"))
+    assert [h.url for h in scoped.hits] == ["/dsa/merging#merge-lists"]

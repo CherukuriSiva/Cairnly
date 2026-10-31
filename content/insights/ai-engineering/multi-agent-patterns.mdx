@@ -1,0 +1,84 @@
+---
+slug: multi-agent-patterns
+title: "Multi-Agent Patterns: When One Agent Isn't Enough"
+summary: "Orchestrator-worker, sequential, parallel, hierarchical, critic/reflection — these are the building blocks of multi-agent systems. Here is when to use each and what each costs."
+category: ai-engineering
+tags: ["agents", "multi-agent", "patterns", "architecture"]
+audience: ["cs-students", "working-pros"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1776338299851.jpeg
+  - references/linkedin/1779280188407.gif
+  - references/linkedin/1779641814297.jpeg
+relatedLessons:
+  - ai-engineering/what-is-an-agent
+  - ai-engineering/the-react-loop
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Most tasks are handled best by a single agent. But when a problem outgrows one context window, demands parallelism, or needs independent checking, you reach for a multi-agent pattern. The core patterns — sequential, parallel, orchestrator-worker, hierarchical, and critic/reflection — are a small vocabulary you can compose. Each buys you something (decomposition, speed, quality) and charges something (latency, cost, error propagation, coordination overhead). The skill is knowing which to use and, just as important, when not to.
+</InsightSummary>
+
+<Body>
+## When a single agent runs out of room
+
+A single agent with good tools and memory handles a surprising amount. You only need multiple agents when one of three things breaks:
+
+- **Context limits.** The task needs more knowledge than fits in one window, so you split it across agents that each hold a slice.
+- **Complexity.** The task has distinct sub-problems (research, then analysis, then a written report) that benefit from focused, specialized prompts.
+- **Parallelism.** Independent sub-tasks can run at the same time, and you want the wall-clock speedup.
+
+If none of those apply, a single agent is the right answer. Multi-agent is a tool for specific structural problems, not a default.
+
+## The five core patterns
+
+**Sequential (prompt chaining).** Agents run in a fixed order: the output of step one feeds step two, and so on. Best for deterministic workflows with clear dependencies. Cheapest pattern. Hidden cost: it is slow when steps that *could* run in parallel are forced into a line.
+
+**Parallel (parallelization).** One task fans out to several agents that work simultaneously, then their outputs are merged. Best for reducing latency on independent sub-tasks at scale. Hidden cost: higher token usage and compute duplication. Avoid when the sub-tasks actually depend on each other or share context heavily — parallelizing coupled work just creates inconsistency.
+
+**Orchestrator-worker.** A lead agent plans, delegates sub-tasks to workers, and synthesizes their results. Best for clear task decomposition — e.g., a coding agent spawning workers for security, tests, and style review while it continues its primary task. Hidden cost: the orchestration layer itself is real engineering, and a bad plan poisons every worker downstream.
+
+**Hierarchical.** A manager agent sits above several specialized sub-agents (research, analysis, data, report), each reusable across workflows. Best for long-term ROI at enterprise scale where the same sub-agents are reused across many repeatable use cases. Hidden cost: a complex orchestration layer and higher up-front development effort.
+
+**Critic / reflection (generator-verifier).** A generator produces output; a critic or verifier checks it against explicit criteria and returns feedback, looping until the output is accepted. This is the simplest and most widely deployed multi-agent pattern — code generation with review, fact-checking, compliance checks, rubric grading. Worth it when accuracy and quality matter more than speed. Hidden cost: each revision loop is another full inference pass, multiplying latency and cost.
+
+Two more show up often: **routing**, where a classifier sends each request to the right specialist, and **human-in-the-loop**, where a person reviews or approves before a consequential action — non-negotiable for compliance, billing, legal, and other high-risk decisions, at the cost of intentional latency and manual bandwidth. Real systems are usually **composite**: a router fronting a mix of sequential, parallel, hierarchical, and critic stages.
+
+## The ReAct pattern as a self-contained loop
+
+Before reaching for multiple agents, remember that a *single* agent already has a powerful internal pattern: **ReAct** (reason + act). The agent thinks about what to do, calls a tool, observes the result, and loops — reasoning and acting in alternation until the task is done. Many problems that look like they need a team of agents are really one ReAct agent with the right tools. Add planning and an evaluator-optimizer loop on top and a single agent covers a wide range of "agentic" behavior on its own.
+
+## When NOT to go multi-agent
+
+The biggest mistake in this space is reaching for a multi-agent architecture too early. Every agent you add multiplies token cost, latency, and the number of places coordination can fail. Errors propagate: a wrong result from one agent silently corrupts everyone downstream. Most tasks do not need it. Start with one agent and the simplest pattern that works; escalate to more structure only when a concrete limit — context, complexity, or parallelism — forces your hand.
+</Body>
+
+<CommonMistakes>
+- **Going multi-agent prematurely.** The most common error is adding orchestration before a single agent has actually failed. Multi-agent multiplies cost, latency, and failure surface — earn it with a real limit, don't reach for it by default.
+- **Parallelizing coupled work.** The parallel pattern only pays off for genuinely independent sub-tasks. Fanning out work that shares context or has dependencies produces inconsistent, hard-to-merge results.
+- **Ignoring error propagation.** In sequential and orchestrator patterns, one bad upstream output silently poisons everything after it. Without per-stage checks, you debug the wrong agent.
+- **Forgetting the revision tax.** Critic/reflection loops are great for quality but each loop is another full inference pass — budget the latency and cost, or cap the number of iterations.
+- **Building a hierarchy for a one-off.** Hierarchical and composite patterns earn their orchestration overhead only on repeatable, reused workflows. For a single task, they are pure overhead.
+</CommonMistakes>
+
+<KeyTakeaways>
+- Use multiple agents only when a single agent hits a real wall: context limits, distinct sub-problems, or independent work you want to parallelize.
+- The five core patterns are sequential, parallel, orchestrator-worker, hierarchical, and critic/reflection — a small vocabulary you compose into composite systems.
+- Each pattern trades a benefit for a cost: sequential is cheap but slow, parallel is fast but token-heavy, hierarchical has ROI but heavy orchestration, critic improves quality but multiplies inference passes.
+- A single ReAct agent (reason, act, observe, loop) with good tools handles far more than people expect — try it before reaching for a team.
+- Premature multi-agent design is the dominant failure mode: start simple, escalate only when a concrete limit forces it.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Make sure the fundamentals are solid with [What is an agent](/ai-engineering/what-is-an-agent).
+- Learn the single-agent loop first in [The ReAct loop](/ai-engineering/the-react-loop).
+- Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) for agent system design.
+</WhatToDoNext>
+
+<SourceNote />

@@ -1,0 +1,215 @@
+---
+slug: linear-and-logistic-regression
+title: "Linear and Logistic Regression: Intuition, Implementation, and Interpretation"
+track: ml-foundations
+tier: medium
+estimatedMinutes: 35
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Explain how linear regression fits a line and what the coefficients mean
+- Implement and evaluate a linear regression model with scikit-learn
+- Explain how logistic regression extends linear regression to classification
+- Interpret logistic regression coefficients as log-odds
+- Identify when each model is and isn't the right choice
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Linear and logistic regression are the two models every ML practitioner must understand deeply, not just use as black boxes. They appear in interviews constantly — interviewers ask you to explain the math, interpret the outputs, and defend why you'd choose them over a neural network. They're also genuinely useful: logistic regression is hard to beat on high-dimensional sparse data like text, and its outputs are interpretable in a way tree models and neural nets are not.
+</WhyThisMatters>
+
+<Body>
+## Linear regression
+
+Linear regression predicts a continuous output by fitting a weighted sum of input features:
+
+```
+ŷ = β₀ + β₁x₁ + β₂x₂ + ... + βₙxₙ
+```
+
+Where `β₀` is the bias (intercept) and `β₁...βₙ` are learned coefficients. The model finds the coefficients that minimise the mean squared error between predictions and true values.
+
+**Interpreting coefficients:** Each `βᵢ` tells you how much the predicted output changes for a one-unit increase in feature `xᵢ`, *holding all other features constant*. If `β_house_size = 150`, a 1 m² increase in house size predicts a ₹150 increase in price (holding location, age, etc. constant).
+
+```python
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import numpy as np
+
+# Load data — predicting house prices
+df = pd.read_csv("house_prices.csv")
+X = df[["size_sqm", "num_rooms", "age_years", "distance_to_centre_km"]]
+y = df["price_inr"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# Scale features — critical for coefficient interpretation
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled  = scaler.transform(X_test)
+
+model = LinearRegression()
+model.fit(X_train_scaled, y_train)
+
+y_pred = model.predict(X_test_scaled)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+r2   = r2_score(y_test, y_pred)
+
+print(f"RMSE: ₹{rmse:,.0f}")
+print(f"R²: {r2:.3f}")  # proportion of variance explained
+
+# Inspect coefficients (after scaling, magnitudes are comparable)
+for feature, coef in zip(X.columns, model.coef_):
+    print(f"  {feature}: {coef:+.0f}")
+```
+
+**R² (coefficient of determination)** is the most useful single metric for regression. R² = 0.85 means the model explains 85% of the variance in the target. R² = 1.0 is a perfect fit; R² = 0.0 means the model is no better than predicting the mean.
+
+## Logistic regression
+
+Logistic regression predicts a probability for a binary class. It applies the *sigmoid function* to the linear combination:
+
+```
+P(y=1) = σ(β₀ + β₁x₁ + ... + βₙxₙ) = 1 / (1 + e^(−z))
+```
+
+The sigmoid squashes any real number into (0, 1). You then threshold the probability (typically at 0.5) to make a class prediction.
+
+```python
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, roc_auc_score
+
+# Binary classification — predicting customer churn
+df = pd.read_csv("churn.csv")
+X = df.drop(columns=["churned"])
+y = df["churned"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled  = scaler.transform(X_test)
+
+# C is the inverse regularisation strength — lower C = stronger regularisation
+model = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
+model.fit(X_train_scaled, y_train)
+
+y_pred  = model.predict(X_test_scaled)
+y_proba = model.predict_proba(X_test_scaled)[:, 1]
+
+print(classification_report(y_test, y_pred))
+print(f"AUC-ROC: {roc_auc_score(y_test, y_proba):.3f}")
+```
+
+**Interpreting logistic regression coefficients:** Each coefficient is a *log-odds* ratio. To convert to an odds ratio, exponentiate: `exp(β)`. If `β_tenure = -0.5`, then `exp(-0.5) ≈ 0.61` — each additional month of tenure multiplies the odds of churning by 0.61 (reduces churn odds by 39%).
+
+## When to use each
+
+| Situation | Use |
+|---|---|
+| Continuous target (price, temperature, revenue) | Linear regression |
+| Binary outcome (churn/no-churn, fraud/not-fraud) | Logistic regression |
+| Interpretability is required | Both — coefficients are human-readable |
+| High-dimensional sparse features (text, one-hot encodings) | Logistic regression — scales well |
+| Non-linear decision boundary needed | Switch to a tree model or neural network |
+| Fast baseline before complex modelling | Either — always train a regression model first |
+
+**The key limitation of both:** they assume a linear relationship between features and the outcome (or log-odds for logistic). Real-world data often has non-linear interactions — this is when you reach for gradient boosting or deep learning.
+</Body>
+
+<Code>
+```python
+# Full logistic regression pipeline with evaluation
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import (
+    classification_report, roc_auc_score,
+    confusion_matrix, ConfusionMatrixDisplay
+)
+import matplotlib.pyplot as plt
+
+# --- Data ---
+df = pd.read_csv("churn.csv")
+X = df.drop(columns=["churned"])
+y = df["churned"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# --- Preprocessing ---
+scaler = StandardScaler()
+X_train_s = scaler.fit_transform(X_train)
+X_test_s  = scaler.transform(X_test)
+
+# --- Model ---
+model = LogisticRegression(C=1.0, class_weight="balanced", max_iter=1000)
+model.fit(X_train_s, y_train)
+
+# --- Evaluation ---
+y_pred  = model.predict(X_test_s)
+y_proba = model.predict_proba(X_test_s)[:, 1]
+
+print("=== Classification Report ===")
+print(classification_report(y_test, y_pred, target_names=["Stay", "Churn"]))
+print(f"AUC-ROC: {roc_auc_score(y_test, y_proba):.3f}")
+
+# --- Cross-validation sanity check ---
+cv_scores = cross_val_score(model, X_train_s, y_train, cv=5, scoring="roc_auc")
+print(f"\nCV AUC: {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+
+# --- Coefficient inspection ---
+coef_df = pd.DataFrame({
+    "feature": X.columns,
+    "coef":    model.coef_[0],
+    "odds_ratio": np.exp(model.coef_[0])
+}).sort_values("coef", ascending=False)
+print("\n=== Top 5 churn drivers ===")
+print(coef_df.head())
+```
+</Code>
+
+<TryItYourself>
+1. Download the [Telco Customer Churn dataset](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) from Kaggle.
+2. Drop `customerID`, encode `TotalCharges` as float (it arrives as string), one-hot encode categorical columns.
+3. Train a `LogisticRegression(class_weight="balanced")` and report AUC-ROC.
+4. Print the top-5 positive and top-5 negative coefficient features.
+5. Answer: "Which three features most strongly predict churn, and what direction do they push?" Push your notebook to GitHub with this answer in a markdown cell.
+</TryItYourself>
+
+<CommonMistakes>
+- **Not scaling features before logistic regression** — logistic regression is not scale-invariant. A feature with range 0–100,000 will dominate a feature with range 0–1. Always `StandardScaler` before fitting.
+- **Forgetting `class_weight="balanced"` on imbalanced datasets** — if only 5% of customers churn, the model will predict "no churn" for everyone and achieve 95% accuracy. Use `class_weight="balanced"` or `stratify=y` in the split, and report F1/AUC rather than raw accuracy.
+- **Interpreting coefficients from unscaled features** — coefficient magnitudes are only comparable when features are on the same scale. Fit the scaler first, then inspect `model.coef_`.
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: Your logistic regression model achieves 97% accuracy on a fraud detection dataset where 3% of transactions are fraudulent. What is the most likely explanation?**
+
+- A) The model is extremely well-calibrated
+- B) The model is predicting "not fraud" for almost every transaction — high accuracy on an imbalanced dataset is misleading ✅
+- C) You should use a lower decision threshold
+- D) The training set was too small
+</MiniQuiz>
+
+<InterviewExplanation>
+"Linear regression minimises mean squared error to fit a weighted sum of features to a continuous target. Logistic regression applies a sigmoid to the same linear combination to produce a class probability. The key difference is the loss function: MSE for regression, binary cross-entropy for logistic. I always scale features before logistic regression since it's not scale-invariant, report AUC-ROC rather than accuracy for imbalanced targets, and use `class_weight='balanced'` when classes are skewed. Coefficients from scaled logistic regression are interpretable as log-odds — you can exponentiate them to get odds ratios that business stakeholders can understand."
+</InterviewExplanation>
+
+<CompletionChecklist>
+- [ ] Implemented linear regression on a housing or salary dataset — reported RMSE and R²
+- [ ] Implemented logistic regression on a churn or fraud dataset — reported F1 and AUC-ROC
+- [ ] Explained coefficient interpretation to a non-technical person
+- [ ] Pushed the notebook to GitHub with results documented
+</CompletionChecklist>

@@ -1,0 +1,52 @@
+---
+slug: reranking-with-cross-encoders
+title: "Reranking Retrieved Results with Cross-Encoders"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Distinguish a bi-encoder (retrieval) from a cross-encoder (reranking)
+- Explain the retrieve-then-rerank pattern and why it improves precision
+- Understand the latency/quality trade-off reranking introduces
+- Decide how many candidates to retrieve vs how many to keep
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Vector retrieval is fast but approximate — the top-1 result is often not the *best* result, just a close one. A reranker re-scores the top candidates with a much more accurate model, pushing the truly relevant passage to position one. It's one of the highest-ROI upgrades to a RAG pipeline and a common "how would you improve retrieval quality?" answer.
+</WhyThisMatters>
+
+<Body>
+## Bi-encoder vs cross-encoder
+
+- **Bi-encoder (retrieval)** — embeds the query and each document *separately*, then compares vectors. Fast (you precompute doc embeddings) but the query and doc never "see" each other, so it's coarse.
+- **Cross-encoder (reranking)** — feeds the query *and* a document together into the model and outputs a single relevance score. Far more accurate, but you can't precompute it, so it's slow per pair.
+
+## Retrieve-then-rerank
+
+You can't run a cross-encoder over your whole corpus — too slow. So you do two stages:
+
+1. **Retrieve** a generous candidate set (e.g. top-50) cheaply with the bi-encoder.
+2. **Rerank** those 50 with the cross-encoder and keep the top-5 for the prompt.
+
+You get the cross-encoder's accuracy at a fraction of the cost.
+
+## The trade-off you're buying
+
+Reranking adds a model call over N candidates — real latency. Tune the funnel: retrieve enough candidates that the right answer is *in* the set (recall), but few enough that reranking stays within budget. Retrieve 50 → rerank → keep 5 is a common starting point.
+</Body>
+
+<MiniQuiz>
+**Q: Why not just use a cross-encoder for the initial retrieval over the whole corpus?**
+
+- A) Cross-encoders are less accurate than bi-encoders
+- B) A cross-encoder scores query+doc pairs and can't be precomputed, so scoring the whole corpus is far too slow ✅
+- C) Cross-encoders can't produce relevance scores
+- D) Bi-encoders are only for images
+</MiniQuiz>
+
+<InterviewExplanation>
+"To improve retrieval precision I add reranking. The retriever is a bi-encoder — it embeds query and documents separately, which is fast because doc embeddings are precomputed, but coarse since the two never interact. A cross-encoder feeds the query and a document together and outputs one relevance score, which is much more accurate but can't be precomputed. So I do retrieve-then-rerank: pull a generous candidate set like top-50 cheaply, then rerank those with the cross-encoder and keep the top-5 for the prompt. I tune the funnel so the right passage is in the candidate set without blowing the latency budget."
+</InterviewExplanation>

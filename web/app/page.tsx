@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ask, type AskEvent, type Provider, type Source } from "@/lib/ask";
+import { ask, listKbs, type AskEvent, type KnowledgeBase, type Provider, type Source } from "@/lib/ask";
 
 interface Turn {
   question: string;
@@ -9,6 +9,7 @@ interface Turn {
   sources: Source[];
   status: "streaming" | "done" | "refused" | "error";
   meta?: string;
+  notice?: string;
 }
 
 const EXAMPLES = [
@@ -21,6 +22,12 @@ export default function Home() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [provider, setProvider] = useState<Provider>("ollama");
+  const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
+  const [kb, setKb] = useState("lessons");
+
+  useEffect(() => {
+    listKbs().then(setKbs).catch(() => setKbs([]));
+  }, []);
   const busy = turns.at(-1)?.status === "streaming";
   const abortRef = useRef<AbortController | null>(null);
 
@@ -53,10 +60,11 @@ export default function Home() {
           ...t,
           status: e.refused ? "refused" : "done",
           meta: `${e.model} · best match ${e.top_similarity.toFixed(2)}`,
+          notice: e.notice || undefined,
         }));
     };
     try {
-      await ask(question, provider, onEvent, abortRef.current.signal);
+      await ask(question, kb, provider, onEvent, abortRef.current.signal);
     } catch (err) {
       update((t) => ({ ...t, status: "error", meta: (err as Error).message }));
     }
@@ -64,20 +72,34 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <div>
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">cairnly</h1>
           <p className="text-sm text-[var(--muted)]">Ask the docs. Every answer cites its sources.</p>
         </div>
+        <div className="flex min-w-0 gap-2">
+        {kbs.length > 1 && (
+          <select
+            value={kb}
+            onChange={(e) => setKb(e.target.value)}
+            className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 text-sm sm:flex-none"
+            aria-label="Knowledge base"
+          >
+            {kbs.map((k) => (
+              <option key={k.name} value={k.name}>{k.title}</option>
+            ))}
+          </select>
+        )}
         <select
           value={provider}
           onChange={(e) => setProvider(e.target.value as Provider)}
-          className="rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 text-sm"
+          className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 text-sm sm:flex-none"
           aria-label="Model provider"
         >
           <option value="ollama">Local (Ollama)</option>
           <option value="anthropic">Claude API</option>
         </select>
+        </div>
       </header>
 
       <section className="flex-1 space-y-6">
@@ -147,6 +169,7 @@ function TurnView({ turn }: { turn: Turn }) {
           ))}
         </ol>
       )}
+      {turn.notice && <p className="text-xs italic text-[var(--muted)]">{turn.notice}</p>}
       {turn.meta && (
         <p className={`text-xs ${turn.status === "error" ? "text-red-500" : "text-[var(--muted)]"}`}>
           {turn.status === "refused" && "Not in the knowledge base · "}
@@ -163,7 +186,7 @@ function Cited({ text, onCite }: { text: string; onCite: (n: number) => void }) 
     <>
       {text.split(/(\[\d+\])/).map((part, i) => {
         const m = part.match(/^\[(\d+)\]$/);
-        if (!m) return <span key={i}>{part}</span>;
+        if (!m) return <Inline key={i} text={part} />;
         const n = Number(m[1]);
         return (
           <button key={i} onClick={() => onCite(n)}
@@ -171,6 +194,26 @@ function Cited({ text, onCite }: { text: string; onCite: (n: number) => void }) 
             {n}
           </button>
         );
+      })}
+    </>
+  );
+}
+
+// Minimal inline markdown for answers: **bold** and `code`. Everything else stays plain text
+// (newlines are kept by whitespace-pre-wrap). Rendered as React elements, never as raw HTML.
+function Inline({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith("`") && part.endsWith("`") && part.length > 2)
+          return (
+            <code key={i} className="rounded bg-[var(--line)] px-1 text-[0.9em]">
+              {part.slice(1, -1)}
+            </code>
+          );
+        return <span key={i}>{part}</span>;
       })}
     </>
   );

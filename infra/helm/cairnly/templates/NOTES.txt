@@ -1,0 +1,6 @@
+cairnly is starting. The ingest job runs after install; watch it with:
+  kubectl get jobs -l app.kubernetes.io/instance={{ .Release.Name }} -w
+
+Try it locally:
+  kubectl port-forward svc/{{ .Release.Name }}-api 8010:8010
+  curl localhost:8010/health

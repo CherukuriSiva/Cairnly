@@ -1,0 +1,143 @@
+---
+slug: dsa-on-resume
+title: "DSA on Your Resume and How to Present Your Solutions Repo"
+track: dsa
+tier: short
+estimatedMinutes: 10
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Structure a GitHub solutions repository that demonstrates competence, not just completion
+- Write solution READMEs that show pattern recognition and analysis, not just code
+- Frame DSA skills on your resume without "I solved 500 LeetCode problems"
+- Use your solutions repo as a portfolio piece in behavioral interviews
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A well-structured solutions repo signals to hiring managers that you approach problems systematically rather than grinding blindly. It also serves as your personal reference during interview prep. Most candidates have a messy collection of files with no organization. Standing out is easy if you present your work with the same care you'd give to production code.
+</WhyThisMatters>
+
+<Body>
+## The solutions repo structure
+
+Organize by pattern, not by difficulty or problem number:
+
+```
+dsa-solutions/
+  README.md               # overview, pattern index, progress tracker
+  two-pointers/
+    two-sum-sorted.py
+    three-sum.py
+    container-with-most-water.py
+    README.md              # pattern explanation, when to use
+  sliding-window/
+    max-subarray-sum-k.py
+    longest-substring-no-repeat.py
+    minimum-window-substring.py
+    README.md
+  dynamic-programming/
+    climbing-stairs.py
+    coin-change.py
+    house-robber.py
+    README.md
+  ...
+```
+
+## What makes a solution file stand out
+
+Don't just dump code. Add context:
+
+```python
+"""
+LeetCode 15: 3Sum
+Pattern: Two Pointers (converging on sorted array)
+Difficulty: Medium
+Time: O(n^2)  |  Space: O(1) excluding output
+
+Key insight: Fix one element, then use two-pointer on the remainder.
+Skip duplicates at all three levels to avoid duplicate triplets.
+
+Related: Two Sum, 4Sum, 3Sum Closest
+"""
+
+def three_sum(nums):
+    nums.sort()
+    result = []
+    for i in range(len(nums) - 2):
+        if i > 0 and nums[i] == nums[i - 1]:
+            continue
+        left, right = i + 1, len(nums) - 1
+        while left < right:
+            total = nums[i] + nums[left] + nums[right]
+            if total == 0:
+                result.append([nums[i], nums[left], nums[right]])
+                while left < right and nums[left] == nums[left + 1]:
+                    left += 1
+                while left < right and nums[right] == nums[right - 1]:
+                    right -= 1
+                left += 1
+                right -= 1
+            elif total < 0:
+                left += 1
+            else:
+                right -= 1
+    return result
+```
+
+The header takes 30 seconds to write and immediately shows: pattern knowledge, complexity awareness, and the ability to connect related problems.
+
+## Resume framing
+
+**Don't write:**
+- "Solved 300+ LeetCode problems"
+- "Strong in data structures and algorithms"
+
+**Do write:**
+- "Built a categorized DSA solutions portfolio covering 12 algorithmic patterns with complexity analysis (github.com/you/dsa-solutions)"
+- "Demonstrated systematic problem-solving: pattern recognition, brute-force to optimal progression, and edge-case analysis"
+
+On your resume, DSA mastery is best shown indirectly:
+- **Projects section**: Link your solutions repo if it's well-organized
+- **Skills section**: List specific patterns (not "algorithms" generically)
+- **Experience section**: Mention algorithmic thinking in context ("Optimized search from O(n^2) to O(n log n) using binary search on sorted intervals")
+
+## In behavioral interviews
+
+When asked "tell me about a challenging technical problem," your DSA practice is fair game if you frame it well:
+
+**Weak answer:** "I solved a hard LeetCode problem."
+
+**Strong answer:** "I was working on a real-time notification system and realized the core problem was identical to the meeting rooms interval scheduling problem. By applying a sweep-line algorithm, I reduced the peak memory usage by 60% compared to the naive approach that tracked every active notification individually."
+
+Connect the pattern to a real or realistic scenario. This shows you can transfer interview knowledge to production work.
+
+## The progress tracker
+
+In your repo's main README, maintain a table:
+
+```markdown
+| Pattern | Problems Solved | Confidence |
+|---|---|---|
+| Two Pointers | 8 | High |
+| Sliding Window | 6 | High |
+| Binary Search | 5 | Medium |
+| DP | 4 | Low - need more practice |
+| Graphs | 3 | Medium |
+```
+
+This is for you, not the recruiter. It keeps your prep focused on weak areas.
+</Body>
+
+<MiniQuiz>
+**Q: Which of these is the most effective way to present DSA skills on a resume?**
+
+- A) "Solved 500+ LeetCode problems"
+- B) "Strong in data structures and algorithms"
+- C) "Built a pattern-categorized solutions portfolio with complexity analysis" ✅
+- D) "LeetCode rating: 1800"
+</MiniQuiz>
+
+<InterviewExplanation>
+"I organize my DSA practice by pattern rather than by problem number. Each solution includes the pattern name, time/space complexity, the key insight, and related problems. This helps me recognize patterns faster in interviews and serves as a quick-reference during prep. I also connect algorithmic patterns to real engineering scenarios, because the value of DSA knowledge is in applying it to production problems, not in the problem count."
+</InterviewExplanation>

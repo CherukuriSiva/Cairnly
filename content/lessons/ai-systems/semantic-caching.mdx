@@ -1,0 +1,106 @@
+---
+slug: semantic-caching
+title: "Semantic Caching to Cut Latency & Cost"
+track: ai-systems
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Explain why exact-match caching barely helps LLM apps
+- Cache on *meaning* by comparing query embeddings
+- Set a similarity threshold and understand the staleness trade-off
+- Sketch a Redis-backed semantic cache
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+LLM calls are slow and metered. Many users ask the *same question in different words* — "what's your refund policy?" vs "how do I get money back?" An exact-match cache misses both as different strings. A semantic cache serves the second from the first, cutting latency from seconds to milliseconds and shaving real money off the bill.
+</WhyThisMatters>
+
+<Body>
+## Exact-match caching barely helps
+
+A normal cache keys on the exact string. But natural-language queries are almost never byte-identical, so the hit rate is near zero. You need to cache on **meaning**, not characters.
+
+## Cache on the embedding
+
+The idea: embed the incoming query, search your cache of past query embeddings, and if the nearest one is **similar enough**, return its stored answer.
+
+1. Embed the query.
+2. Find the nearest cached query embedding.
+3. If similarity ≥ threshold (e.g. 0.95–0.98), return the cached answer — a hit.
+4. Otherwise call the LLM and store `(embedding, answer)` for next time.
+
+## The threshold is the whole game
+
+- **Too low** → you serve a cached answer to a question that's *related but different* (wrong answer).
+- **Too high** → almost nothing hits; you've built an exact-match cache with extra steps.
+
+High-stakes domains use a conservative threshold (0.98+). Tune it against real queries.
+
+## Mind staleness and personalization
+
+A semantic cache assumes the answer is stable. Don't cache responses that depend on the user, the time, or live data — or scope the cache key by tenant/user.
+</Body>
+
+<Code>
+```python
+import numpy as np
+
+class SemanticCache:
+    def __init__(self, embed, threshold: float = 0.97):
+        self.embed = embed
+        self.threshold = threshold
+        self.keys: list[np.ndarray] = []   # cached query embeddings (Redis vector in prod)
+        self.vals: list[str] = []          # cached answers
+
+    def get_or_call(self, query: str, llm) -> tuple[str, bool]:
+        q = self.embed(query)
+        q /= np.linalg.norm(q)
+        for k, v in zip(self.keys, self.vals):
+            if float(q @ k) >= self.threshold:   # cosine sim on normalized vectors
+                return v, True                    # cache hit
+        answer = llm(query)                       # miss → call + store
+        self.keys.append(q)
+        self.vals.append(answer)
+        return answer, False
+```
+</Code>
+
+<TryItYourself>
+1. Implement `SemanticCache` with any embedding function
+2. Ask "what's the refund policy?" then "how do I get my money back?"; confirm the 2nd hits
+3. Lower the threshold to 0.5 and find a wrong hit; explain the risk
+4. Add a per-user cache key and confirm User B doesn't get User A's answer
+5. Measure latency on hit vs miss
+</TryItYourself>
+
+<CommonMistakes>
+- **Threshold too low** — serves a related-but-wrong cached answer
+- **Caching personalized or time-sensitive responses** — stale/incorrect for the next user
+- **One global cache across tenants** — leaks one customer's answer to another
+- **No eviction policy** — the cache grows unbounded
+- **Forgetting to normalize embeddings** — cosine similarity needs unit vectors
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Built a semantic cache keyed on embeddings
+- [ ] Demonstrated a hit on a reworded query
+- [ ] Tuned the threshold and saw a wrong hit at a low value
+- [ ] Scoped the cache by user/tenant
+- [ ] Measured the latency win
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why does an exact-match cache barely help an LLM chatbot?**
+
+- A) LLMs can't be cached
+- B) Users phrase the same question differently, so byte-identical hits are rare ✅
+- C) Embeddings are too slow
+- D) Redis doesn't support text
+</MiniQuiz>
+
+<InterviewExplanation>
+"Exact-match caching fails for LLM apps because users phrase the same question differently, so string keys almost never match. A semantic cache keys on meaning: I embed the query, find the nearest cached query embedding, and if cosine similarity clears a threshold I return the stored answer — otherwise I call the model and cache the result. The threshold is the whole trade-off: too low serves related-but-wrong answers, too high kills the hit rate. I keep it conservative for high-stakes domains, scope the cache per tenant to avoid leakage, and never cache personalized or time-sensitive responses."
+</InterviewExplanation>

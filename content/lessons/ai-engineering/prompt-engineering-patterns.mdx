@@ -1,0 +1,54 @@
+---
+slug: prompt-engineering-patterns
+title: "Prompt Engineering Patterns: System Prompts & Chat Templates"
+track: ai-engineering
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Separate the three message roles: system, user, assistant
+- Write a system prompt that constrains behavior instead of hoping for it
+- Understand why chat templates must be byte-identical between training and inference
+- Structure a RAG prompt: instruction + retrieved context + question
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Most "the model is dumb" complaints are actually prompt bugs. The difference between a hallucinating assistant and a grounded one is often a single line in the system prompt. And if you fine-tune, your training prompt format must match your inference format exactly — a mismatched template silently destroys quality.
+</WhyThisMatters>
+
+<Body>
+## Three roles, three jobs
+
+Every chat model sees a conversation made of typed messages:
+
+- **system** — the standing rules: who the model is, what it must and must not do
+- **user** — the human's turn (the query, plus any retrieved context you inject)
+- **assistant** — the model's reply
+
+The system prompt is your highest-leverage knob. "Answer only from the provided context; if the answer isn't there, say you don't know" turns a confident hallucinator into a careful assistant.
+
+## Chat templates are not optional formatting
+
+Under the hood, those roles get rendered into a single string using the model's **chat template** — special tokens that mark where each turn starts and ends. For Llama-3.2 that looks like `<|start_header_id|>system<|end_header_id|>` ... `<|eot_id|>`.
+
+The rule that trips people up: **the template you train on must be byte-identical to the template you serve on.** Change a newline and you've moved the model off-distribution.
+
+## The RAG prompt shape
+
+A retrieval prompt is just a structured user turn: an instruction, the retrieved passages (numbered, so the model can cite them), then the question. You stop *before* the assistant turn so the model generates the answer.
+</Body>
+
+<MiniQuiz>
+**Q: You fine-tuned a model with one chat template, but at inference you format prompts slightly differently (an extra blank line). Quality drops sharply. Why?**
+
+- A) The model needs more training data
+- B) The inference template no longer matches the training distribution ✅
+- C) The temperature is too high
+- D) The system prompt is too long
+</MiniQuiz>
+
+<InterviewExplanation>
+"I think about prompts in three roles. The system prompt sets non-negotiable behavior — for a RAG app I'd say 'answer only from the provided context and refuse if it's missing.' The user turn carries the instruction plus numbered retrieved passages so the model can cite. The biggest gotcha is chat templates: if I fine-tune, the training and inference templates have to be byte-identical, otherwise I push the model off-distribution and quality silently collapses."
+</InterviewExplanation>

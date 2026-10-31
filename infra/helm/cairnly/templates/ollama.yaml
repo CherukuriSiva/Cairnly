@@ -1,0 +1,47 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-ollama
+  labels: {{- include "cairnly.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-ollama }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }}-ollama }
+    spec:
+      containers:
+        - name: ollama
+          image: {{ .Values.ollama.image }}
+          # Start the server, pull the models, then keep serving.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              ollama serve & pid=$!
+              until ollama list >/dev/null 2>&1; do sleep 1; done
+              {{- range .Values.ollama.models }}
+              ollama pull {{ . }}
+              {{- end }}
+              touch /tmp/ready
+              wait $pid
+          ports: [{ containerPort: 11434, name: http }]
+          readinessProbe:
+            exec: { command: ["cat", "/tmp/ready"] }
+            periodSeconds: 5
+          resources: {{- toYaml .Values.ollama.resources | nindent 12 }}
+          volumeMounts: [{ name: models, mountPath: /root/.ollama }]
+      volumes:
+        - name: models
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-ollama
+  labels: {{- include "cairnly.labels" . | nindent 4 }}
+spec:
+  selector: { app: {{ .Release.Name }}-ollama }
+  ports: [{ port: 11434, targetPort: http, name: http }]
+{{- end }}

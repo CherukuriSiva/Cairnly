@@ -1,0 +1,73 @@
+---
+slug: choosing-your-ai-coding-tool
+title: "Choosing Your AI Coding Tool in 2026"
+summary: "Claude Code, Cursor, GitHub Copilot, Codex CLI, Gemini CLI — each has different strengths, context windows, pricing, and workflows. Here is how to pick."
+category: ai-engineering
+tags: ["tooling", "productivity", "agentic-coding"]
+audience: ["cs-students", "working-pros"]
+depth: short
+priority: P2
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1774714099474.jpeg
+  - references/linkedin/1779804243138.jpeg
+relatedLessons: []
+relatedRoadmaps:
+  - ai-engineer-technical-path
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+AI coding tools sit on a spectrum, from an inline autocomplete plugin to a terminal agent that edits whole repositories on its own. The right pick depends on how you actually work: how much autonomy you want, how big a context the tool can hold, what model sits behind it by default, what it costs per month, and whether your team is already on one. There is no single winner — a daily autocompleter, a greenfield builder, and an enterprise team each have a different best fit. The pragmatic move is to start with whatever your team uses and only switch when a tool is measurably slowing you down.
+</InsightSummary>
+
+<Body>
+## The spectrum, from plugin to autonomous agent
+
+The tools fall along a line of increasing autonomy:
+
+- **IDE plugin (e.g. GitHub Copilot).** Lives inside your existing editor as inline completion and chat. Lowest friction, lowest disruption — it suggests, you accept. Widest IDE coverage and the cheapest entry point, which is why it dominates daily inline use.
+- **AI-first IDE (e.g. Cursor).** A whole editor built around the model, with multi-file composer edits, codebase indexing, and the ability to bring your own model (Claude, GPT, Gemini). More powerful than a plugin, with a step up in learning curve.
+- **Terminal agents (e.g. Claude Code, Codex CLI, Gemini CLI).** Run in the terminal and operate as agents: they read across the repo, plan, run commands, and apply multi-file changes. This is the deep end — most autonomy, biggest refactors, and the workflow that benefits most from large context windows and MCP tool access.
+
+## What actually matters when choosing
+
+Five factors do most of the work:
+
+1. **Context window.** How much of your codebase the tool can hold at once. Bigger windows (up to ~1M tokens on some tools) mean fewer "it forgot the other file" failures on large refactors.
+2. **Default model quality.** What you get out of the box — a frontier model versus a smaller, cheaper default changes both quality and cost.
+3. **Price per month.** Entry plans start around $10–$20/month; heavy agentic use on premium plans climbs much higher, and some tools meter usage so costs spike under load.
+4. **Workflow type.** Inline-chat (you stay in control of each edit) versus autonomous (you delegate a task and review the result). Pick the one that matches how you like to work.
+5. **Scope and integrations.** File-access scope, MCP support for connecting tools and data, and how cleanly it fits your existing editor and CI.
+
+## A rough comparison
+
+| Tool | Type | Agentic depth | Default model | Best for |
+| --- | --- | --- | --- | --- |
+| GitHub Copilot | IDE plugin / extension | Inline + light agent | Multi-model | Daily inline autocomplete, widest IDE coverage, enterprise teams |
+| Cursor | AI-first IDE | Composer multi-file edits | Bring-your-own (Claude/GPT/Gemini) | Greenfield work and a polished multi-file editing experience |
+| Claude Code | Terminal agent | Deep, autonomous | Frontier Claude model | Complex multi-file refactors and quality-over-cost work |
+| Codex CLI | Terminal agent | Deep, async/cloud delegation | OpenAI models | Async cloud delegation and shell-heavy workflows |
+| Gemini CLI | Terminal agent | Agentic, web-grounded | Gemini | Low-cost learning, hobby projects, web-search-backed coding |
+
+Treat the cells as direction, not gospel — context windows, default models, and pricing on every one of these change frequently, so verify the current numbers before you commit.
+
+## The pragmatic advice
+
+Do not agonize. The biggest productivity loss is not picking the "wrong" tool — it is constantly switching and re-learning workflows. Start with whatever your team already uses, because shared tooling, configs, and conventions compound. Reach for a terminal agent when you have large, multi-file refactors that an inline plugin keeps fumbling. Reach for a cheaper or free tier when you are learning on your own. And only switch tools when one is concretely getting in your way — not because a new one is trending this month.
+</Body>
+
+<KeyTakeaways>
+- AI coding tools form a spectrum: IDE plugin (Copilot) to AI-first IDE (Cursor) to autonomous terminal agents (Claude Code, Codex CLI, Gemini CLI).
+- Choose on five factors: context window, default model quality, monthly price, workflow type (inline vs. autonomous), and scope/MCP integrations.
+- Plugins win for daily inline autocomplete; AI-first IDEs for polished multi-file editing; terminal agents for deep, autonomous refactors.
+- Pricing and model defaults change constantly and some tools meter usage — verify current numbers before committing.
+- Start with what your team uses and only switch when a tool is measurably slowing you down; constant tool-hopping costs more than it saves.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Pick one tool and use it on a real project as you follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
+</WhatToDoNext>
+
+<SourceNote />

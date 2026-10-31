@@ -1,0 +1,175 @@
+---
+slug: defend-eval-metrics
+title: "How to Defend Evaluation Metrics and Admit Failure Modes"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 20
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Present evaluation metrics with confidence and context
+- Anticipate and respond to skeptical questions about your metrics
+- Admit failure modes without undermining your credibility
+- Use failure modes as evidence of engineering maturity
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+When you present metrics in an interview, the interviewer's job is to poke holes. "Your precision is 85% — what about the other 15%?" "How do you know your faithfulness metric is reliable?" If you freeze up or get defensive, you look like you haven't thought deeply about your system. If you handle these gracefully — admitting real failure modes and explaining how you'd address them — you stand out as someone who's actually operated AI in production.
+</WhyThisMatters>
+
+<Body>
+## How to present a metric
+
+Never throw out a number without context. Use this template:
+
+> "[Metric name] is [value] on [test set description]. I measured this by [methodology]. The main limitation is [what it doesn't capture]."
+
+**Bad**: "We got 85% accuracy."
+
+**Good**: "Precision@5 is 0.85 on a test set of 50 manually-labeled queries covering our top 5 question categories. I measured this by tagging each retrieved document as relevant or not relevant. The main limitation is that our test set doesn't cover edge cases like multi-part questions or code-related queries."
+
+## Defending retrieval metrics
+
+### "Your precision@5 is 0.85. Is that good?"
+
+> "It depends on the use case. For a customer support bot where wrong answers erode trust, I'd want higher — maybe 0.92+. For an internal research tool where users expect to filter results themselves, 0.85 is solid. In our case, the confidence gate catches most of the 15% failure cases — it refuses rather than giving wrong answers. So the effective accuracy from the user's perspective is higher."
+
+### "How do you know your test set is representative?"
+
+> "Honestly, it's the weakest part of our evaluation. I built it from the 50 most common queries in our production logs, so it represents common cases well. It under-represents rare, complex queries. I'd improve it by adding failure cases — every time a user reports a wrong answer, I add that query to the test set. It's a living dataset, not a one-time snapshot."
+
+### "You used MRR. Why not NDCG?"
+
+> "MRR measures where the first relevant result appears — it's the right metric when users primarily care about the top result, which is our case since we pass the top-1 chunk to the LLM with highest priority. NDCG would be better if we cared about the full ranking of all 5 results equally. For a RAG pipeline, MRR is more actionable because the LLM's answer quality correlates most with the top result's quality."
+
+## Defending generation metrics
+
+### "You measure faithfulness with an LLM-as-judge. Isn't that circular?"
+
+> "It's a valid concern. Using the same LLM to generate and judge can introduce bias — the judge is more likely to rate its own outputs favorably. I mitigate this two ways: first, I use a different model as the judge (if I generate with GPT-4o-mini, I judge with Claude). Second, I calibrate the judge against human labels on 20 examples — if the judge and human agree on 90%+ of ratings, I trust the automated scores. It's not perfect, but it scales where human review doesn't."
+
+### "Your faithfulness is 91%. What about the other 9%?"
+
+> "The 9% failure cases are mostly one of two patterns. First, the model infers an implication that's reasonable but not explicitly stated in the context — like concluding 'annual plans can be refunded' when the context says 'all plans can be refunded within 30 days.' The claim is technically correct but the judge flags it because the exact phrase isn't in the context. Second, the model sometimes adds a helpful caveat like 'please contact support for specific cases' that isn't in the context. I consider the first pattern acceptable and the second pattern a minor issue. True hallucination — the model inventing facts — is under 2%."
+
+### "How often do you run evaluation?"
+
+> "Currently, before every deployment — which is roughly weekly. I'd like to move to CI-triggered evaluation where every PR that changes the pipeline or prompts automatically runs the eval suite. The blocker is cost: running 50 faithfulness checks with LLM-as-judge costs about $2 per run, which is fine weekly but expensive per-commit."
+
+## How to admit failure modes
+
+The best engineers proactively describe their system's weaknesses. It signals maturity and trustworthiness. Use this pattern:
+
+> "The system fails when [specific condition]. I know this because [how you discovered it]. I handle it by [mitigation]. If I had more time, I'd [ideal fix]."
+
+### Failure mode 1: Ambiguous queries
+
+> "The system fails on ambiguous queries like 'how much does it cost?' without specifying which product. The retriever returns documents about multiple products, and the LLM picks one arbitrarily. I discovered this from production logs — these queries had low faithfulness scores. Currently, the confidence gate catches some of these because retrieval scores are low when multiple topics match. The ideal fix is a clarification step: detect ambiguous queries and ask the user to specify."
+
+### Failure mode 2: Multi-hop reasoning
+
+> "The system can't answer questions that require combining information from two documents. For example, 'Can enterprise customers get a refund on their annual plan?' requires knowing (a) what enterprise customers get and (b) the refund policy for annual plans. My retriever finds one or the other, not both. The mitigation is to retrieve more chunks (top-10 instead of top-5), which sometimes captures both. The real fix is query decomposition — break complex questions into sub-queries."
+
+### Failure mode 3: Outdated information
+
+> "If we update a document but don't rebuild the index, the system returns stale information. Our index rebuilds nightly, so there's a maximum 24-hour staleness window. I haven't solved this fully — the ideal approach is incremental indexing where document updates trigger immediate re-embedding."
+
+## The credibility formula
+
+Interviewers assess your credibility based on a simple formula:
+
+**Credibility = (depth of knowledge about success) + (honesty about failure) + (concrete plan to improve)**
+
+Saying "the system is 91% faithful and here are the three failure modes I know about" is more impressive than "the system is 99% accurate." The first shows engineering maturity. The second sounds like you haven't looked closely enough.
+
+## Metrics cheat sheet
+
+Keep these relationships in mind when discussing metrics:
+
+| If interviewer asks about... | Discuss... | Watch out for... |
+|---|---|---|
+| Overall accuracy | Break into retrieval + generation | "Accuracy" means different things to different people |
+| Precision | Precision-recall tradeoff | Don't claim high precision without mentioning recall impact |
+| Faithfulness | Methodology (LLM-judge vs human) | Circular evaluation if same model generates and judges |
+| Latency | p50 vs p99, not just average | Average hides tail latency problems |
+| Cost | Per-query breakdown | Don't forget embedding and safety check costs |
+</Body>
+
+<Code>
+```python
+# Prepare your metrics summary for interview
+def format_metrics_for_interview(metrics: dict) -> str:
+    """Format your metrics with the required context."""
+    sections = []
+    
+    sections.append("## Retrieval Metrics")
+    sections.append(f"- Precision@5: {metrics['p_at_5']:.2f} on {metrics['test_set_size']} labeled queries")
+    sections.append(f"- Recall@5: {metrics['r_at_5']:.2f}")
+    sections.append(f"- MRR: {metrics['mrr']:.2f}")
+    sections.append(f"- Known limitation: {metrics['retrieval_limitation']}")
+    
+    sections.append("\n## Generation Metrics")
+    sections.append(f"- Faithfulness: {metrics['faithfulness']:.2f} (judged by {metrics['judge_model']})")
+    sections.append(f"- Known limitation: {metrics['generation_limitation']}")
+    
+    sections.append("\n## Operational Metrics")
+    sections.append(f"- p50 latency: {metrics['p50_ms']}ms")
+    sections.append(f"- Refusal rate: {metrics['refusal_rate']:.1%}")
+    sections.append(f"- Per-query cost: ${metrics['cost_per_query']:.4f}")
+    
+    return "\n".join(sections)
+
+# Example
+my_metrics = {
+    "p_at_5": 0.85,
+    "r_at_5": 0.72,
+    "mrr": 0.91,
+    "test_set_size": 50,
+    "retrieval_limitation": "Test set under-represents multi-hop queries",
+    "faithfulness": 0.91,
+    "judge_model": "Claude 3.5 Haiku",
+    "generation_limitation": "Judge flags reasonable inferences as unsupported (~4% false positive rate)",
+    "p50_ms": 1800,
+    "refusal_rate": 0.12,
+    "cost_per_query": 0.0005,
+}
+
+print(format_metrics_for_interview(my_metrics))
+```
+</Code>
+
+<TryItYourself>
+1. Fill in the `my_metrics` dict with your actual project numbers (or realistic estimates)
+2. Practice presenting each metric using the "[value] on [test set] measured by [method] with limitation [X]" template
+3. Write out your top 3 failure modes using the "fails when / know because / handle by / would fix" pattern
+4. Have someone play the skeptical interviewer role and poke holes in your metrics
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Can present each metric with context (value, test set, methodology, limitation)
+- [ ] Prepared responses for at least 3 skeptical follow-up questions
+- [ ] Documented 3 failure modes with mitigations and improvement plans
+- [ ] Practiced being challenged on metrics without getting defensive
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Getting defensive when challenged** — "That's not a problem" shuts down the conversation; "Good question, here's what I found" opens it
+- **Presenting metrics without methodology** — "91% faithfulness" means nothing without explaining how you measured it
+- **Claiming the system has no failure modes** — every system has failure modes; not knowing them means you haven't tested enough
+- **Using "accuracy" without defining it** — accuracy means different things in retrieval vs generation; always specify the metric name
+- **Not having improvement plans** — "it fails on multi-hop queries" is honest; "it fails and I don't know how to fix it" is incomplete
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: An interviewer says "Your faithfulness score is 91%, but you measured it with an LLM judge. How do you know the judge is reliable?" What's the best response?**
+
+- A) "LLM judges are an industry standard, so it's reliable"
+- B) "I calibrated the judge against human labels on 20 examples and they agreed 92% of the time. The main bias is the judge flagging reasonable inferences as unsupported." ✅
+- C) "91% is just an estimate, the real number could be higher or lower"
+- D) "I trust the judge because it's a more powerful model than the one generating answers"
+</MiniQuiz>
+
+<InterviewExplanation>
+"When presenting metrics, I always include the value, test set size, methodology, and known limitations. When challenged, I don't get defensive — I explain the failure modes I've already identified, the mitigations in place, and what I'd do with more time. For example, if asked about the 9% gap in faithfulness, I'd break it down: roughly 4% is the judge flagging reasonable inferences, 3% is the model adding helpful caveats not in the context, and only 2% is actual hallucination. Proactively admitting and categorizing failure modes signals that I've actually operated the system, not just built a demo."
+</InterviewExplanation>

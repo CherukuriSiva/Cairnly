@@ -1,0 +1,100 @@
+---
+slug: what-companies-ask-ai-engineers
+title: "What Companies Actually Ask AI Engineers to Do"
+summary: "Job descriptions are vague. Here is a ground-level view of what AI and ML engineers spend their time on — and what comes up in interviews."
+category: career
+tags: ["career", "jobs", "interviews", "ai-engineering"]
+audience: ["cs-students", "career-switchers"]
+depth: medium
+priority: P1
+sourceType: linkedin
+sourceFiles:
+  - references/linkedin/1780033713908.jpeg
+  - references/linkedin/1780235151417.jpeg
+  - references/linkedin/1779850612438.pdf
+relatedLessons:
+  - career/ai-era-resume
+  - career/behavioral-interviews
+  - ai-engineering/explain-rag-in-interview
+  - ai-engineering/interviewer-questions-ai
+relatedRoadmaps:
+  - cs-student-ai-era-roadmap
+  - final-year-placement-prep
+publishedAt: "2026-06-06"
+updatedAt: "2026-06-06"
+---
+
+<InsightSummary>
+Job descriptions for AI engineers are notoriously vague, so it helps to see the work from the ground. Most of the job is building RAG systems, integrating LLMs into products, running fine-tuning experiments, wiring up agents, and deploying and operating it all. Interviews mirror that: a technical round on RAG, frameworks, and system design, then a scenario/managerial round on how you make decisions. The throughline employers care about is not "can you call an API" but "can you build something reliable, scalable, and production-ready."
+</InsightSummary>
+
+<Body>
+## The day job
+
+Strip away the buzzwords and AI/ML engineering work clusters into a recognizable set of activities:
+
+- **Build RAG systems** — document-based chatbots over PDFs, databases, and websites; vector databases (FAISS, Chroma, Pinecone, Weaviate); retrieval optimization; prompt engineering.
+- **LLM integration** — wire models from various providers into products and build AI features inside existing apps.
+- **Fine-tuning experiments** — tune models on company data and build domain-specific models, often with efficient methods (LoRA, QLoRA, PEFT).
+- **Agent pipelines** — multi-agent systems, tool and function calling, autonomous workflows, agentic RAG.
+- **Chatbot/assistant development** — support bots, HR bots, internal assistants, voice bots.
+- **Deployment and MLOps** — deploy on cloud (Docker, Kubernetes, AWS/Azure/GCP), serve via FastAPI, then CI/CD pipelines, model monitoring, logging/observability, and version control for models.
+- **Data engineering and classic ML** — cleaning, ETL, dataset prep, feature engineering, plus classification, regression, recommendation, forecasting, vision, and NLP where the product needs it.
+- **GenAI product development** — AI SaaS products, AI search, content generation, and copilots.
+
+You will rarely do all of these in one role, but RAG, LLM integration, agents, and deployment show up in the large majority of AI-engineering jobs.
+
+## Technical interview, round 1
+
+The first round tests whether you understand the building blocks. Expect questions on:
+
+- **LLM and GenAI concepts** — what generative AI is, what an LLM is, hallucinations.
+- **RAG and vector databases** — explain RAG, chunking strategies, vector search, retrieval optimization.
+- **Frameworks and tools** — LangChain/LangGraph architecture, agent frameworks, cloud LLM platforms (e.g. Bedrock).
+- **Python and backend** — async programming, API design, Docker basics, Git workflow.
+- **Production AI system design** — how to design a scalable RAG pipeline, reduce latency and cost, and secure an LLM application.
+
+## Technical interview, round 2
+
+The second round is more managerial and scenario-driven — less "define X," more "walk me through how you'd handle Y":
+
+- **Project and architecture** — explain a GenAI project you worked on and the architecture decisions behind it.
+- **Tradeoffs and operations** — how you optimize latency and cost, manage cost at scale, handle production incidents, and ensure reliability.
+- **Process and collaboration** — how you work with architects and QA, prioritize multiple AI tasks, manage stakeholders, and ship on deadline.
+- **Motivation** — why this role, and what draws you to AI engineering.
+
+This round is testing judgment and communication, not recall. Have concrete stories ready.
+
+## Common RAG interview questions (with the shape of strong answers)
+
+RAG comes up so often it deserves its own prep. A few that recur, and how to think about them:
+
+- **"Why use RAG when LLMs are already powerful?"** Because LLMs have a knowledge cutoff and static training data — they can't answer questions about recent events or private/company data. RAG retrieves relevant external context so answers stay accurate and current; without it, LLMs give incomplete or outdated responses.
+- **"Is RAG still relevant with long-context models?"** Yes. Long-context models without RAG suffer from "lost in the middle" (struggling to find the relevant part of a huge context), high API cost, and increased latency. RAG surfaces just the most relevant information, keeping answers accurate *and* cost-efficient.
+- **"What are RAG's fundamental challenges?"** Scalability (fast, well-indexed retrieval over large, dynamic sources is compute-heavy), latency (the two-step retrieve-then-generate flow adds delay), and hallucination risk (the model can still fabricate if retrieved context is ambiguous or insufficient).
+- **"How do you reduce RAG latency?"** Caching (store retrieved results / responses to avoid redundant work), embedding quantization (lower precision to cut memory and speed retrieval), selective query rewriting (only for complex/ambiguous queries), and selective reranking (only for complicated queries, to avoid wasting compute on simple ones).
+- **"What do R, A, and G stand for?"** Retrieval (fetch the most relevant external information for the query), Augmented (inject that context into the prompt alongside the user question and instructions), Generation (the LLM produces a coherent, grounded answer from that augmented prompt).
+- **"How does RAG reduce hallucinations?"** By grounding generation in retrieved, trusted, up-to-date facts instead of relying solely on training memory — combining retrieval with generation makes answers more accurate and less prone to fabrication.
+
+Be ready to also explain chunking strategy and how you'd *evaluate* RAG quality — those round out the topic.
+
+## What "production-ready" actually means
+
+The signal employers repeat is that the job is not just making something work in a notebook — it is building **reliable, scalable, production-ready AI systems.** In an interview that means going beyond "it returns an answer" to talk about evaluation (how you measure quality), monitoring (how you catch regressions and drift), cost control (how you keep token and infra spend sane), and security. Candidates who frame their work in those terms stand out from those who can only demo a happy path.
+</Body>
+
+<KeyTakeaways>
+- The AI-engineering day job clusters around RAG systems, LLM integration, fine-tuning experiments, agent pipelines, and deployment/MLOps — RAG, integration, agents, and deployment appear in most roles.
+- Round 1 interviews test fundamentals: GenAI/LLM concepts, RAG and vector DBs, frameworks (LangChain/LangGraph, Bedrock), Python/backend, and production system design.
+- Round 2 is managerial/scenario: explaining your architecture, latency/cost tradeoffs, incident handling, collaboration, and motivation — judgment over recall.
+- RAG questions are near-guaranteed: know why RAG beats raw LLMs and long-context, its core challenges (scalability, latency, hallucination), latency fixes (caching, quantization, selective rewrite/rerank), and R-A-G.
+- The recurring signal is "production-ready" — frame your work in terms of evaluation, monitoring, cost control, and security, not just a working demo.
+</KeyTakeaways>
+
+<WhatToDoNext>
+- Translate this into a resume with [The AI-era resume](/career/ai-era-resume).
+- Prepare the soft side with [Behavioral interviews](/career/behavioral-interviews).
+- Drill the technical answers with [Explain RAG in an interview](/ai-engineering/explain-rag-in-interview) and [Interviewer questions on AI](/ai-engineering/interviewer-questions-ai), then follow the [CS student AI-era roadmap](/roadmap/cs-student-ai-era-roadmap) or [Final-year placement prep](/roadmap/final-year-placement-prep).
+</WhatToDoNext>
+
+<SourceNote />

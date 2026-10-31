@@ -1,0 +1,117 @@
+---
+slug: agent-memory
+title: "Agent Memory: Managing the Context Window"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Distinguish short-term (conversation) memory from long-term (retrieval) memory
+- Store the agent's running history of thoughts, actions, and observations
+- Keep memory inside the context budget with a rolling window or summarization
+- Understand why feeding observations back is what makes multi-step reasoning work
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+An agent without memory repeats itself: it calls the same tool, forgets what it already learned, and never converges. But naive "remember everything" blows the context window and the cost with it. Knowing how to keep the *right* history within budget is the difference between an agent that solves a task in 3 steps and one that loops uselessly.
+</WhyThisMatters>
+
+<Body>
+## Two kinds of memory
+
+- **Short-term memory** — the current session's message history: the task, each Thought/Action, and every Observation. This is what lets the agent reason across steps.
+- **Long-term memory** — facts persisted across sessions, usually in a vector store and retrieved on demand (that's just RAG wearing a different hat).
+
+This lesson is about short-term memory, the engine of multi-step reasoning.
+
+## The simplest memory: a message list
+
+At its core, memory is an append-only list of `{role, content}` messages. Add the user task, add each assistant response, add each observation. The agent loop reads this list every iteration. Clear it when a new task starts.
+
+```python
+class AgentMemory:
+    def __init__(self):
+        self.history: list[dict[str, str]] = []
+    def add_message(self, role: str, content: str):
+        self.history.append({"role": role, "content": content})
+    def get_messages(self) -> list[dict[str, str]]:
+        return self.history
+    def clear(self):
+        self.history = []
+```
+
+## Keeping it in budget
+
+History grows every step and the context window is finite. Two standard strategies:
+
+1. **Rolling window** — keep the last N turns (plus the original task, which you should *never* drop).
+2. **Summarization** — when history gets long, compress older turns into a short summary and keep recent turns verbatim.
+
+The original task and recent observations are the highest-value tokens; protect them.
+</Body>
+
+<Code>
+```python
+class WindowedMemory:
+    """Keeps the task + the last `window` messages to stay within budget."""
+    def __init__(self, window: int = 12):
+        self.window = window
+        self.task: dict | None = None
+        self.history: list[dict] = []
+
+    def add_message(self, role: str, content: str):
+        msg = {"role": role, "content": content}
+        if self.task is None and role == "user":
+            self.task = msg          # pin the original task forever
+        self.history.append(msg)
+
+    def get_messages(self) -> list[dict]:
+        recent = self.history[-self.window:]
+        # always include the pinned task even if it scrolled out of the window
+        if self.task and self.task not in recent:
+            return [self.task, *recent]
+        return recent
+
+    def clear(self):
+        self.task, self.history = None, []
+```
+</Code>
+
+<TryItYourself>
+1. Implement `AgentMemory` and wire it into your ReAct controller
+2. Run a 3-step task and print the history; confirm observations are present
+3. Swap in `WindowedMemory` with `window=4` on a long task; confirm the original task survives
+4. Add a `token_count` of the history each step and watch it grow
+5. Implement a `summarize_old_turns` step that triggers past a token threshold
+</TryItYourself>
+
+<CommonMistakes>
+- **Dropping the original task** when windowing — the agent forgets what it's doing
+- **Never trimming** — history outgrows the context window and requests start failing
+- **Storing raw tool dumps** — huge observations eat the budget; trim or summarize them
+- **Confusing short-term and long-term memory** — cross-session facts belong in a vector store, not the message list
+- **Not clearing memory between tasks** — stale history bleeds into the next run
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented an append-only message memory
+- [ ] Verified observations are fed back and used across steps
+- [ ] Added a rolling window that pins the original task
+- [ ] Measured history token growth and added a trim/summarize trigger
+- [ ] Can explain short-term vs long-term memory
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Your agent keeps re-running the same web search every iteration. Most likely cause?**
+
+- A) The temperature is too low
+- B) Observations aren't being written back to memory, so it forgets it already searched ✅
+- C) The tool registry is missing
+- D) The context window is too large
+</MiniQuiz>
+
+<InterviewExplanation>
+"Short-term memory is the session's message history — the task plus every Thought, Action, and Observation — and it's what lets an agent reason across steps. If I don't feed observations back into it, the agent forgets and repeats actions. But I can't keep everything: the context window is finite, so I use a rolling window that always pins the original task, or I summarize older turns when history gets long. Long-term, cross-session memory is a different thing — that's just retrieval from a vector store on demand."
+</InterviewExplanation>

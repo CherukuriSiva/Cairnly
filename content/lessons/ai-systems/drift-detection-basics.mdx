@@ -1,0 +1,101 @@
+---
+slug: drift-detection-basics
+title: "Drift Detection: Data Drift vs Concept Drift (KS, PSI)"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Distinguish data drift from concept drift
+- Use the KS test for continuous features and PSI for distributions
+- Apply drift detection to LLM apps via query-embedding monitoring
+- Decide what action a drift alert should trigger
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Models rot. The inputs your model sees in month six look nothing like your training set, and accuracy quietly falls off a cliff with no error in the logs. Drift detection is the early-warning system that tells you to retrain *before* users notice. It's a core MLOps interview topic and a real production safeguard.
+</WhyThisMatters>
+
+<Body>
+## Two kinds of drift
+
+- **Data drift (covariate shift)** — the *inputs* change distribution. Users start asking about topics your model never trained on. The relationship between input and output is unchanged; the inputs just moved.
+- **Concept drift** — the *relationship* changes. The same input now maps to a different correct answer (a policy changed, fraud patterns evolved). Harder to detect because you often lack fresh labels.
+
+## Detecting data drift
+
+Compare a recent window of inputs to a reference (training) window:
+
+- **KS test (Kolmogorov–Smirnov)** — for a continuous feature, tests whether two samples come from the same distribution. A small p-value = drift.
+- **PSI (Population Stability Index)** — bins a feature and sums how much mass shifted between buckets. Rule of thumb: PSI < 0.1 stable, 0.1–0.25 moderate, > 0.25 significant drift.
+- **Chi-squared** — for categorical features.
+
+## Drift for LLM apps
+
+You don't have tabular features, but you have **query embeddings**. Track the distribution of incoming query embeddings (e.g. cluster them, or PSI on a reduced dimension). A sudden shift means users are asking about new things your retrieval corpus may not cover.
+
+## What an alert should do
+
+Drift is a *signal*, not an automatic retrain. Route alerts to: collect fresh labels, expand the retrieval corpus, or schedule retraining — with a human deciding when the signal is strong enough.
+</Body>
+
+<Code>
+```python
+import numpy as np
+from scipy.stats import ks_2samp
+
+def detect_data_drift(reference: np.ndarray, current: np.ndarray, alpha: float = 0.05) -> dict:
+    """KS test per continuous feature; flags features whose distribution moved."""
+    drifted = {}
+    for i in range(reference.shape[1]):
+        stat, p = ks_2samp(reference[:, i], current[:, i])
+        drifted[f"feature_{i}"] = {"ks": float(stat), "p": float(p), "drift": p < alpha}
+    return drifted
+
+def psi(reference: np.ndarray, current: np.ndarray, bins: int = 10) -> float:
+    """Population Stability Index between two 1-D samples."""
+    edges = np.histogram_bin_edges(reference, bins=bins)
+    ref = np.histogram(reference, edges)[0] / len(reference) + 1e-6
+    cur = np.histogram(current, edges)[0] / len(current) + 1e-6
+    return float(np.sum((cur - ref) * np.log(cur / ref)))
+```
+</Code>
+
+<TryItYourself>
+1. Generate a reference sample and a shifted sample; run `detect_data_drift`
+2. Compute PSI between them and check it against the 0.1 / 0.25 thresholds
+3. Embed 100 "old" queries and 100 "new-topic" queries; PSI on a reduced dimension
+4. Set an alert threshold and log when drift fires
+5. Write down the action each alert level should trigger
+</TryItYourself>
+
+<CommonMistakes>
+- **Confusing data and concept drift** — they need different responses
+- **Auto-retraining on every alert** — drift is a signal; a human decides
+- **No reference window** — you need a fixed baseline to compare against
+- **Watching only inputs** — concept drift needs label/outcome monitoring too
+- **PSI without sensible bins** — too few/many bins distorts the index
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Implemented a KS-test drift check
+- [ ] Implemented PSI and applied the standard thresholds
+- [ ] Applied drift detection to query embeddings
+- [ ] Defined alert thresholds and their actions
+- [ ] Can explain data vs concept drift
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Users keep asking your support bot about a brand-new product it was never trained on, but the input→answer relationship is unchanged. This is:**
+
+- A) Concept drift
+- B) Data drift (the input distribution moved) ✅
+- C) Not drift
+- D) A latency problem
+</MiniQuiz>
+
+<InterviewExplanation>
+"Data drift is when the inputs change distribution — users ask about new topics — while the input-to-output relationship holds. Concept drift is when that relationship itself changes, like a policy update, and it's harder because you often lack fresh labels. I detect data drift by comparing a recent window to a reference window: KS test for continuous features, PSI with the 0.1/0.25 thresholds, chi-squared for categoricals. For LLM apps I track query-embedding distributions instead of tabular features. Crucially, a drift alert is a signal to investigate or retrain, not an automatic retrain — a human decides."
+</InterviewExplanation>

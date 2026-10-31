@@ -1,0 +1,101 @@
+---
+slug: streaming-responses-sse
+title: "Streaming Responses with SSE & WebSockets"
+track: ai-systems
+tier: short
+estimatedMinutes: 15
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Explain why streaming transforms perceived LLM latency
+- Compare Server-Sent Events (SSE) with WebSockets for token streaming
+- Stream tokens from a FastAPI endpoint
+- Know what you trade away when you stream (post-hoc guardrails)
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A 4-second wait for a full answer feels broken; the same 4 seconds with words appearing immediately feels fast. Streaming is the single biggest *perceived* latency win in LLM UX, which is why every serious chat product does it. Knowing SSE vs WebSockets and the guardrail trade-off is a common production-engineering question.
+</WhyThisMatters>
+
+<Body>
+## Time-to-first-token beats total time
+
+Users judge responsiveness by **time to first token**, not total generation time. Streaming sends each token as it's produced, so the answer starts appearing in ~200ms even if it takes 4s to finish. Same total time, completely different feel.
+
+## SSE vs WebSockets
+
+- **SSE (Server-Sent Events)** — one-way, server→client, over plain HTTP. Simple, auto-reconnects, perfect for "stream the model's tokens to the browser." This is the default for LLM streaming.
+- **WebSockets** — full duplex, bidirectional. Use when the client also needs to send mid-stream (interrupt, collaborative editing, live tools). More moving parts.
+
+For a chatbot that streams an answer, **SSE is usually the right, simpler choice.**
+
+## The guardrail trade-off
+
+Here's the catch: once you stream a token, it's on the user's screen. You can no longer run an *output* guardrail over the *complete* answer before showing it. Options:
+
+- Run **input** guardrails before streaming starts (you still can).
+- **Buffer-and-scan** small windows, or stop the stream if a check trips.
+- For high-stakes domains, **don't stream** — generate fully, verify, then return.
+
+Streaming is a UX win you pay for in output-moderation flexibility.
+</Body>
+
+<Code>
+```python
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+
+app = FastAPI()
+
+async def token_stream(query: str):
+    # input guardrails run BEFORE the first token leaves
+    if not is_safe_prompt(query):
+        yield "data: [blocked]\n\n"
+        return
+    async for token in llm.stream(query):     # provider yields tokens
+        yield f"data: {token}\n\n"             # SSE frame
+    yield "data: [DONE]\n\n"
+
+@app.get("/chat")
+async def chat(q: str):
+    return StreamingResponse(token_stream(q), media_type="text/event-stream")
+```
+</Code>
+
+<TryItYourself>
+1. Build the SSE endpoint and consume it with `curl -N`
+2. Measure time-to-first-token vs total time
+3. Add an input guardrail before the stream begins
+4. Try buffering 20 tokens and scanning for a banned word before forwarding
+5. Decide which of your use cases should NOT stream and why
+</TryItYourself>
+
+<CommonMistakes>
+- **Reaching for WebSockets** when one-way SSE would do
+- **Assuming you can still moderate the full output** — once streamed, it's shown
+- **No `[DONE]` sentinel** — clients can't tell when the stream ended
+- **Streaming high-stakes answers** that need full-output verification
+- **Forgetting input guardrails** — you can still run those before streaming
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Streamed tokens from a FastAPI SSE endpoint
+- [ ] Measured the time-to-first-token improvement
+- [ ] Ran input guardrails before streaming
+- [ ] Articulated the output-guardrail trade-off
+- [ ] Chose SSE vs WebSockets deliberately
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: What do you give up by streaming tokens to the user as they're generated?**
+
+- A) The ability to use a GPU
+- B) The ability to run an output guardrail over the *complete* answer before the user sees any of it ✅
+- C) Input validation
+- D) Token counting
+</MiniQuiz>
+
+<InterviewExplanation>
+"Users judge responsiveness by time-to-first-token, so streaming each token as it's produced makes a 4-second answer feel instant. For LLM apps I default to SSE — one-way, over plain HTTP, auto-reconnecting — and reserve WebSockets for when the client needs to send mid-stream. The trade-off is that once a token is on screen I can't run an output guardrail over the complete answer, so I run input guardrails before streaming, buffer-and-scan small windows, and for high-stakes domains I don't stream at all — I generate fully, verify, then return."
+</InterviewExplanation>

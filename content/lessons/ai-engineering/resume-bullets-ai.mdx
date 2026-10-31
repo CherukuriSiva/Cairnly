@@ -1,0 +1,146 @@
+---
+slug: resume-bullets-ai
+title: "Resume Bullets for AI Projects: What to Write, What to Drop"
+track: ai-engineering
+tier: short
+estimatedMinutes: 12
+difficulty: easy
+---
+
+<WhatYouWillLearn>
+- Write resume bullets that pass the 6-second recruiter scan
+- Use the "Verb + What + How + Impact" formula for AI projects
+- Distinguish impressive metrics from meaningless ones
+- Avoid the most common AI resume mistakes
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Recruiters spend 6-10 seconds on your resume. Your AI project bullets need to communicate "this person has built real things" instantly. A bad bullet like "Worked with LLMs and embeddings" says nothing. A good bullet like "Built a domain-specific RAG assistant achieving 85% precision@5 on 50 test queries, deployed to 200 daily users" lands you an interview. The difference is structure, specificity, and knowing what to drop.
+</WhyThisMatters>
+
+<Body>
+## The formula: Verb + What + How + Impact
+
+Every resume bullet should follow this pattern:
+
+**[Strong verb]** + **[what you built]** + **[key technical details]** + **[measurable impact]**
+
+Example:
+> Built a domain-specific RAG assistant **[what]** using FAISS vector search and OpenAI embeddings **[how]**, achieving 85% precision@5 and reducing customer support response time by 40% **[impact]**
+
+## Strong verbs for AI projects
+
+Use verbs that show ownership and engineering depth:
+
+| Use these | Not these |
+|---|---|
+| Built, Designed, Implemented | Worked on, Helped with, Contributed to |
+| Deployed, Shipped, Launched | Used, Learned, Studied |
+| Optimized, Reduced, Improved | Familiar with, Experienced in |
+| Evaluated, Measured, Calibrated | Researched, Explored |
+| Integrated, Automated, Migrated | Assisted, Supported |
+
+## Good bullets vs bad bullets
+
+### RAG pipeline
+
+**Bad**: "Built a RAG pipeline using Python and OpenAI"
+
+**Good**: "Built and deployed a 6-stage RAG pipeline with FAISS retrieval, confidence-gated generation, and safety guardrails, achieving 91% faithfulness on a 50-query evaluation set"
+
+Why it's better: mentions the architecture, evaluation methodology, and a specific metric.
+
+### Embeddings / vector search
+
+**Bad**: "Used embeddings for semantic search"
+
+**Good**: "Designed a vector search system processing 100K+ document chunks with FAISS IndexFlatIP and bge-small embeddings, achieving sub-50ms retrieval latency with 85% precision@5"
+
+Why it's better: includes scale, specific tools, and performance numbers.
+
+### Fine-tuning
+
+**Bad**: "Fine-tuned a language model"
+
+**Good**: "Fine-tuned Mistral-7B using LoRA (rank-16, 0.06% trainable parameters) on 500 domain-specific examples, improving task accuracy from 72% to 89% vs the prompted baseline"
+
+Why it's better: shows the technique, efficiency, and a before/after comparison.
+
+### Evaluation
+
+**Bad**: "Evaluated AI system performance"
+
+**Good**: "Built an automated evaluation pipeline measuring precision@k, faithfulness, and answer relevancy using LLM-as-judge, running on 50+ labeled queries per deployment cycle"
+
+### Deployment
+
+**Bad**: "Deployed an AI application"
+
+**Good**: "Deployed a RAG assistant to Hugging Face Spaces serving 200+ daily queries with 1.8s p50 latency, semantic caching (30% hit rate), and automated quality monitoring"
+
+## What metrics to include
+
+**Include:**
+- Precision@k, recall@k, MRR (retrieval quality)
+- Faithfulness score (generation quality)
+- Latency (p50 or p99)
+- Cost savings or efficiency gains
+- User count or query volume
+- Before/after comparisons
+
+**Drop:**
+- "Accuracy" without specifying what it measures
+- Training loss (nobody cares about your loss curve)
+- Number of parameters (unless it's about efficiency, like LoRA)
+- Lines of code
+- Number of commits
+
+## What to drop entirely
+
+Remove bullets that show consumption, not creation:
+
+- "Completed Coursera course on ML" — goes in Education, not Experience
+- "Familiar with PyTorch, TensorFlow, LangChain" — put in a Skills section, not bullets
+- "Read papers on transformer architecture" — unless you implemented something from the paper
+- "Experimented with different models" — experimentation without results isn't a bullet
+
+## Structuring your AI projects section
+
+If your AI experience is a personal project (like the capstone), format it as:
+
+```
+RAG Assistant for [Domain]                          [Month Year]
+Personal Project | github.com/you/project | live-demo-url.com
+
+- Built a 6-stage RAG pipeline (safety → embed → retrieve → 
+  confidence gate → generate → output check) using FAISS and 
+  GPT-4o-mini, deployed to Hugging Face Spaces
+- Implemented confidence-gated retrieval reducing hallucinated 
+  responses, calibrated on 50 labeled test queries (precision@5: 
+  0.85, faithfulness: 0.91)
+- Added regex + LLM-judge safety guardrails handling PII 
+  redaction and prompt injection detection
+```
+
+Three bullets is the sweet spot. One for the core system, one for the quality/evaluation story, one for an additional capability.
+
+## The "so what?" test
+
+For every bullet, ask: "If the interviewer reads only this bullet, will they want to ask me about it?" If the answer is no, rewrite it.
+
+- "Used FAISS for search" — so what? Everyone has used FAISS.
+- "Calibrated a confidence gate achieving 90% precision with 12% refusal rate on production queries" — that's interesting. How did you calibrate it? What's an acceptable refusal rate? This starts a conversation.
+</Body>
+
+<MiniQuiz>
+**Q: Which resume bullet is strongest for an AI engineering role?**
+
+- A) "Worked with embeddings, FAISS, and LLMs to build an AI application"
+- B) "Built a RAG pipeline using modern AI tools and frameworks"
+- C) "Deployed a confidence-gated RAG assistant achieving 91% faithfulness, serving 200 daily queries with 1.8s p50 latency" ✅
+- D) "Studied and implemented various AI engineering patterns including RAG, fine-tuning, and agents"
+</MiniQuiz>
+
+<InterviewExplanation>
+"I write resume bullets with the formula: strong verb, what I built, how I built it, and measurable impact. For AI projects, the key metrics are retrieval quality (precision@k), generation quality (faithfulness), and operational metrics (latency, cost, user count). I include before/after comparisons when possible. I drop anything that shows consumption rather than creation — courses completed, tools used, papers read. Every bullet should make an interviewer want to ask a follow-up question."
+</InterviewExplanation>

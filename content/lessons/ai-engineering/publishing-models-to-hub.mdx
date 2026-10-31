@@ -1,0 +1,112 @@
+---
+slug: publishing-models-to-hub
+title: "Publishing Models: Adapter vs Merged to the Hub"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Distinguish a LoRA adapter from a merged full model
+- Decide which to publish for which consumer
+- Upload an artifact to the Hugging Face Hub programmatically
+- Version artifacts and write a model card so others can use them
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Training a model is worthless if no one can load it. Publishing to a hub (or registry) is the handoff from "it ran on my GPU" to "the team can serve it." Knowing the adapter-vs-merged distinction — and which to ship — is a practical fine-tuning skill and a tidy portfolio artifact (a public model others can actually run).
+</WhyThisMatters>
+
+<Body>
+## Adapter vs merged
+
+LoRA training produces a small **adapter** — just the low-rank deltas, often a few MB — not a new full model. You have two things to publish:
+
+- **The adapter** — tiny, but the consumer must load it *on top of* the exact base model. Great for sharing cheaply and stacking multiple adapters.
+- **The merged model** — adapter folded into the base weights, producing a standalone full model (GBs). Heavier, but loads like any normal model with no base-model coordination.
+
+## Which to ship
+
+- Publish the **adapter** when consumers already have the base model and you want lightweight, composable artifacts (and you can iterate cheaply).
+- Publish the **merged** model when you want a drop-in artifact a serving stack can load directly, or when the base model isn't conveniently available to consumers.
+
+Often you publish both: the adapter for tinkerers, the merged model for serving.
+
+## Upload programmatically
+
+Pushing is a folder upload to a hub repo with an auth token. Wrap it so adapter and merged pushes are one call each, with a clear commit message:
+
+```python
+from huggingface_hub import HfApi
+
+def _upload_folder(folder, repo_id, token, message):
+    HfApi(token=token).upload_folder(folder_path=str(folder), repo_id=repo_id,
+                                     repo_type="model", commit_message=message)
+
+def push_adapter(adapter_dir, repo_id, token):
+    _upload_folder(adapter_dir, repo_id, token, "Upload LoRA adapter")
+
+def push_merged(merged_dir, repo_id, token):
+    _upload_folder(merged_dir, repo_id, token, "Upload merged FP16 model")
+```
+
+## Version it and write a card
+
+Tag releases (commit/branch/version) so a consumer can pin a known-good artifact — the same "serve by version, roll back by re-pointing" discipline as a model registry. Include a model card: base model, training data summary, eval numbers, and intended use.
+</Body>
+
+<Code>
+```python
+import os
+
+def publish(adapter_dir, merged_dir, repo_id: str):
+    token = os.environ["HF_TOKEN"]                 # never hardcode
+    # tinkerers want the small, composable adapter...
+    push_adapter(adapter_dir, f"{repo_id}-adapter", token)
+    # ...serving wants a standalone merged model
+    push_merged(merged_dir, f"{repo_id}-merged", token)
+    return {"adapter": f"{repo_id}-adapter", "merged": f"{repo_id}-merged"}
+
+# consumer side — pin a version, don't float on 'latest'
+# adapter:  PeftModel.from_pretrained(base_model, f"{repo_id}-adapter", revision="v1.0")
+# merged:   AutoModelForCausalLM.from_pretrained(f"{repo_id}-merged", revision="v1.0")
+```
+</Code>
+
+<TryItYourself>
+1. After a LoRA run, locate the adapter directory and check its size vs the base model
+2. Merge the adapter into the base and compare the merged model's size
+3. Push the adapter to a Hub repo with `push_adapter`
+4. Load it back on top of the base model and run inference
+5. Write a minimal model card (base, data, eval, intended use) and pin a `revision`
+</TryItYourself>
+
+<CommonMistakes>
+- **Publishing an adapter without naming the base model** — it's unusable alone
+- **Hardcoding the HF token** — read it from the environment
+- **Floating on `latest`** — consumers should pin a `revision` for reproducibility
+- **No model card** — others can't tell what it was trained on or for
+- **Shipping only the merged model** when consumers wanted the cheap adapter (or vice versa)
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Explained adapter vs merged and when to ship each
+- [ ] Uploaded an artifact to the Hub programmatically
+- [ ] Loaded it back and ran inference
+- [ ] Pinned a version/revision
+- [ ] Wrote a model card with base, data, eval, and intended use
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: You publish only a 12 MB LoRA adapter but omit which base model it targets. What happens for a consumer?**
+
+- A) It works standalone
+- B) It's unusable — an adapter must be loaded on top of the exact base model it was trained against ✅
+- C) It auto-downloads the right base
+- D) It becomes a merged model
+</MiniQuiz>
+
+<InterviewExplanation>
+"LoRA produces a small adapter — just the low-rank deltas — not a full model, so I have two things I can publish. The adapter is tiny and composable but must be loaded on top of the exact base model; the merged model folds the adapter into the base into a standalone artifact that serving can load directly. I publish the adapter for people who already have the base and want to iterate cheaply, the merged model for a drop-in serving artifact — often both. Uploading is a folder push to the hub with a token read from the environment, never hardcoded, and I pin versions and write a model card with the base model, data summary, eval numbers, and intended use so the artifact is actually reproducible and usable."
+</InterviewExplanation>

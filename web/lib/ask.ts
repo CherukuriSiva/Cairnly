@@ -16,13 +16,26 @@ export interface Source {
 export type AskEvent =
   | { type: "sources"; sources: Source[] }
   | { type: "token"; text: string }
-  | { type: "done"; refused: boolean; model: string; top_similarity: number }
+  | { type: "done"; refused: boolean; model: string; top_similarity: number; notice?: string }
   | { type: "error"; message: string };
 
 export type Provider = "ollama" | "anthropic";
 
+export interface KnowledgeBase {
+  name: string;
+  title: string;
+  notice: string;
+}
+
+export async function listKbs(): Promise<KnowledgeBase[]> {
+  const res = await fetch(`${API_URL}/kbs`);
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return res.json();
+}
+
 export async function ask(
   question: string,
+  kb: string,
   provider: Provider,
   onEvent: (event: AskEvent) => void,
   signal?: AbortSignal,
@@ -30,7 +43,7 @@ export async function ask(
   const res = await fetch(`${API_URL}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, provider }),
+    body: JSON.stringify({ question, kb, provider }),
     signal,
   });
   if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);

@@ -1,0 +1,278 @@
+---
+slug: cost-and-latency
+title: "Cost and Latency Tradeoffs in a Production RAG"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Identify where latency and cost come from in a RAG pipeline
+- Calculate per-query cost for embedding, retrieval, and generation
+- Apply caching, model tiering, and prompt compression to reduce costs
+- Set latency budgets and measure against them
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+A demo doesn't have a budget. A product does. Your RAG pipeline might work perfectly at 10 queries per day, but at 10,000 queries per day, the LLM bill alone could be $3,000/month. Understanding where costs and latency come from — and how to reduce them without sacrificing quality — is what separates a prototype from a production system.
+</WhyThisMatters>
+
+<Body>
+## Where cost and latency come from
+
+A RAG query passes through several stages, each with its own cost and latency profile:
+
+| Stage | Latency | Cost driver | Typical range |
+|---|---|---|---|
+| Input safety check | 1-5ms (regex) or 200-500ms (LLM) | LLM calls if using judge | $0 - $0.001/query |
+| Query embedding | 10-50ms (local) or 100-300ms (API) | API calls or GPU time | $0.00002/query (OpenAI) |
+| Vector search | 1-50ms | Infrastructure (RAM, CPU) | ~$0/query (FAISS on local) |
+| LLM generation | 500-3000ms | Token count (input + output) | $0.003 - $0.06/query |
+| Output safety check | 1-5ms (regex) or 200-500ms (LLM) | LLM calls if using judge | $0 - $0.001/query |
+
+**Key insight**: LLM generation dominates both cost and latency. Everything else is noise in comparison.
+
+## Calculating per-query cost
+
+Let's do the math for a typical RAG query:
+
+```python
+# Cost model for a single RAG query
+def estimate_query_cost():
+    # Embedding the query
+    embedding_cost = 0.00002  # OpenAI text-embedding-3-small: $0.02/1M tokens
+    
+    # LLM generation (GPT-4o-mini)
+    context_tokens = 2000  # ~5 retrieved chunks at 400 tokens each
+    system_prompt_tokens = 200
+    query_tokens = 50
+    input_tokens = context_tokens + system_prompt_tokens + query_tokens
+    output_tokens = 300  # typical answer length
+    
+    # GPT-4o-mini pricing: $0.15/1M input, $0.60/1M output
+    input_cost = (input_tokens / 1_000_000) * 0.15
+    output_cost = (output_tokens / 1_000_000) * 0.60
+    generation_cost = input_cost + output_cost
+    
+    total = embedding_cost + generation_cost
+    return {
+        "embedding": embedding_cost,
+        "generation": generation_cost,
+        "total": total,
+        "monthly_10k_queries": total * 10_000 * 30,
+    }
+
+cost = estimate_query_cost()
+print(f"Per query: ${cost['total']:.5f}")
+print(f"Monthly (10k queries/day): ${cost['monthly_10k_queries']:.2f}")
+```
+
+With GPT-4o-mini, a typical query costs about $0.0005. At 10,000 queries/day, that's roughly $150/month. Manageable.
+
+Switch to GPT-4o (10x more expensive) and you're at $1,500/month. Switch to Claude Opus and it's more. The model choice is the biggest cost lever.
+
+## Optimization 1: Model tiering
+
+Use a cheap model for easy queries and an expensive model only when needed:
+
+```python
+def tiered_generation(query: str, context: str, retrieval_score: float) -> str:
+    if retrieval_score > 0.9:
+        # High confidence — cheap model is fine
+        return call_llm(query, context, model="gpt-4o-mini")
+    elif retrieval_score > 0.75:
+        # Medium confidence — use a better model
+        return call_llm(query, context, model="gpt-4o")
+    else:
+        # Low confidence — refuse rather than pay for a bad answer
+        return "I don't have enough information to answer this confidently."
+```
+
+In practice, 70-80% of queries can be handled by the cheap model. This cuts your LLM bill by 50-70%.
+
+## Optimization 2: Semantic caching
+
+If the same question (or a very similar one) was asked recently, return the cached answer instead of calling the LLM again.
+
+```python
+import hashlib
+import time
+
+class SemanticCache:
+    def __init__(self, embedder, threshold: float = 0.95, ttl_seconds: int = 3600):
+        self.embedder = embedder
+        self.threshold = threshold
+        self.ttl = ttl_seconds
+        self.cache = []  # List of (embedding, answer, timestamp)
+    
+    def get(self, query: str) -> str | None:
+        query_emb = self.embedder.encode(query)
+        now = time.time()
+        
+        for emb, answer, ts in self.cache:
+            if now - ts > self.ttl:
+                continue  # Expired
+            similarity = cosine_similarity(query_emb, emb)
+            if similarity >= self.threshold:
+                return answer
+        return None
+    
+    def put(self, query: str, answer: str):
+        query_emb = self.embedder.encode(query)
+        self.cache.append((query_emb, answer, time.time()))
+```
+
+**Cache hit rates**: For customer support bots, 20-40% of queries are semantically similar to recent ones. That's 20-40% cost savings with no quality loss.
+
+## Optimization 3: Prompt compression
+
+The biggest input cost comes from the retrieved context. You can reduce it by:
+
+1. **Retrieve fewer chunks**: Use top-3 instead of top-5 if quality holds
+2. **Truncate chunks**: Only include the most relevant sentences from each chunk
+3. **Summarize context**: Use a cheap model to summarize retrieved chunks before passing to the main model
+
+```python
+def compress_context(chunks: list[str], max_tokens: int = 1000) -> str:
+    """Keep only the most relevant sentences from retrieved chunks."""
+    combined = "\n".join(chunks)
+    if count_tokens(combined) <= max_tokens:
+        return combined
+    
+    # Simple approach: keep first N tokens
+    words = combined.split()
+    compressed = " ".join(words[:max_tokens])
+    return compressed
+```
+
+## Setting latency budgets
+
+Define an acceptable total latency and allocate across stages:
+
+| Stage | Budget | Strategy if over budget |
+|---|---|---|
+| Embedding | 50ms | Use local model instead of API |
+| Retrieval | 20ms | Use IndexFlatIP for < 100k vectors |
+| Generation | 2000ms | Use streaming, or switch to faster model |
+| Safety checks | 10ms | Use regex only, skip LLM judge |
+| **Total** | **2100ms** | |
+
+Measure actual latency and compare to budget:
+
+```python
+import time
+
+def timed_pipeline(query: str, retriever, generator) -> dict:
+    timings = {}
+    
+    t0 = time.time()
+    embedding = embed(query)
+    timings["embedding_ms"] = (time.time() - t0) * 1000
+    
+    t0 = time.time()
+    results = retriever.search(embedding, k=5)
+    timings["retrieval_ms"] = (time.time() - t0) * 1000
+    
+    t0 = time.time()
+    answer = generator.generate(query, results)
+    timings["generation_ms"] = (time.time() - t0) * 1000
+    
+    timings["total_ms"] = sum(timings.values())
+    return {"answer": answer, "timings": timings}
+```
+
+## The streaming escape hatch
+
+LLM generation is the latency bottleneck. **Streaming** doesn't reduce total time, but it reduces *perceived* latency — users see the first token in 200-500ms instead of waiting 2-3 seconds for the full response.
+
+For most user-facing applications, streaming is mandatory. Users won't wait 3 seconds staring at a spinner.
+
+## Quick reference: model pricing and speed
+
+| Model | Input cost (per 1M tokens) | Output cost | Typical latency | Best for |
+|---|---|---|---|---|
+| GPT-4o-mini | $0.15 | $0.60 | 500-1000ms | Most RAG queries |
+| GPT-4o | $2.50 | $10.00 | 1000-2000ms | Complex reasoning |
+| Claude 3.5 Haiku | $0.25 | $1.25 | 400-800ms | Fast classification |
+| Claude 3.5 Sonnet | $3.00 | $15.00 | 800-1500ms | High-quality generation |
+
+*Prices as of early 2025. Check provider pricing pages for current rates.*
+</Body>
+
+<Code>
+```python
+def cost_calculator(
+    queries_per_day: int,
+    input_tokens_per_query: int = 2250,
+    output_tokens_per_query: int = 300,
+    input_price_per_m: float = 0.15,   # GPT-4o-mini
+    output_price_per_m: float = 0.60,
+    cache_hit_rate: float = 0.0,
+    cheap_model_fraction: float = 1.0,
+    expensive_multiplier: float = 10.0,
+) -> dict:
+    """Calculate monthly RAG cost with optimizations."""
+    effective_queries = queries_per_day * (1 - cache_hit_rate)
+    
+    cheap_queries = effective_queries * cheap_model_fraction
+    expensive_queries = effective_queries * (1 - cheap_model_fraction)
+    
+    def query_cost(n, multiplier=1.0):
+        input_cost = (n * input_tokens_per_query / 1_000_000) * input_price_per_m * multiplier
+        output_cost = (n * output_tokens_per_query / 1_000_000) * output_price_per_m * multiplier
+        return input_cost + output_cost
+    
+    daily = query_cost(cheap_queries) + query_cost(expensive_queries, expensive_multiplier)
+    monthly = daily * 30
+    
+    return {"daily": daily, "monthly": monthly, "per_query": daily / queries_per_day}
+
+# Scenario comparison
+scenarios = [
+    ("No optimization", {"queries_per_day": 10000}),
+    ("30% cache hit", {"queries_per_day": 10000, "cache_hit_rate": 0.3}),
+    ("Cache + tiering", {"queries_per_day": 10000, "cache_hit_rate": 0.3, 
+                         "cheap_model_fraction": 0.8}),
+]
+
+for name, kwargs in scenarios:
+    result = cost_calculator(**kwargs)
+    print(f"{name}: ${result['monthly']:.2f}/month (${result['per_query']:.5f}/query)")
+```
+</Code>
+
+<TryItYourself>
+1. Use the cost calculator to estimate your RAG pipeline's monthly cost at 1k, 10k, and 100k queries/day
+2. Add semantic caching to your pipeline and estimate the cache hit rate for your use case
+3. Implement the latency measurement wrapper and profile your existing pipeline
+4. Try model tiering: route easy queries to a cheap model and compare quality
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Can break down per-query cost into embedding, retrieval, and generation
+- [ ] Calculated monthly cost for a realistic query volume
+- [ ] Understand at least two optimization strategies (caching, tiering, compression)
+- [ ] Can set and measure against a latency budget
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Ignoring cost during development** — a $0.05/query system at 10k queries/day is $15,000/month
+- **Using the most expensive model for every query** — model tiering can cut costs 50-70%
+- **Not streaming responses** — users perceive 3-second wait times as broken
+- **Caching too aggressively** — a stale cached answer is worse than no cache; use TTLs
+- **Optimizing latency before measuring** — profile first, then optimize the actual bottleneck
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: Your RAG system costs $5,000/month. Analysis shows 35% of queries are near-duplicates and 75% are simple enough for GPT-4o-mini. What's your estimated monthly cost after applying semantic caching and model tiering?**
+
+- A) $4,000/month
+- B) $2,500/month
+- C) $1,300/month ✅
+- D) $500/month
+</MiniQuiz>
+
+<InterviewExplanation>
+"In a production RAG system, LLM generation dominates both cost and latency. I optimize with three techniques: First, semantic caching — embedding-based cache lookup for similar recent queries, which typically saves 20-30%. Second, model tiering — routing high-confidence queries to a cheap model like GPT-4o-mini and only using expensive models for complex cases. Third, prompt compression — retrieving fewer chunks or summarizing context to reduce input tokens. I set latency budgets per stage and measure against them, using streaming to reduce perceived latency. Together, these optimizations typically cut costs 50-70% without meaningful quality loss."
+</InterviewExplanation>

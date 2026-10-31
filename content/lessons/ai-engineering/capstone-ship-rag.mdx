@@ -1,0 +1,351 @@
+---
+slug: capstone-ship-rag
+title: "Capstone: Ship a Domain-RAG Assistant to HF Spaces or Vercel"
+track: ai-engineering
+tier: medium
+estimatedMinutes: 90
+difficulty: hard
+---
+
+<WhatYouWillLearn>
+- Combine every skill from this track into a deployable RAG assistant
+- Choose a domain, curate a corpus, and build the full pipeline
+- Deploy to Hugging Face Spaces (Gradio) or Vercel (Next.js + API route)
+- Write a project README that demonstrates your work to hiring managers
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+Everything before this lesson was practice. This is the lesson where you ship something real. A deployed RAG assistant with a public URL, a GitHub repo, and a README is worth more on your resume than 10 tutorials completed. Hiring managers want to see that you can go from idea to deployed product. This capstone gives you that artifact.
+</WhyThisMatters>
+
+<Body>
+## Overview
+
+In this capstone, you'll build and deploy a domain-specific RAG assistant. You'll choose a topic you care about, curate a document corpus, build the full pipeline (retrieval, confidence gates, safety, generation), and deploy it publicly.
+
+**Time allocation:**
+- Domain selection and corpus curation: 15 min
+- Pipeline implementation: 30 min
+- Deployment: 20 min
+- README and polish: 15 min
+- Testing and verification: 10 min
+
+## Step 1: Choose a domain and curate a corpus
+
+Pick a domain where you can find 10-50 documents publicly. Good choices:
+
+| Domain | Source | Why it works |
+|---|---|---|
+| Python documentation | docs.python.org | Well-structured, public, rich content |
+| A specific textbook's chapters | Your own notes or open textbooks | Shows domain expertise |
+| Company FAQ / Help center | Public help docs from any SaaS | Realistic support use case |
+| Research papers on a topic | arXiv, Semantic Scholar | Shows you can handle dense content |
+| Cooking recipes | Any recipe site | Fun, easy to explain to non-technical interviewers |
+
+Gather your documents as plain text or markdown files. Aim for 20-50 documents totaling 50,000-200,000 words.
+
+```python
+# corpus_loader.py
+import os
+import json
+
+def load_corpus(docs_dir: str) -> list[dict]:
+    """Load all documents from a directory."""
+    documents = []
+    for filename in os.listdir(docs_dir):
+        if filename.endswith((".txt", ".md")):
+            filepath = os.path.join(docs_dir, filename)
+            with open(filepath) as f:
+                content = f.read()
+            documents.append({
+                "id": filename,
+                "text": content,
+                "source": filename,
+            })
+    print(f"Loaded {len(documents)} documents")
+    return documents
+```
+
+## Step 2: Build the pipeline
+
+You've already built every component in earlier lessons. Now wire them together:
+
+```python
+# pipeline.py
+from config import Config
+from chunking import recursive_chunk
+from retrieval import Retriever
+from safety import SafetyPipeline
+from confidence import retrieval_gate
+
+class RAGPipeline:
+    def __init__(self, config: Config):
+        self.config = config
+        self.retriever = Retriever(config.index_path, config.metadata_path)
+        self.safety = SafetyPipeline()
+    
+    def answer(self, query: str) -> dict:
+        # 1. Input safety
+        safety_result = self.safety.check_input(query)
+        if not safety_result.safe:
+            return {"answer": "I can't help with that request.", "refused": True}
+        query = safety_result.redacted_input
+        
+        # 2. Retrieve
+        results = self.retriever.search(query, k=self.config.top_k)
+        
+        # 3. Confidence gate
+        if results[0].score < self.config.confidence_threshold:
+            return {
+                "answer": "I don't have enough information to answer this question confidently. Try rephrasing or asking about a different topic.",
+                "refused": True,
+            }
+        
+        # 4. Generate
+        context = "\n\n".join(r.text for r in results[:self.config.top_k])
+        answer = self._generate(query, context)
+        
+        # 5. Output safety
+        output_check = self.safety.check_output(answer)
+        if not output_check.safe:
+            return {"answer": "I generated a response that didn't pass our safety review.", "refused": True}
+        
+        return {
+            "answer": answer,
+            "sources": [{"text": r.text[:200], "source": r.source, "score": float(r.score)} for r in results[:3]],
+            "refused": False,
+        }
+    
+    def _generate(self, query: str, context: str) -> str:
+        prompt = f"""Answer the user's question based only on the provided context. 
+If the context doesn't contain enough information, say so.
+Always cite which part of the context supports your answer.
+
+Context:
+{context}
+
+Question: {query}
+
+Answer:"""
+        return call_llm(prompt, model=self.config.model)
+```
+
+## Step 3: Build the index
+
+```python
+# build_index.py
+from sentence_transformers import SentenceTransformer
+from chunking import recursive_chunk
+from corpus_loader import load_corpus
+import faiss
+import json
+import numpy as np
+
+def build_index(docs_dir: str, output_dir: str):
+    # Load and chunk
+    documents = load_corpus(docs_dir)
+    chunks = []
+    for doc in documents:
+        doc_chunks = recursive_chunk(doc["text"], max_size=500)
+        for chunk in doc_chunks:
+            chunks.append({"text": chunk, "source": doc["source"]})
+    
+    print(f"Created {len(chunks)} chunks from {len(documents)} documents")
+    
+    # Embed
+    model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+    texts = [c["text"] for c in chunks]
+    embeddings = model.encode(texts, normalize_embeddings=True, show_progress_bar=True)
+    
+    # Build FAISS index
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings.astype("float32"))
+    
+    # Save
+    faiss.write_index(index, f"{output_dir}/index.faiss")
+    with open(f"{output_dir}/metadata.json", "w") as f:
+        json.dump({str(i): c for i, c in enumerate(chunks)}, f)
+    
+    print(f"Index saved: {index.ntotal} vectors, {dim} dimensions")
+
+if __name__ == "__main__":
+    build_index("./docs", "./index")
+```
+
+## Step 4: Deploy to Hugging Face Spaces (Gradio)
+
+Gradio is the fastest path to a deployed demo with a web UI.
+
+```python
+# app.py — Gradio interface for HF Spaces
+import gradio as gr
+from pipeline import RAGPipeline
+from config import Config
+
+pipeline = RAGPipeline(Config())
+
+def chat(message: str, history: list) -> str:
+    result = pipeline.answer(message)
+    answer = result["answer"]
+    
+    if not result["refused"] and result.get("sources"):
+        answer += "\n\n**Sources:**\n"
+        for s in result["sources"]:
+            answer += f"- {s['source']} (relevance: {s['score']:.2f})\n"
+    
+    return answer
+
+demo = gr.ChatInterface(
+    fn=chat,
+    title="Domain RAG Assistant",
+    description="Ask questions about [your domain]. Powered by RAG with FAISS retrieval and confidence-gated generation.",
+    examples=[
+        "What is [topic]?",
+        "How do I [task]?",
+        "Explain the difference between [A] and [B]",
+    ],
+)
+
+if __name__ == "__main__":
+    demo.launch()
+```
+
+**Deployment steps for HF Spaces:**
+1. Create a new Space on huggingface.co (select Gradio as SDK)
+2. Push your code: `git push` to the HF Space repo
+3. Add a `requirements.txt` with your dependencies
+4. Add your API key as a Space Secret (Settings > Secrets)
+5. The Space builds and deploys automatically
+
+## Alternative: Deploy to Vercel (Next.js)
+
+If you prefer a more polished UI:
+
+1. Create a Next.js app: `npx create-next-app@latest rag-assistant`
+2. Add an API route (`app/api/chat/route.ts`) that calls your Python pipeline
+3. Build a chat UI with React
+4. Deploy: `vercel deploy`
+
+For the Python backend, host it on Railway, Render, or HF Spaces as an API.
+
+## Step 5: Write the README
+
+Your README is your portfolio pitch. Include:
+
+```markdown
+# [Domain] RAG Assistant
+
+A retrieval-augmented generation assistant for [domain] built with FAISS, 
+sentence-transformers, and GPT-4o-mini.
+
+## Architecture
+- **Retrieval**: FAISS IndexFlatIP with bge-small-en-v1.5 embeddings
+- **Chunking**: Recursive character splitting (500 tokens, 100 token overlap)
+- **Safety**: Regex PII redaction + prompt injection detection
+- **Confidence gate**: Retrieval score threshold (calibrated on 20 test queries)
+- **Generation**: GPT-4o-mini with source citations
+
+## Demo
+[Link to your deployed app]
+
+## Results
+- Precision@5: 0.82 on 20 test queries
+- Faithfulness: 0.91 (sampled with LLM-judge)
+- Average latency: 1.8s (p50)
+
+## Run locally
+pip install -r requirements.txt
+python build_index.py
+python app.py
+```
+
+## Capstone checklist
+
+This is the minimum for a portfolio-worthy project:
+
+- [ ] Chosen a domain with 20+ documents
+- [ ] Built the FAISS index with chunked and embedded documents
+- [ ] Implemented the full pipeline: safety → retrieve → confidence gate → generate → output safety
+- [ ] Deployed to a public URL (HF Spaces or Vercel)
+- [ ] Tested with 10+ queries, including edge cases and refusal triggers
+- [ ] Written a README with architecture, results, and run instructions
+- [ ] Pushed code to a public GitHub repo
+</Body>
+
+<Code>
+```python
+# Minimal project structure
+"""
+rag-assistant/
+├── app.py              # Gradio or FastAPI entry point
+├── pipeline.py         # Main RAG pipeline
+├── retrieval.py        # FAISS search wrapper
+├── chunking.py         # Document chunking
+├── safety.py           # Input/output guardrails
+├── config.py           # All constants and thresholds
+├── build_index.py      # Index builder script
+├── docs/               # Your corpus documents
+│   ├── doc1.md
+│   ├── doc2.md
+│   └── ...
+├── index/              # Generated FAISS index
+│   ├── index.faiss
+│   └── metadata.json
+├── tests/              # Test queries and evaluation
+│   └── test_queries.json
+├── requirements.txt
+└── README.md
+"""
+
+# requirements.txt contents
+requirements = """
+faiss-cpu==1.7.4
+sentence-transformers==2.7.0
+gradio==4.44.0
+openai==1.55.0
+"""
+print(requirements)
+```
+</Code>
+
+<TryItYourself>
+1. Choose your domain and gather 20+ documents
+2. Run `build_index.py` to create the FAISS index
+3. Test the pipeline locally with `python app.py`
+4. Deploy to HF Spaces following the steps above
+5. Share the URL with a friend and collect feedback on 5 queries
+6. Write the README and push to GitHub
+</TryItYourself>
+
+<CompletionChecklist>
+- [ ] Domain chosen with 20+ documents curated
+- [ ] FAISS index built and tested locally
+- [ ] Full pipeline works: safety, retrieval, confidence gate, generation
+- [ ] Deployed to a public URL
+- [ ] README written with architecture, demo link, and results
+- [ ] Code pushed to public GitHub repo
+- [ ] Tested with 10+ queries including edge cases
+</CompletionChecklist>
+
+<CommonMistakes>
+- **Choosing a domain that's too broad** — "all of computer science" is unmanageable; pick a specific topic
+- **Skipping the confidence gate** — a demo that confidently hallucinates is worse than one that admits ignorance
+- **No README** — a repo without a README looks abandoned; write it before you share the link
+- **Hardcoding API keys** — use environment variables or HF Space Secrets, never commit keys
+- **Not testing with adversarial inputs** — try prompt injection, off-topic questions, and PII in queries
+- **Deploying but not testing the deployed version** — local works but deployment has different paths; test both
+</CommonMistakes>
+
+<MiniQuiz>
+**Q: Your deployed RAG app works locally but returns empty answers on Hugging Face Spaces. What should you check first?**
+
+- A) The LLM model is too large for the Space
+- B) The API key is not set as a Space Secret ✅
+- C) Gradio doesn't work on Hugging Face
+- D) The FAISS index file is corrupted
+</MiniQuiz>
+
+<InterviewExplanation>
+"For my capstone, I built and deployed a domain-specific RAG assistant covering [your domain]. The architecture has five stages: input safety checks, FAISS retrieval with bge-small embeddings, a confidence gate calibrated on 20 test queries, GPT-4o-mini generation with source citations, and output safety filtering. I deployed it to Hugging Face Spaces with Gradio for the UI. On my test set, it achieves 82% precision@5 and 91% faithfulness. The code is open source on GitHub with a README documenting the architecture and results."
+</InterviewExplanation>

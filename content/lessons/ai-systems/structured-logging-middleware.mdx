@@ -1,0 +1,110 @@
+---
+slug: structured-logging-middleware
+title: "Structured Logging Middleware for AI Services"
+track: ai-systems
+tier: medium
+estimatedMinutes: 30
+difficulty: medium
+---
+
+<WhatYouWillLearn>
+- Explain why structured (JSON) logs beat free-text `print`
+- Add FastAPI middleware that times every request automatically
+- Emit machine-queryable events for latency, status, and path
+- Surface latency in a response header and feed SLA monitoring
+</WhatYouWillLearn>
+
+<WhyThisMatters>
+You can't operate what you can't query. Free-text logs are invisible to dashboards and alerts; structured JSON logs are filterable, aggregatable, and SLA-ready. A logging middleware captures latency and status for *every* endpoint with zero per-handler code — the foundation that drift detection, dashboards, and incident response all build on.
+</WhyThisMatters>
+
+<Body>
+## Structured beats free-text
+
+`print(f"request took {t}ms")` is unqueryable. A structured event — `{"event": "inference_processed", "path": "/predict", "status_code": 200, "latency_ms": 42}` — can be filtered by path, grouped to compute p95, and alerted on. Use a library like `structlog` to emit JSON with timestamps and log levels.
+
+## Middleware times everything, for free
+
+Rather than instrument every handler, add one **middleware** that wraps every request: record the start time, call the handler, compute elapsed, and log a structured event. Every current and future endpoint is now observed automatically.
+
+## What to capture per request
+
+- `path`, `method`, `status_code` — the request shape and outcome.
+- `latency_ms` — the number that matters for SLAs.
+- a request/trace ID — to correlate logs across services.
+
+This is exactly the data drift dashboards and p95 alerts consume.
+
+## Expose latency to clients too
+
+Set an `X-Process-Time` response header so callers (and your load tests) can see server-side latency directly, not just measure round-trip from outside.
+</Body>
+
+<Code>
+```python
+import time, logging, structlog
+from fastapi import FastAPI, Request
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+structlog.configure(processors=[
+    structlog.processors.add_log_level,
+    structlog.processors.TimeStamper(fmt="iso"),
+    structlog.processors.JSONRenderer(),
+])
+logger = structlog.get_logger()
+
+async def logging_middleware(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    latency_ms = round((time.time() - start) * 1000, 2)
+    logger.info(
+        "inference_processed",
+        path=request.url.path,
+        method=request.method,
+        status_code=response.status_code,
+        latency_ms=latency_ms,
+    )
+    response.headers["X-Process-Time"] = str(latency_ms)   # surface to caller
+    return response
+
+app = FastAPI()
+app.middleware("http")(logging_middleware)
+```
+</Code>
+
+<TryItYourself>
+1. Add the middleware to your inference server and hit a few endpoints
+2. Confirm each request emits one JSON line with path, status, and latency
+3. Read the `X-Process-Time` header from a client
+4. Pipe logs to a file and compute p95 latency with `jq`
+5. Add a request-ID field and correlate two log lines from one request
+</TryItYourself>
+
+<CommonMistakes>
+- **Free-text logs** — unqueryable; emit structured JSON
+- **Per-handler timing code** — middleware does it once for all routes
+- **Logging request bodies with PII** — log metadata and IDs, not raw payloads
+- **No request/trace ID** — you can't correlate logs across services
+- **Only logging errors** — you need successful-request latency for p95/SLA
+</CommonMistakes>
+
+<CompletionChecklist>
+- [ ] Configured structlog to emit JSON events
+- [ ] Added latency-timing middleware to FastAPI
+- [ ] Captured path, method, status, and latency per request
+- [ ] Exposed `X-Process-Time` to callers
+- [ ] Computed p95 from the structured logs
+</CompletionChecklist>
+
+<MiniQuiz>
+**Q: Why add logging as FastAPI *middleware* instead of inside each route handler?**
+
+- A) Middleware runs faster
+- B) One middleware instruments every current and future endpoint automatically ✅
+- C) Handlers can't measure time
+- D) It avoids needing structlog
+</MiniQuiz>
+
+<InterviewExplanation>
+"You can't operate what you can't query, so I emit structured JSON logs, not free text — an event with path, status, and latency_ms can be filtered and aggregated into a p95, and alerted on. I capture it with a single FastAPI middleware that records the start time, calls the handler, computes elapsed, and logs one structured event, so every endpoint is observed with zero per-handler code. I include a request ID to correlate across services, surface server-side latency in an X-Process-Time header, and I log metadata and IDs rather than raw payloads to avoid PII. That structured stream is what drift dashboards, p95 alerts, and incident response all consume."
+</InterviewExplanation>
