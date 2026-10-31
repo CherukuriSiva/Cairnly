@@ -40,6 +40,28 @@ The rule that trips people up: **the template you train on must be byte-identica
 A retrieval prompt is just a structured user turn: an instruction, the retrieved passages (numbered, so the model can cite them), then the question. You stop *before* the assistant turn so the model generates the answer.
 </Body>
 
+<BookNote chapter="5">
+
+Chapter 5 presents prompt engineering as real engineering work, not guesswork. A prompt usually
+has a task description, examples, and the actual input, and the system prompt and user prompt
+are combined in a model-specific template before the model sees them. Getting that template
+wrong can quietly hurt quality.
+
+The advice Huyen collects is practical. Be explicit about what you want, including the format
+and what to do when unsure. Give the model the context it needs instead of hoping it knows.
+Split a complex job into smaller steps, each with its own prompt, so each step is easier to test
+and debug. Ask the model to reason before answering when the task needs it. Showing a few
+examples often helps, though stronger models need fewer.
+
+She also stresses treating prompts like code. Keep them in versioned files outside the
+application logic, track which version produced which output, and evaluate a change before you
+ship it. A prompt that worked for one model may behave differently after a model upgrade, so
+re-run your evaluations whenever either changes.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 5
+
+</BookNote>
+
 <MiniQuiz>
 **Q: You fine-tuned a model with one chat template, but at inference you format prompts slightly differently (an extra blank line). Quality drops sharply. Why?**
 

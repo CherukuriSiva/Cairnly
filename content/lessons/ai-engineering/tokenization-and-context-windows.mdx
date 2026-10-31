@@ -45,6 +45,27 @@ def count_tokens(text: str, model_name: str = "gpt-4-turbo-preview") -> int:
 Input and output tokens are usually priced **differently** (output is pricier). Cost = `input_tokens × input_rate + output_tokens × output_rate`. Track it per request and you'll never be surprised by the invoice.
 </Body>
 
+<BookNote chapter="2">
+
+The book treats tokens as the unit everything else is measured in. A model never sees characters
+or words; it sees pieces from a fixed vocabulary, and how text splits into those pieces depends
+on the tokenizer. English text usually needs fewer tokens than many other languages, so the same
+message can cost more, and fit less, depending on the language.
+
+This matters in three practical ways. Price: most APIs bill per input and output token, so long
+prompts and long answers both add up. Latency: output is produced one token at a time, so a
+longer answer simply takes longer to stream. Capacity: the context window caps how many tokens
+the prompt and the answer can share. A bigger window does not mean the model pays equal
+attention to everything inside it; information buried in the middle of a long prompt is easier
+for a model to miss than information at the start or end.
+
+When you plan a feature, estimate its token budget early. Count what you send, what you expect
+back, and how often it runs.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 2
+
+</BookNote>
+
 <MiniQuiz>
 **Q: Your model has a 128K-token context window. You inject 125K tokens of retrieved documents and ask for a 5K-token summary. What happens?**
 

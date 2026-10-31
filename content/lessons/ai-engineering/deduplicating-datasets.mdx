@@ -38,6 +38,28 @@ Comparing every pair is quadratic and dies on large corpora. **MinHash LSH** buc
 The kept record is the *first* one seen. Order your input so high-quality sources (curated data) come **before** noisier ones (scraped data). Then dedup keeps the good copy and drops the noisy near-duplicate.
 </Body>
 
+<BookNote chapter="8">
+
+Duplicates look harmless, but chapter 8 explains why they cause trouble. Repeated examples skew
+what the model sees as normal, waste training compute, and can make it memorise and repeat those
+items. Worse, if copies of test examples sit in the training set, your evaluation measures recall
+of seen data instead of real ability.
+
+Huyen separates the levels at which duplication happens. Whole documents may repeat, parts of
+documents may repeat across sources, and examples may be near copies that differ only in
+whitespace, punctuation or a few words. Exact matching, for example by hashing normalised text,
+catches the first kind cheaply. Near duplicates need fuzzier methods, such as comparing sets of
+word sequences with techniques like MinHash, or comparing embeddings and treating very close
+vectors as copies.
+
+In practice, run exact deduplication first, then a near-duplicate pass with a threshold you have
+checked by reading the pairs it flags. Always deduplicate across your train, validation and test
+splits, not only inside each one.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 8
+
+</BookNote>
+
 <Code>
 ```python
 import re, string

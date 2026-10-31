@@ -97,6 +97,27 @@ Most teams stop at RAG. Fine-tuning is a marginal improvement that costs signifi
 | Up-to-date data | Impossible | Solves this | Doesn't help |
 </Body>
 
+<BookNote chapter="1">
+
+Huyen draws a clear line between classic machine learning work and AI engineering. In the older
+workflow, a team collected data, trained a model and then shipped it. Today most teams start from
+a model someone else trained and spend their effort adapting it: writing prompts, adding
+retrieval, and only sometimes finetuning. The hard parts move with that shift. Training is no
+longer the bottleneck; deciding whether an open-ended answer is good becomes the main problem.
+
+She describes three layers you will touch. The application layer is where prompts, context and
+the user interface live. The model layer covers choosing, adapting and evaluating models. The
+infrastructure layer serves models and watches them in production. When you design an AI app,
+ask which layer a problem belongs to before you reach for a fix: a weak answer is often a
+context problem, not a model problem.
+
+For a new graduate this is good news. You can build useful products quickly, but you need solid
+engineering habits, because evaluation and iteration are where the real work sits.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 1
+
+</BookNote>
+
 <MiniQuiz>
 **Q: A legal tech startup wants their AI to answer questions about client contracts uploaded last month, using formal legal language. Which strategy combination makes the most sense?**
 

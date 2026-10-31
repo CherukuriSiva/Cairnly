@@ -225,6 +225,27 @@ You don't have to build all of this from scratch. These tools are commonly used 
 Start with structured logging and trace IDs. Add a purpose-built tool when you outgrow JSON files.
 </Body>
 
+<BookNote chapter="10">
+
+The end of chapter 10 turns to running an AI system once it is live. Huyen distinguishes
+monitoring, which tracks known signals and alerts when they move, from observability, which
+means collecting enough detail that you can investigate problems you did not predict.
+
+For AI apps the useful signals go beyond uptime. Track quality indicators, such as how often the
+model refuses, how often outputs fail format checks, and what users do with an answer: do they
+copy it, rephrase the question, or give up? Track cost and latency per request. Watch for drift,
+because user inputs, your data and even a hosted model's behaviour can change without warning.
+
+Logs and traces make investigation possible. Record each step of a request, including the
+prompt version, retrieved context, model and output, so a bad answer can be traced back to its
+cause. User feedback is valuable data too, both explicit ratings and implicit signals in how
+people react. Be careful with privacy when you store any of it, and decide upfront how long you
+keep it.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 10
+
+</BookNote>
+
 <Code>
 ```python
 import json

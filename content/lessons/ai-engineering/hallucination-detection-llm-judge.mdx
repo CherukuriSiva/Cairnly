@@ -51,6 +51,27 @@ On failure you have three escalating responses:
 Match the action to the stakes.
 </Body>
 
+<BookNote chapter="3">
+
+Using one model to grade another is popular because it is fast, cheap compared with people, and
+works on open-ended answers. Chapter 3 is careful about its weak spots, and they matter when you
+use a judge to catch hallucinations.
+
+A judge is itself a model, so its scores are probabilistic: run it twice and you may get two
+different verdicts. Its behaviour depends on the exact prompt and the exact model behind it, so a
+score of 4 from one setup is not comparable with a 4 from another. Judges also show biases. They
+can favour answers written by their own model family, prefer the first option they see, or rate
+longer answers higher regardless of quality.
+
+Practical habits follow from this. Treat the judge prompt and model as a versioned part of your
+system and record both next to every score. Give the judge a narrow, concrete question, such as
+whether each claim appears in the provided sources, instead of asking for a vague quality score.
+Check a sample of its verdicts by hand before you trust the numbers.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 3
+
+</BookNote>
+
 <Code>
 ```python
 JUDGE = """You are grading an answer for groundedness.

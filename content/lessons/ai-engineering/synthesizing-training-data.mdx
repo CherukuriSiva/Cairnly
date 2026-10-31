@@ -36,6 +36,28 @@ Real conversations have follow-ups ("what about for adults?"). Generate these by
 Synthetic ≠ sloppy. Every generated record must validate against the same schema as your real data — same fields (`instruction`, `input`, `output`), same types. A record that doesn't validate gets dropped, not trained on.
 </Body>
 
+<BookNote chapter="8">
+
+Chapter 8 covers using AI to create training data, a common move when real data is scarce,
+private or expensive to label. Huyen lists good reasons to do it: to cover rare cases, to balance
+classes, to produce many variations of an instruction, or to turn existing documents into
+question and answer pairs.
+
+The risks are just as real. Generated data inherits the mistakes and blind spots of the model
+that wrote it, so errors can be copied at scale. Research also warns that training models
+repeatedly on model-written data can narrow what they produce over time, losing the rare cases
+you most wanted. And if your test set was generated the same way, your scores may look better
+than real performance.
+
+So verification is part of synthesis, not an afterthought. Check generated examples with rules
+that a program can test, with a judge model, or with people on a sample. Mix synthetic data with
+real data rather than replacing it. Keep track of which examples are synthetic, so you can
+measure their effect and remove them if they hurt.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 8
+
+</BookNote>
+
 <Code>
 ```python
 from dataclasses import dataclass

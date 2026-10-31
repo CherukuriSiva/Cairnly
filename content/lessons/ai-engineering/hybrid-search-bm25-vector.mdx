@@ -36,6 +36,27 @@ Run both retrievers, then merge their ranked lists. **Reciprocal Rank Fusion** i
 Use hybrid when your corpus has identifiers, jargon, or names users will type verbatim (technical docs, legal, code, catalogs). For purely conversational corpora, vector alone is often enough — measure before adding complexity.
 </Body>
 
+<BookNote chapter="6">
+
+The book compares two families of retrievers. Term-based retrieval, such as BM25, scores
+documents by the words they share with the query, weighting rare words more. Embedding-based
+retrieval turns queries and documents into vectors and finds the closest ones by meaning.
+
+Each has a clear strength. Keyword search is fast, cheap and needs no model, and it handles exact
+terms well: product codes, error messages, names. Embedding search finds passages that use
+different words for the same idea, but it costs more to build and run, and it can blur exact
+terms that matter.
+
+Huyen notes that production systems often combine them. One common shape uses a cheap retriever
+to collect candidates and a more precise model to rerank them; another runs both searches and
+merges the rankings. Before you pick, measure. Build a small test set of questions with the
+passages that should be found, and compare retrievers on how often the right passage lands near
+the top. Your own data will tell you which mix works.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 6
+
+</BookNote>
+
 <MiniQuiz>
 **Q: A user searches your docs for the exact error code "E-4042". Which retriever is most likely to surface it?**
 

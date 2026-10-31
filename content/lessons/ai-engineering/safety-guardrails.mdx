@@ -237,6 +237,27 @@ def safe_answer(query: str, retriever, config) -> dict:
 **Optimization**: Run regex checks first. Only invoke LLM judges when regex passes. This saves cost on the 5-10% of queries that regex catches immediately.
 </Body>
 
+<BookNote chapter="10">
+
+Chapter 10 places guardrails at two points in the request path. Input guardrails run before the
+model sees anything. They can block known attack patterns, stop requests that are off-limits for
+your product, and remove or mask private data, such as phone numbers or account details, before
+it leaves your system for an outside model API.
+
+Output guardrails run after the model answers and before the user sees it. They look for
+problems like a malformed response, toxic or unsafe text, leaked private information, or claims
+that are not supported by the provided context. When a check fails, the system can retry, fall
+back to a safer response, or pass the case to a person.
+
+Huyen is clear about the cost. Every check adds latency, and streaming makes output checks harder
+because the user sees tokens before the full answer can be judged. Guardrails also make mistakes
+in both directions, blocking harmless requests and missing harmful ones. Measure their false
+positive and false negative rates like any other model, and tune them for your risk level.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 10
+
+</BookNote>
+
 <Code>
 ```python
 import re

@@ -44,6 +44,30 @@ High-stakes domains use a conservative threshold (0.98+). Tune it against real q
 A semantic cache assumes the answer is stable. Don't cache responses that depend on the user, the time, or live data — or scope the cache key by tenant/user.
 </Body>
 
+<BookNote chapter="10">
+
+In chapter 10, Huyen builds up a production architecture one component at a time, and caching
+appears as a way to cut both cost and latency. She separates two kinds of cache for model
+responses.
+
+An exact cache stores answers keyed by the precise input. If the same request arrives again, the
+stored answer is returned with no model call. It is simple and safe, but real users rarely repeat
+a question word for word.
+
+A semantic cache matches by meaning instead. It embeds the new query, searches stored queries for
+one that is close enough, and reuses that answer. This can raise the hit rate a lot, but it adds
+risk and work. Two questions can be close in vector space yet need different answers, so a loose
+threshold returns wrong replies. Each lookup also costs an embedding and a vector search, which
+only pays off if hits are common.
+
+Before adding one, check your traffic for repeated questions, choose the similarity threshold
+with a test set, decide how long entries stay valid, and never cache answers that depend on
+private user data.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 10
+
+</BookNote>
+
 <Code>
 ```python
 import numpy as np

@@ -220,6 +220,28 @@ def answer_with_finetuned_rag(query, retriever, ft_model, tokenizer):
 The fine-tuned model produces better answers from the same retrieved context because it understands domain terminology and formatting conventions the base model doesn't.
 </Body>
 
+<BookNote chapter="7">
+
+Chapter 7 starts with when to finetune at all. A useful rule from Huyen: retrieval mainly fixes
+missing facts, while finetuning mainly fixes behaviour, such as format, style or following a
+specific kind of instruction. Try prompting and retrieval first; finetune when they are not
+enough and you have good data.
+
+Full finetuning updates every weight, which needs a lot of GPU memory for the weights, their
+gradients and the optimizer state. Parameter-efficient methods avoid this by training a small
+number of new parameters. LoRA is the best-known one. It leaves the original weight matrices
+frozen and learns a pair of thin matrices whose product is added to them, so the update is low
+rank and tiny compared with the full model.
+
+That design has practical benefits. Training fits on smaller hardware, the trained adapter is
+small to store, and the adapter can be merged into the base weights for serving or kept separate.
+Keeping adapters separate lets one deployed base model serve many customers or tasks, each with
+its own adapter loaded as needed.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 7
+
+</BookNote>
+
 <Code>
 ```python
 # Minimal LoRA config exploration — no GPU required

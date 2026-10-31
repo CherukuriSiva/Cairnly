@@ -52,6 +52,27 @@ History grows every step and the context window is finite. Two standard strategi
 The original task and recent observations are the highest-value tokens; protect them.
 </Body>
 
+<BookNote chapter="6">
+
+The book describes memory in three layers. Internal knowledge is what the model learned during
+training and cannot be changed without retraining. Short-term memory is the context window:
+whatever you put in the current prompt, which disappears after the call. Long-term memory is
+external storage the agent can read from and write to, such as a database or a vector index.
+
+Why bother? Without memory, an agent forgets everything between sessions and runs out of room in
+long tasks. With it, the agent can keep track of user preferences, earlier decisions and
+intermediate results, and stay consistent over many steps.
+
+Managing memory is a design problem with trade-offs. The context window fills up, so you must
+decide what to keep, summarise or drop, for example keeping recent turns verbatim and older ones
+as short summaries. Long-term stores can collect outdated or conflicting facts, so new
+information needs a rule for whether it adds to or replaces what is stored. Retrieval from
+memory is just another retrieval problem, and it deserves the same testing.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 6
+
+</BookNote>
+
 <Code>
 ```python
 class WindowedMemory:

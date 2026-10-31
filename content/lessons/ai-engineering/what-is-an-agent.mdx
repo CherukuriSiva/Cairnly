@@ -134,6 +134,27 @@ Start with RAG. If you find that:
 Then consider adding agent capabilities to specific flows — not replacing your entire system with an agent.
 </Body>
 
+<BookNote chapter="6">
+
+Huyen defines an agent by two things: the environment it works in and the actions available to
+it there. The tools you give an agent decide what it can perceive and change, so tool design is
+as important as the model choice.
+
+She groups tools into three useful kinds. Some add knowledge, such as search or a database query.
+Some extend what the model can do, such as a calculator or a code runner. Some let it act on the
+world, such as sending an email or updating a record. The last kind brings the most value and the
+most risk.
+
+The chapter is honest about failure. Agents chain many steps, and errors compound: if each step
+is right ninety-something percent of the time, a long chain often goes wrong somewhere. Agents
+also cost more and take longer than a single call. So start with the simplest design that solves
+the task, add autonomy only where it clearly helps, and keep a person in the loop for actions
+that are hard to undo.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 6
+
+</BookNote>
+
 <Code>
 ```python
 from dataclasses import dataclass

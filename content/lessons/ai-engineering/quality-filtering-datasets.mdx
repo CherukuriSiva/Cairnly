@@ -43,6 +43,27 @@ Write rejected records to a `debug/rejected.jsonl` rather than dropping them sil
 A filter bug (or a bad source) can silently gut your dataset. Log how many records each rule drops, and treat an abnormal drop rate as an alert — the same discipline as the on-topic pass-rate monitor.
 </Body>
 
+<BookNote chapter="8">
+
+Huyen's view in chapter 8 is that data quality usually beats data quantity. A small set of
+carefully chosen, correct examples can teach a model more than a large pile of noisy ones, and
+bad examples actively teach the wrong behaviour.
+
+She describes quality along several lines: is each example relevant to the task, is the answer
+correct, does it follow the format you want, is it consistent with similar examples, and does
+the set cover the range of inputs your users will send. A dataset can be clean yet narrow, so
+coverage deserves its own check.
+
+Filtering starts with looking. Read samples, plot simple statistics such as length and topic,
+and look for odd clusters. Then apply filters in rising cost: cheap rules first, for example
+removing empty, truncated or wrongly formatted rows, then scoring with a model for things rules
+cannot catch. Keep the rejected examples and the reason for each, because reviewing them shows
+whether a filter is too strict and helps you explain the pipeline later.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 8
+
+</BookNote>
+
 <Code>
 ```python
 import re

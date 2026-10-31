@@ -36,6 +36,27 @@ Pure prompting fails when:
 3. **Generate** — the LLM answers using the provided context, not just its training data
 </Body>
 
+<BookNote chapter="6">
+
+Chapter 6 opens with a simple claim: a model can only answer well if it has the right
+information in front of it. Retrieval-augmented generation builds that information per query.
+A retriever finds relevant pieces of your data, and the generator writes an answer using them.
+
+Huyen explains why this pattern stays useful even as context windows grow. Your data is usually
+larger than any window, it changes often, and stuffing everything into the prompt costs more and
+can make the model less accurate. Fetching only what each question needs is cheaper and easier to
+keep fresh.
+
+The quality of the whole system depends heavily on retrieval. Decisions that look like small
+details, such as how you split documents into chunks, what you embed, and how many results you
+pass on, often matter more than which generator you choose. The chapter also suggests rewriting
+the user's question into a clearer search query, especially in a conversation, where a
+follow-up like "how do I test it?" means nothing without the earlier turns.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 6
+
+</BookNote>
+
 <MiniQuiz>
 **Q: A user asks your chatbot about a policy document uploaded last week. The LLM was trained in 2024. Should you use RAG or pure prompting?**
 

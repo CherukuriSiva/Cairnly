@@ -56,6 +56,27 @@ def push_merged(merged_dir, repo_id, token):
 Tag releases (commit/branch/version) so a consumer can pin a known-good artifact — the same "serve by version, roll back by re-pointing" discipline as a model registry. Include a model card: base model, training data summary, eval numbers, and intended use.
 </Body>
 
+<BookNote chapter="7">
+
+When you finetune with an adapter method like LoRA, chapter 7 makes clear you end up with two
+things: the large base model you started from and a small set of trained adapter weights. How
+you package them is a real decision, not a detail.
+
+If you merge the adapter into the base weights, you get one ordinary model. It is simple to load
+and adds no extra work at inference time, but every variant is a full-size copy. If you keep the
+adapter separate, each variant is only megabytes, many variants can share one base model in
+memory, and you can swap them quickly. The cost is a little more setup when serving.
+
+For publishing, that suggests clear habits. Record exactly which base model and version the
+adapter expects, because an adapter is useless or harmful on the wrong base. Describe the
+training data and the evaluation results so others know what the model is for and where it
+fails. Version your releases so a user can pin the one they tested, and check the base model's
+license before you share anything built on it.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 7
+
+</BookNote>
+
 <Code>
 ```python
 import os

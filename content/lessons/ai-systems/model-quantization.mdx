@@ -40,6 +40,29 @@ Quantization is only a win if quality holds. Run your **eval harness** on the qu
 Even quantized, serving one request at a time wastes the accelerator. **Dynamic micro-batching** collects requests that arrive within a few milliseconds and runs them as one batch — big throughput gains for a tiny added latency. Tune the batch window against your latency budget.
 </Body>
 
+<BookNote chapter="9">
+
+Chapter 9 is about making inference faster and cheaper, and quantization is one of the most
+common tools. The idea is to store numbers with fewer bits. Model weights trained in 32 or 16 bit
+formats can often be kept in 8 or even 4 bits with only a small drop in quality.
+
+Fewer bits help in two ways. The model takes less memory, so it fits on smaller or fewer GPUs.
+And because generating text is often limited by how fast weights move from memory rather than
+by raw compute, smaller weights can also mean faster responses.
+
+Huyen separates doing this after training from building it into training. Post-training
+quantization is the easy path: take a finished model and convert it. Quantization-aware training
+simulates low precision while training so the model learns to cope, which helps keep quality at
+very low bit widths.
+
+The trade-off is quality, and it varies by task and model. Some skills, such as maths or long
+reasoning, can degrade more than casual chat. So treat a quantized model as a new model and run
+your own evaluation set before you swap it in.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 9
+
+</BookNote>
+
 <Code>
 ```python
 import torch

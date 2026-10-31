@@ -200,6 +200,28 @@ For most user-facing applications, streaming is mandatory. Users won't wait 3 se
 *Prices as of early 2025. Check provider pricing pages for current rates.*
 </Body>
 
+<BookNote chapter="9">
+
+Chapter 9 gives names to the numbers you should watch. Time to first token is how long a user
+waits before anything appears. Time per output token is how fast the rest streams. Total latency
+combines both and grows with answer length. Throughput is how many tokens or requests a system
+handles per second, and Huyen adds goodput: the requests that actually meet your latency target,
+which is what users feel.
+
+These numbers pull against each other. Batching many requests together raises throughput and
+lowers cost per request, but can make each individual request slower. A larger model may answer
+better while costing more and responding more slowly.
+
+The chapter's toolbox works at three levels. At the model level, use a smaller or compressed
+model when it is good enough. At the service level, batch requests, reuse repeated prompt
+prefixes with prompt caching, and run work in parallel. At the application level, shorten
+prompts, cap output length and stream tokens so the wait feels shorter. Measure before and after
+each change, because the right trade-off depends on your traffic.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 9
+
+</BookNote>
+
 <Code>
 ```python
 def cost_calculator(

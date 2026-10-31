@@ -56,6 +56,27 @@ A mean F1 of 0.71 on 40 examples could really be anywhere from 0.6 to 0.8. A **b
 Quality without latency is half a picture. Record p50 and p95 latency on the same test queries so a "better" model that's 3× slower doesn't sneak through.
 </Body>
 
+<BookNote chapter="4">
+
+Chapter 4 walks through building an evaluation pipeline for a real system rather than for a
+model in isolation. Huyen recommends judging each component on its own as well as the whole
+flow: if retrieval fails, a perfect generator still produces a bad answer, and an end-to-end
+score alone will not tell you which part broke.
+
+Before writing any code, decide what good looks like. Write a short guideline that describes the
+criteria, with scoring rules and real examples of good and bad outputs for each score. Without
+that, two people, or two judge prompts, will grade the same answer differently.
+
+Then decide on data. Keep test examples that reflect real usage, and split results into slices,
+for example by user type, topic or input length, because an average can hide a group that is
+doing badly. Finally, ask how many examples you need for a result you can trust: if a small
+change in the test set flips your conclusion, the set is too small. An eval harness is a living
+tool that grows as you learn where the app fails.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 4
+
+</BookNote>
+
 <Code>
 ```python
 import re, random

@@ -96,6 +96,29 @@ Keep these relationships in mind when discussing metrics:
 | Cost | Per-query breakdown | Don't forget embedding and safety check costs |
 </Body>
 
+<BookNote chapter="4">
+
+In interviews you are often asked why you chose a metric. Chapter 4 gives a good frame for the
+answer: start from what the application must do, not from whatever benchmark is famous.
+
+Huyen groups the criteria an app usually cares about. Can the model handle the domain at all?
+Does it produce fluent, factually consistent text? Does it follow the instructions and output
+format you need? And can it do this within your cost and latency budget? A metric is only worth
+defending if it maps to one of those needs.
+
+She also warns about public leaderboards. Popular benchmarks may have leaked into training data,
+so a high score can reflect memorisation rather than skill, and an aggregate ranking may weight
+abilities you do not need. Your own evaluation set, built from your use case, is the stronger
+evidence.
+
+So when you defend a number, say what it measures, why that matters for the users, how big the
+test set is, and what its known blind spots are. Admitting a limitation honestly sounds stronger
+than claiming a metric is perfect.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 4
+
+</BookNote>
+
 <Code>
 ```python
 # Prepare your metrics summary for interview

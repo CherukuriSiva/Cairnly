@@ -146,6 +146,27 @@ Always run your evaluation twice: once with the current system (baseline) and on
 The investment in building a good test set pays for itself every time you make a change. Without it, every change is a gamble.
 </Body>
 
+<BookNote chapter="3">
+
+Huyen argues that evaluation is the biggest obstacle to shipping AI products, and that it gets
+harder as models get better. A smarter model writes answers that look right to a casual reader,
+so spotting the wrong ones takes more effort. Open-ended tasks also lack a single correct output,
+which rules out the simple accuracy checks you learned in ML courses.
+
+The chapter sorts the options into a few families. Exact methods work when there is something
+concrete to compare against: does the generated code pass its tests, does the extracted field
+match the label, how close is the output to a reference answer. When nothing concrete exists,
+teams use a second model as a judge, or people review samples by hand.
+
+The useful takeaway for an app builder is to match the method to the task. If you can turn a
+requirement into something a program can check, do that first, because it is cheap, fast and
+repeatable. Save judge models and human review for qualities a program cannot measure, and keep
+some human review even when automated scores look healthy.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 3
+
+</BookNote>
+
 <Code>
 ```python
 from dataclasses import dataclass

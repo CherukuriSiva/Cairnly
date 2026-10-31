@@ -60,6 +60,28 @@ The model emits free text; you must extract `Thought`, `Action: <tool>: <input>`
 - **Feed observations into memory** — the agent must *remember* what tools returned, or it repeats the same action.
 </Body>
 
+<BookNote chapter="6">
+
+Chapter 6 describes agent behaviour as planning plus execution. Planning means breaking a task
+into steps and choosing which tool to call next; execution means making those calls and reading
+the results. Patterns like ReAct interleave the two: the model writes a short thought, takes an
+action, looks at the observation, and repeats until it can answer.
+
+Huyen recommends separating planning from doing whenever you can. If the agent first proposes a
+plan, you can check it cheaply before any tool runs: does each step use a real tool, are the
+arguments valid, is the plan short enough to be plausible? Catching a bad plan early is much
+cheaper than undoing bad actions.
+
+Reflection is the other piece. After a step, or at the end, the agent checks whether the result
+actually moved it toward the goal and corrects course if not. Reflection improves results but
+adds calls, cost and latency. When you debug an agent, look at its failures by type: invalid
+tool names, wrong arguments, plans that never finish, or answers that ignore what the tools
+returned.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 6
+
+</BookNote>
+
 <Code>
 ```python
 import re

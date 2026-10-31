@@ -46,6 +46,29 @@ def validate_citations(response: str, sources: list[str]) -> tuple[bool, str]:
 ```
 </Body>
 
+<BookNote chapter="2">
+
+Chapter 2 explains hallucination as a side effect of how these models generate text: they pick
+each next token from a probability distribution, so a fluent but false continuation is always
+possible. Huyen discusses two working explanations from research.
+
+The first is sometimes called self-delusion. A model cannot tell the text it was given apart from
+the text it has just written itself. Once it produces one wrong detail, it treats that detail as
+fact and keeps building on it, so a small slip can grow into a confident, detailed story.
+
+The second points at training. During supervised finetuning, people write answers that may rely
+on knowledge the model never learned. The model is then rewarded for producing answers that
+sound like that, even when it has nothing to base them on, which teaches it to guess with
+confidence.
+
+Neither idea gives a complete fix, but both suggest useful habits: give the model the facts it
+needs in the prompt, ask it to say when the sources do not cover a question, and check outputs
+instead of trusting fluency.
+
+Further reading: Chip Huyen, AI Engineering (O'Reilly, 2025), chapter 2
+
+</BookNote>
+
 <MiniQuiz>
 **Q: Your RAG bot answers a question with a fact that's true in the world but absent from the retrieved passages. What is this?**
 
