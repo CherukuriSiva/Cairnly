@@ -12,9 +12,13 @@ graduates.
 
 ## Decision
 
-- Import all 162 MDX files (126 lessons, 29 insights, 7 roadmaps) once into `content/`, with
-  only the front-matter keys for paid access and the old ordering dropped. `corpus/`,
-  `curate.py` and `CURATION.md` are deleted.
+- Import all 162 MDX files (126 lessons, 29 insights, 7 roadmaps) once into `content/`. Four
+  front-matter keys were dropped from every file: two about paid access and two about
+  ordering. A few files were also edited by hand: the one line naming GradStack in the
+  full-stack capstone lesson was reworded, two lessons got MDX escapes, two lessons had their
+  examples moved to a neutral customer-support domain, and 24 lessons got a book note.
+  `content/README.md` lists every edit by file. `corpus/`, `curate.py` and `CURATION.md` are
+  deleted.
 - `content/syllabus.yaml` is the only source of order: six tracks, named modules, lesson slugs.
 - The web app generates static pages from `content/` at build time, and `cairnly ingest`
   indexes the same files, converting MDX with `mdx.py`.
