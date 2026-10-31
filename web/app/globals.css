@@ -26,6 +26,18 @@ body {
   color: var(--ink);
 }
 
+/* Inline code gets a light background instead of the plugin's literal backticks. */
+.prose :where(code):not(:where(pre code))::before,
+.prose :where(code):not(:where(pre code))::after {
+  content: none;
+}
+.prose :where(code):not(:where(pre code)) {
+  background: var(--line);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.3em;
+  font-weight: 500;
+}
+
 /* Typography: prose colours follow the cairnly variables in light and dark mode. */
 .prose {
   --tw-prose-body: var(--ink);

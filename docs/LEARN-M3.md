@@ -116,8 +116,8 @@ both gate error rates at most 5%.
 
 The follow-up result is honest rather than impressive: rewritten follow-ups found a right
 lesson exactly as often as the hand-written questions (13 of 15 each on the first run, 14 of 15
-each on two later runs: the chat model does not answer the same way every time), and a few
-rewrites left a vague phrase ("that setup") unresolved. A larger
+each on later runs, after two lessons were edited and re-ingested: the index changed, so both
+sides moved together), and a few rewrites left a vague phrase ("that setup") unresolved. A larger
 rewrite model, or two or three examples in the rewrite prompt, is the next thing to try.
 
 ## 8. Book notes (`<BookNote>`)

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ask, buildAskBody, type AskEvent, type PastTurn, type Provider, type Source } from "@/lib/ask";
+import { inlineTokens } from "@/lib/inline";
 
 interface Turn extends PastTurn {
   sources: Source[];
@@ -231,23 +232,21 @@ function Cited({ text, onCite }: { text: string; onCite: (n: number) => void }) 
   );
 }
 
-// Minimal inline markdown for answers: **bold**, *italic* and `code`. Everything else stays plain
-// text (newlines are kept by whitespace-pre-wrap). Rendered as React elements, never as raw HTML.
+// Minimal inline markdown for answers (see lib/inline.ts). Everything else stays plain text
+// (newlines are kept by whitespace-pre-wrap). Rendered as React elements, never as raw HTML.
 function Inline({ text }: { text: string }) {
   return (
     <>
-      {text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/).map((part, i) => {
-        if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
-          return <strong key={i}>{part.slice(2, -2)}</strong>;
-        if (part.startsWith("*") && part.endsWith("*") && part.length > 2)
-          return <em key={i}>{part.slice(1, -1)}</em>;
-        if (part.startsWith("`") && part.endsWith("`") && part.length > 2)
+      {inlineTokens(text).map((token, i) => {
+        if (token.kind === "bold") return <strong key={i}>{token.text}</strong>;
+        if (token.kind === "italic") return <em key={i}>{token.text}</em>;
+        if (token.kind === "code")
           return (
             <code key={i} className="rounded bg-[var(--line)] px-1 text-[0.9em]">
-              {part.slice(1, -1)}
+              {token.text}
             </code>
           );
-        return <span key={i}>{part}</span>;
+        return <span key={i}>{token.text}</span>;
       })}
     </>
   );
