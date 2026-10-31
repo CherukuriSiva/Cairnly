@@ -16,16 +16,13 @@ export default function RoadmapsPage() {
           <li key={roadmap.slug}>
             <Link
               href={`/roadmap/${roadmap.slug}`}
-              className="block rounded-xl border p-5 hover:border-[var(--accent)]"
-              style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+              className="block rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5 hover:border-[var(--accent)]"
             >
-              <span className="font-mono text-xs uppercase tracking-widest" style={{ color: "var(--muted)" }}>
+              <span className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">
                 {roadmap.timeHorizon}
               </span>
               <span className="mt-1 block font-semibold">{roadmap.title}</span>
-              <span className="mt-1 block text-sm" style={{ color: "var(--muted)" }}>
-                {roadmap.summary}
-              </span>
+              <span className="mt-1 block text-sm text-[var(--muted)]">{roadmap.summary}</span>
             </Link>
           </li>
         ))}

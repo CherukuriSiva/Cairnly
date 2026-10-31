@@ -23,13 +23,10 @@ export default function InsightsPage() {
                 <li key={insight.slug}>
                   <Link
                     href={`/insights/${insight.slug}`}
-                    className="block rounded-xl border p-4 hover:border-[var(--accent)]"
-                    style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+                    className="block rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 hover:border-[var(--accent)]"
                   >
                     <span className="block font-semibold">{insight.title}</span>
-                    <span className="mt-1 block text-sm" style={{ color: "var(--muted)" }}>
-                      {insight.summary}
-                    </span>
+                    <span className="mt-1 block text-sm text-[var(--muted)]">{insight.summary}</span>
                   </Link>
                 </li>
               ))}

@@ -13,15 +13,15 @@ const TINT = "color-mix(in srgb, var(--accent) 12%, transparent)";
 export function TrackNav({ track, active }: { track: NavTrack; active: string }) {
   return (
     <nav aria-label={`${track.title} lessons`} className="space-y-5 p-4">
-      <Link href={`/${track.id}`} className="block px-3 font-mono text-xs" style={{ color: "var(--muted)" }}>
+      <Link
+        href={`/${track.id}`}
+        className="block px-3 font-mono text-xs text-[var(--muted)] hover:text-[var(--ink)]"
+      >
         ← {track.title}
       </Link>
       {track.modules.map((module) => (
         <div key={module.title}>
-          <p
-            className="px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest"
-            style={{ color: "var(--muted)" }}
-          >
+          <p className="px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-[var(--muted)]">
             {module.title}
           </p>
           <ul className="mt-1 space-y-0.5">
@@ -32,12 +32,12 @@ export function TrackNav({ track, active }: { track: NavTrack; active: string })
                   <Link
                     href={`/${track.id}/${lesson.slug}`}
                     aria-current={current ? "page" : undefined}
-                    className={`block rounded-lg px-3 py-2 text-sm hover:text-[var(--ink)] ${current ? "font-semibold" : ""}`}
-                    style={
+                    className={`block rounded-lg px-3 py-2 text-sm ${
                       current
-                        ? { background: TINT, color: "var(--accent)" }
-                        : { color: "var(--muted)" }
-                    }
+                        ? "font-semibold text-[var(--accent)]"
+                        : "text-[var(--muted)] hover:text-[var(--ink)]"
+                    }`}
+                    style={current ? { background: TINT } : undefined}
                   >
                     {lesson.title}
                   </Link>

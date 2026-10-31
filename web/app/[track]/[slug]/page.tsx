@@ -35,18 +35,13 @@ function NeighbourCard({ entry, label, currentTrack }: { entry?: Entry; label: s
   return (
     <Link
       href={`/${entry.track}/${entry.slug}`}
-      className={`rounded-xl border p-4 hover:border-[var(--accent)] ${label === "Next" ? "sm:text-right" : ""}`}
-      style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+      className={`rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 hover:border-[var(--accent)] ${
+        label === "Next" ? "sm:text-right" : ""
+      }`}
     >
-      <span className="block text-xs" style={{ color: "var(--muted)" }}>
-        {label}
-      </span>
+      <span className="block text-xs text-[var(--muted)]">{label}</span>
       <span className="mt-1 block font-semibold">{lesson?.title}</span>
-      {otherTrack && (
-        <span className="mt-1 block text-xs" style={{ color: "var(--muted)" }}>
-          {otherTrack}
-        </span>
-      )}
+      {otherTrack && <span className="mt-1 block text-xs text-[var(--muted)]">{otherTrack}</span>}
     </Link>
   );
 }
