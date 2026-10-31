@@ -29,7 +29,7 @@ export function TopNav() {
         <Link href="/" className="shrink-0 font-semibold">
           cairnly
         </Link>
-        <nav className="ml-auto flex min-w-0 gap-4 overflow-x-auto whitespace-nowrap text-sm">
+        <nav className="ml-auto flex min-w-0 gap-3 overflow-x-auto whitespace-nowrap text-sm sm:gap-4">
           {LINKS.map((link) => (
             <Link
               key={link.href}

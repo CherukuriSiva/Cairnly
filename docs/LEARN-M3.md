@@ -36,7 +36,7 @@ same file to check the `track` scope.
 
 ## 3. Pages and anchors (`web/`, `pages.py`, `web/lib/anchors.ts`)
 
-Every page is generated at build time (`next build` prerenders 174 pages; only the News page
+Every page is generated at build time (`next build` prerenders 175 pages; only the News page
 reads `content/news/linkedin.yaml` from disk, at each hourly refresh): `/syllabus`, `/<track>`, `/<track>/<lesson>`, `/roadmap/<slug>` and
 `/insights/<slug>`. Lesson pages have a sidebar on desktop and a "Lessons" drawer on phones.
 
