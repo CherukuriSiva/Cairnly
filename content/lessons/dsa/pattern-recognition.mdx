@@ -54,10 +54,10 @@ Before writing any code, ask yourself these questions in order:
 
 | Constraint | Implication |
 |---|---|
-| n <= 20 | Backtracking or bitmask DP (2^20 = 1M, feasible) |
-| n <= 1000 | O(n^2) is fine |
-| n <= 10^5 | Need O(n log n) or O(n) |
-| n <= 10^7 | Need O(n) or better |
+| n \<= 20 | Backtracking or bitmask DP (2^20 = 1M, feasible) |
+| n \<= 1000 | O(n^2) is fine |
+| n \<= 10^5 | Need O(n log n) or O(n) |
+| n \<= 10^7 | Need O(n) or better |
 | "Do it in O(1) extra space" | Two pointers, in-place manipulation |
 
 ## Walkthrough: 8 problems classified
@@ -173,7 +173,7 @@ for problem, answer in PROBLEMS:
 <CommonMistakes>
 - **Jumping to code before classifying**: The biggest time waster in interviews. Spend 60 seconds thinking before touching the keyboard. Interviewers actively reward this.
 - **Fixating on the first pattern you see**: Some problems are hybrids (e.g., "minimum window substring" uses sliding window AND a hash map). Stay flexible.
-- **Ignoring constraints**: A solution that's O(n^2) is perfect when n <= 1000 but will TLE when n = 10^5. Always check the constraint to calibrate your target complexity.
+- **Ignoring constraints**: A solution that's O(n^2) is perfect when n \<= 1000 but will TLE when n = 10^5. Always check the constraint to calibrate your target complexity.
 - **Not considering brute force**: Even if you recognize the optimal pattern, mentioning brute force first shows structured thinking and gives you a fallback if you get stuck on the optimal approach.
 - **Treating DP and Greedy as interchangeable**: DP finds the global optimum by trying all subproblems. Greedy makes locally optimal choices. Greedy only works when you can prove the greedy choice property (e.g., activity selection). When in doubt, use DP.
 </CommonMistakes>
