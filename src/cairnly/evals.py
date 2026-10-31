@@ -8,8 +8,14 @@ Metrics:
 - Recall@k         share of questions with a gold source in the top k results
 - MRR              mean of 1/rank of the first gold source (0 when not in the candidates)
 - false refusals   on-topic questions the confidence gate refused
-- false accepts    questions from the OTHER knowledge bases that the gate let through
+- false accepts    off-topic questions the gate let through. They come from
+                   evals/off-topic.jsonl (cooking, sport, travel, ...: nothing the lessons
+                   cover), plus the golden questions of any other knowledge base present
 - faithfulness     (--judge) share of answers an LLM judge finds fully supported by sources
+
+Follow-ups (`cairnly eval-followups`): for each item in evals/followups.jsonl, recall@k of
+searching with the hand-written standalone question vs. with the follow-up rewritten by the
+LLM (rewrite.py). Rewriting passes when it is at least as good as the standalone baseline.
 """
 
 import json
@@ -21,11 +27,14 @@ from pathlib import Path
 
 import yaml
 
-from cairnly.kb import KnowledgeBase, get_kb, load_kbs
+from cairnly.kb import ROOT, KnowledgeBase, get_kb, load_kbs
+from cairnly.mdx import section_titles
 from cairnly.search import Hit, SearchResult
 
 CANDIDATES = 30
 QUIZ = re.compile(r"^\*\*Q:\s*(.+?)\*\*\s*$", re.M)
+OFF_TOPIC_FILE = ROOT / "evals" / "off-topic.jsonl"
+FOLLOWUPS_FILE = ROOT / "evals" / "followups.jsonl"
 
 
 @dataclass(frozen=True)
@@ -47,15 +56,27 @@ class ItemResult:
 # ---- golden sets -------------------------------------------------------------------------
 
 def lessons_golden(corpus: Path, root: Path | None = None) -> list[GoldenItem]:
-    """Quiz questions under `corpus`; gold paths are relative to `root`, the folder that was
-    ingested (so a subset like corpus/public still matches paths stored as public/...)."""
+    """Quiz questions in the .md/.mdx files under `corpus`; gold paths are relative to `root`,
+    the folder that was ingested (so a subset like content/lessons still matches paths stored
+    as lessons/...). The quiz section (its title from content/sections.json) is excluded."""
+    quiz_title = section_titles()["MiniQuiz"]
     items = []
-    for path in sorted(corpus.rglob("*.md")):
+    paths = (p for p in corpus.rglob("*") if p.suffix in (".md", ".mdx") and p.is_file())
+    for path in sorted(paths):
         rel = path.resolve().relative_to((root or corpus).resolve()).as_posix()
         for n, question in enumerate(QUIZ.findall(path.read_text())):
             items.append(GoldenItem(f"{rel}#q{n}", question.strip(), frozenset([rel]),
-                                    exclude_trails=("Quick quiz",)))
+                                    exclude_trails=(quiz_title,)))
     return items
+
+
+def load_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def off_topic_questions(path: Path = OFF_TOPIC_FILE) -> list[str]:
+    """Questions the lessons must NOT answer; they measure the false-accept rate."""
+    return [row["question"] for row in load_jsonl(path)]
 
 
 def golden_for(kb: KnowledgeBase, path: str | None = None) -> list[GoldenItem]:
@@ -120,6 +141,32 @@ def check_gates(report: dict, thresholds: dict) -> list[str]:
     return failures
 
 
+# ---- follow-up rewriting ----------------------------------------------------------------------
+
+def followup_report(items: list[dict], rewrite_fn: Callable[[str, list[dict]], str],
+                    search_fn: Callable[[str], SearchResult], k: int) -> dict:
+    """Recall@k of the hand-written standalone question vs. the rewritten follow-up.
+
+    Each item: {"id", "history": [{"question", "answer"}], "followup", "standalone", "gold"}.
+    """
+    def found(query: str, gold: set[str]) -> bool:
+        return any(h.path in gold for h in search_fn(query).hits[:k])
+
+    rows = []
+    for item in items:
+        gold = set(item["gold"])
+        rewritten = rewrite_fn(item["followup"], item["history"])
+        rows.append({"id": item["id"], "rewritten": rewritten,
+                     "standalone_found": found(item["standalone"], gold),
+                     "rewritten_found": found(rewritten, gold)})
+    n = len(rows) or 1
+    standalone = round(sum(r["standalone_found"] for r in rows) / n, 4)
+    rewritten = round(sum(r["rewritten_found"] for r in rows) / n, 4)
+    return {"questions": len(rows), f"standalone_recall@{k}": standalone,
+            f"rewritten_recall@{k}": rewritten, "passed": rewritten >= standalone,
+            "rows": rows}
+
+
 # ---- faithfulness (LLM as judge) ------------------------------------------------------------
 
 JUDGE_SYSTEM = """You grade whether an ANSWER is supported by the SOURCES.
@@ -175,12 +222,12 @@ def main(args) -> None:
     kb = get_kb(args.kb)
     items = golden_for(kb, args.golden)[: args.limit]
     others = [o for o in load_kbs().values() if o.name != kb.name and _available(o)]
-    foreign = [i for o in others for i in golden_for(o)][: max(len(items), 1)]
+    foreign = off_topic_questions() + [i.question for o in others for i in golden_for(o)]
 
     with connect() as conn:
         fn = lambda q: search_kb(conn, q, kb, top_k=CANDIDATES)  # noqa: E731
         results = run_retrieval(items, fn)
-        off_topic = [fn(i.question).top_similarity for i in foreign]
+        off_topic = [fn(q).top_similarity for q in foreign]
 
     from cairnly import rerank
 
@@ -207,6 +254,26 @@ def main(args) -> None:
         if failures:
             sys.exit(1)
         print(f"eval gate passed ({len(thresholds)} checks)")
+
+
+def followups_main(args) -> None:
+    """Local only: needs a chat model for the rewrite step."""
+    from cairnly.db import connect
+    from cairnly.llm import get_llm
+    from cairnly.rewrite import rewrite_question
+    from cairnly.search import search_kb
+
+    kb, llm = get_kb(args.kb), get_llm(args.provider)
+    items = load_jsonl(Path(args.golden))
+    with connect() as conn:
+        report = followup_report(
+            items, lambda q, history: rewrite_question(q, history, llm),
+            lambda q: search_kb(conn, q, kb, top_k=CANDIDATES), args.k)
+    print(json.dumps({"model": llm.name, **report}, indent=2))
+    if not report["passed"]:
+        print("FOLLOW-UP EVAL FAILED: rewritten recall is below the standalone baseline",
+              file=sys.stderr)
+        sys.exit(1)
 
 
 def _available(kb: KnowledgeBase) -> bool:

@@ -2,15 +2,20 @@
 import pytest
 
 from cairnly.evals import (
+    FOLLOWUPS_FILE,
     GoldenItem,
     check_gates,
+    followup_report,
     gate_metrics,
     judge,
     lessons_golden,
+    load_jsonl,
+    off_topic_questions,
     retrieval_metrics,
     run_retrieval,
     suggest_min_score,
 )
+from cairnly.kb import ROOT
 from cairnly.search import Hit, SearchResult
 
 
@@ -28,6 +33,61 @@ def test_lessons_golden_uses_quiz_questions_relative_to_the_ingested_root(tmp_pa
     assert item.question == "When does RAG beat prompting?"
     assert item.gold == {"public/lessons/rag.md"}
     assert item.exclude_trails == ("Quick quiz",)
+
+
+def test_lessons_golden_reads_mdx_quiz_lines(tmp_path):
+    lesson = tmp_path / "lessons" / "ai-engineering" / "what-is-rag.mdx"
+    lesson.parent.mkdir(parents=True)
+    lesson.write_text("---\ntitle: RAG\n---\n\n<MiniQuiz>\n**Q: Why retrieve first?**\n\n"
+                      "- A) speed\n- B) grounding \u2705\n</MiniQuiz>\n")
+
+    [item] = lessons_golden(tmp_path)
+
+    assert item.question == "Why retrieve first?"
+    assert item.gold == {"lessons/ai-engineering/what-is-rag.mdx"}
+    assert item.exclude_trails == ("Quick quiz",)
+
+
+def test_real_content_has_a_quiz_question_per_lesson():
+    items = lessons_golden(ROOT / "content")
+    assert len(items) >= 126
+    assert all(next(iter(i.gold)).endswith(".mdx") for i in items)
+
+
+def test_off_topic_set_has_40_unique_questions():
+    questions = off_topic_questions()
+    assert len(questions) == 40 == len(set(questions))
+
+
+def test_followup_set_is_well_formed_and_gold_lessons_exist():
+    items = load_jsonl(FOLLOWUPS_FILE)
+    assert len(items) == 15
+    for item in items:
+        assert item["history"] and item["followup"] and item["standalone"]
+        for path in item["gold"]:
+            assert (ROOT / "content" / path).is_file(), path
+
+
+def test_followup_report_compares_rewritten_with_standalone():
+    items = [
+        {"id": "a", "history": [{"question": "q", "answer": "a"}], "followup": "and it?",
+         "standalone": "good a", "gold": ["a.mdx"]},
+        {"id": "b", "history": [{"question": "q", "answer": "a"}], "followup": "and that?",
+         "standalone": "good b", "gold": ["b.mdx"]},
+    ]
+    paths = {"good a": "a.mdx", "good b": "b.mdx"}
+
+    def search_fn(q):
+        return SearchResult([_hit(paths.get(q, "other.mdx"))], 0.9)
+
+    rewrites = {"and it?": "good a", "and that?": "something vague"}
+    worse = followup_report(items, lambda q, h: rewrites[q], search_fn, k=5)
+    assert (worse["standalone_recall@5"], worse["rewritten_recall@5"]) == (1.0, 0.5)
+    assert worse["passed"] is False
+
+    fixed = {"and it?": "good a", "and that?": "good b"}
+    better = followup_report(items, lambda q, h: fixed[q], search_fn, k=5)
+    assert better["rewritten_recall@5"] == 1.0 and better["passed"] is True
 
 
 def test_run_retrieval_skips_excluded_trails_when_ranking():

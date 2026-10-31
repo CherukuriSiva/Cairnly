@@ -70,6 +70,12 @@ def cmd_eval(args: argparse.Namespace) -> None:
     eval_main(args)
 
 
+def cmd_eval_followups(args: argparse.Namespace) -> None:
+    from cairnly.evals import followups_main
+
+    followups_main(args)
+
+
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
 
@@ -109,6 +115,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--gate", help="fail (exit 1) if metrics drop below this thresholds file")
     p.add_argument("--out", help="write the JSON report here")
     p.set_defaults(func=cmd_eval)
+
+    p = sub.add_parser("eval-followups",
+                       help="search recall: rewritten follow-ups vs. standalone questions")
+    p.add_argument("--kb", default="lessons")
+    p.add_argument("--set", dest="golden", default="evals/followups.jsonl")
+    p.add_argument("-k", type=int, default=5)
+    p.add_argument("--provider", choices=["ollama", "anthropic"])
+    p.set_defaults(func=cmd_eval_followups)
 
     p = sub.add_parser("serve", help="run the HTTP API")
     p.add_argument("--host", default="127.0.0.1")
