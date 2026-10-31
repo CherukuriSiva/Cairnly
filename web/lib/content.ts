@@ -1,6 +1,7 @@
 // Build-time access to the MDX content in ../content (the same files `cairnly ingest` indexes).
-// Only server code imports this: pages are statically generated, so nothing reads the disk at
-// request time.
+// Only server code imports this: pages are statically generated at build time. The one exception
+// is the News page, which re-reads content/news/linkedin.yaml on each ISR refresh (so the web
+// image ships content/news).
 
 import fs from "node:fs";
 import path from "node:path";

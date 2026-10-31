@@ -22,8 +22,10 @@ afterEach(() => {
 });
 
 describe("loadLinkedInPicks", () => {
-  it("returns [] when the file is missing", () => {
+  it("returns [] and warns with the path when the file is missing", () => {
     expect(loadLinkedInPicks(dir)).toEqual([]);
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(console.warn).mock.calls[0][0]).toContain(path.join(dir, "news", "linkedin.yaml"));
   });
 
   it("returns [] for an empty list and for an empty file", () => {
@@ -36,6 +38,7 @@ describe("loadLinkedInPicks", () => {
   it("returns [] for broken YAML without throwing", () => {
     writeYaml("picks: [unclosed\n  - : :");
     expect(loadLinkedInPicks(dir)).toEqual([]);
+    expect(console.warn).toHaveBeenCalledTimes(1);
   });
 
   it("reads valid picks, newest first, with bare YAML dates", () => {

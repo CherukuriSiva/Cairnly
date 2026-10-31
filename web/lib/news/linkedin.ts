@@ -50,14 +50,15 @@ function toPick(entry: unknown): LinkedInPick | string {
   return { url, author, title, note, date };
 }
 
-/** Valid picks, newest first. A missing or broken file gives []. Bad entries are skipped with a warning. */
+/** Valid picks, newest first. A missing or broken file gives [] with a warning naming the path; bad entries are skipped with a warning. */
 export function loadLinkedInPicks(dir: string = CONTENT_DIR): LinkedInPick[] {
+  const file = path.join(dir, "news", "linkedin.yaml");
   let entries: unknown;
   try {
-    const text = fs.readFileSync(path.join(dir, "news", "linkedin.yaml"), "utf8");
-    entries = (parse(text) as { picks?: unknown } | null)?.picks;
+    entries = (parse(fs.readFileSync(file, "utf8")) as { picks?: unknown } | null)?.picks;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.warn("linkedin.yaml could not be read:", error);
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    console.warn(missing ? `LinkedIn picks file not found: ${file}` : `LinkedIn picks file could not be read: ${file}`, missing ? "" : error);
     return [];
   }
   if (!Array.isArray(entries)) return [];

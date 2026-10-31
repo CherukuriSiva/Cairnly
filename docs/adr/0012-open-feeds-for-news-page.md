@@ -30,6 +30,9 @@ The chat does not index news.
 - `/news` is the only page that is not fully static. It needs the web server to reach the
   internet (ECS has NAT egress). If a build or a server has no network, the page shows a
   "couldn't reach these sources" line until the next good refresh.
+- The picks file is read from disk at each refresh, so the web image copies `content/news` to
+  `/content/news` (the server's `../content`). If it is missing, the page shows no picks and the
+  server logs a warning naming the path.
 - The last-good copy is in the server's memory, so it starts empty after a restart or deploy.
 - The Anthropic and LangChain blog feeds were left out: the first returned 404 and the second
   returned HTML when we checked. Add them back when they publish a working feed.

@@ -77,4 +77,5 @@ The News page (`/news`) lists fresh items from open feeds, fetched when the serv
 refreshes the page, and a few hand-picked LinkedIn posts. The picks live in
 `news/linkedin.yaml`: each entry has a `url` (an https `linkedin.com` link), an
 `author`, a `title`, and optionally a `note` and a `date`. Entries that do not fit
-are skipped. This file is not MDX, so the chat never indexes it.
+are skipped. This file is not MDX, so the chat never indexes it. The web server reads it at each
+hourly refresh, so the web image includes `content/news`.

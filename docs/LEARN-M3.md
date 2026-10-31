@@ -36,8 +36,8 @@ same file to check the `track` scope.
 
 ## 3. Pages and anchors (`web/`, `pages.py`, `web/lib/anchors.ts`)
 
-Every page is generated at build time (`next build` prerenders 174 pages; nothing reads the
-disk at request time): `/syllabus`, `/<track>`, `/<track>/<lesson>`, `/roadmap/<slug>` and
+Every page is generated at build time (`next build` prerenders 174 pages; only the News page
+reads `content/news/linkedin.yaml` from disk, at each hourly refresh): `/syllabus`, `/<track>`, `/<track>/<lesson>`, `/roadmap/<slug>` and
 `/insights/<slug>`. Lesson pages have a sidebar on desktop and a "Lessons" drawer on phones.
 
 For a citation to open the right section, the chunk must know the `id` of its heading on the
