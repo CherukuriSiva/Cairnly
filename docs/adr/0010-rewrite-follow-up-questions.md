@@ -23,7 +23,7 @@ reply) falls back to the original question. The rewrite prompt treats the conver
 - Each follow-up adds one LLM round trip before search, which shows up as latency.
 - The rewrite can lose or change meaning. `cairnly eval-followups` compares search recall of
   the rewritten follow-ups with hand-written standalone questions (15 items). With qwen3:8b on
-  2026-11-01 both scored Recall@5 0.867; some rewrites still left a vague word ("that setup")
-  unresolved.
+  2026-11-01 both scored Recall@5 0.867, and 0.933 on two later runs (the chat model varies run
+  to run); some rewrites still left a vague word ("that setup") unresolved.
 - History comes from the client, so it is untrusted: the API caps its size and the prompts
   never let it act as instructions.

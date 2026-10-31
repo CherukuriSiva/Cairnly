@@ -13,7 +13,7 @@ Built in public, one milestone at a time. **Now: M3 (the learning site).**
 | | Recall@5 | MRR | Off-topic questions answered | Faithfulness |
 |---|---|---|---|---|
 | Lessons, all content (127 questions, M3) | **0.937** | **0.873** | **0%** (0 of 40) | 97.5% (M2) |
-| Follow-ups (15, qwen3:8b rewrite) | 0.867 rewritten = 0.867 standalone | | | |
+| Follow-ups (15, qwen3:8b rewrite) | rewritten = standalone (0.867 to 0.933 across runs) | | | |
 
 M2 added a cross-encoder reranker and a confidence gate calibrated from evals (Recall@5
 0.88 → 0.94). M3 measured the gate again on all public content with 40 off-topic questions

@@ -8,8 +8,9 @@ The lessons, insights and roadmaps were imported on 2026-10-31 from the
 author's own GradStack lessons. These are all the edits made to the imported
 files:
 
-- Four front-matter keys were dropped from every file (`isFreePreview`,
-  `isPublicShowcase`, `stage`, `order`), because nothing here is paid and the
+- Four front-matter keys were dropped wherever they appeared (`isFreePreview` from every
+  file; `isPublicShowcase`, `stage` and `order` from the lessons, the only files that had
+  them), because nothing here is paid and the
   order now lives in `syllabus.yaml`.
 - `lessons/full-stack/capstone-content-site.mdx`: the one line naming
   GradStack now reads "Share the live URL with a friend or mentor for review".

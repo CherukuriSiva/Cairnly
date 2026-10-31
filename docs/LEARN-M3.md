@@ -6,7 +6,7 @@ graduates: every lesson is a public page, and every chat answer links to the sec
 ## 1. Content as MDX (`content/`, `mdx.py`)
 
 All 162 files (126 lessons, 29 insights, 7 roadmaps) were imported once from the author's own
-GradStack lessons into `content/`. Four front-matter keys were dropped from every file: two
+GradStack lessons into `content/`. Four front-matter keys were dropped wherever they appeared: two
 about paid access and two about ordering. Nothing is paid any more, and the order now lives
 in the syllabus. Beyond that, a few files were edited by hand: the one line naming GradStack
 in the full-stack capstone lesson was reworded, two lessons got MDX escapes (below), two
@@ -108,15 +108,16 @@ Measured on 2026-11-01 (nomic-embed-text, MiniLM reranker, qwen3:8b for rewritin
 | Highest off-topic best similarity | 0.676 |
 | False refusals / false accepts at 0.67 | 0% / 2.5% (1 of 40) |
 | False refusals / false accepts at **0.70** (new gate) | **0% / 0%** |
-| Follow-ups Recall@5: standalone vs rewritten | 0.867 vs 0.867 (passes: rewritten ≥ standalone) |
+| Follow-ups Recall@5: standalone vs rewritten | 0.867 vs 0.867, then 0.933 vs 0.933 on two later runs (passes: rewritten ≥ standalone) |
 
 The gate moved from 0.67 to 0.70, the middle of the gap ([ADR 0011](adr/0011-recalibrated-confidence-gate.md)).
 The CI limits in `evals/gates.yaml` sit a little below these numbers: Recall@5 0.90, MRR 0.83,
 both gate error rates at most 5%.
 
 The follow-up result is honest rather than impressive: rewritten follow-ups found a right
-lesson exactly as often as the hand-written questions (13 of 15 each; each side found one the
-other missed), and a few rewrites left a vague phrase ("that setup") unresolved. A larger
+lesson exactly as often as the hand-written questions (13 of 15 each on the first run, 14 of 15
+each on two later runs: the chat model does not answer the same way every time), and a few
+rewrites left a vague phrase ("that setup") unresolved. A larger
 rewrite model, or two or three examples in the rewrite prompt, is the next thing to try.
 
 ## 8. Book notes (`<BookNote>`)

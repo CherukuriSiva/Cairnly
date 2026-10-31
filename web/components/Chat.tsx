@@ -97,7 +97,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
         <select
           value={provider}
           onChange={(e) => setProvider(e.target.value as Provider)}
-          className="min-w-0 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 text-sm"
+          className="shrink-0 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 pr-7 text-sm"
           aria-label="Model provider"
         >
           <option value="ollama">Local (Ollama)</option>
@@ -231,14 +231,16 @@ function Cited({ text, onCite }: { text: string; onCite: (n: number) => void }) 
   );
 }
 
-// Minimal inline markdown for answers: **bold** and `code`. Everything else stays plain text
-// (newlines are kept by whitespace-pre-wrap). Rendered as React elements, never as raw HTML.
+// Minimal inline markdown for answers: **bold**, *italic* and `code`. Everything else stays plain
+// text (newlines are kept by whitespace-pre-wrap). Rendered as React elements, never as raw HTML.
 function Inline({ text }: { text: string }) {
   return (
     <>
-      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).map((part, i) => {
+      {text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/).map((part, i) => {
         if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
           return <strong key={i}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith("*") && part.endsWith("*") && part.length > 2)
+          return <em key={i}>{part.slice(1, -1)}</em>;
         if (part.startsWith("`") && part.endsWith("`") && part.length > 2)
           return (
             <code key={i} className="rounded bg-[var(--line)] px-1 text-[0.9em]">

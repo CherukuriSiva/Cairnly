@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { mdxComponents } from "@/components/mdx";
 import { LessonDrawer } from "@/components/lesson/LessonDrawer";
+import { ScrollToActive } from "@/components/lesson/ScrollToActive";
 import { TrackNav } from "@/components/lesson/TrackNav";
 import { slugify } from "@/lib/anchors";
 import { getLesson } from "@/lib/content";
@@ -60,10 +61,10 @@ export default async function LessonPage({ params }: Params) {
   return (
     <div className="mx-auto flex max-w-7xl">
       <aside
-        className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 overflow-y-auto border-r lg:block"
+        className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 border-r lg:block"
         style={{ borderColor: "var(--line)", background: "var(--panel)" }}
       >
-        {nav}
+        <ScrollToActive className="relative h-full overflow-y-auto">{nav}</ScrollToActive>
       </aside>
 
       <main className="mx-auto w-full min-w-0 max-w-3xl px-4 py-8 sm:px-8">

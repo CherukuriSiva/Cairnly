@@ -13,7 +13,7 @@ graduates.
 ## Decision
 
 - Import all 162 MDX files (126 lessons, 29 insights, 7 roadmaps) once into `content/`. Four
-  front-matter keys were dropped from every file: two about paid access and two about
+  front-matter keys were dropped wherever they appeared: two about paid access and two about
   ordering. A few files were also edited by hand: the one line naming GradStack in the
   full-stack capstone lesson was reworded, two lessons got MDX escapes, two lessons had their
   examples moved to a neutral customer-support domain, and 24 lessons got a book note.

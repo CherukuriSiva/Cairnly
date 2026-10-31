@@ -1,6 +1,6 @@
 # ADR 0004: What content the public repo ships
 
-Status: accepted (M1), pending the author's final call on paid lessons
+Status: superseded (M3) by ADR 0009
 
 Superseded on 2026-10-31 by ADR 0009: all content is public.
 
