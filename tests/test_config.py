@@ -54,6 +54,27 @@ def test_production_refuses_the_claude_api(monkeypatch, tmp_path, fresh_settings
         fresh_settings()
 
 
+@pytest.mark.parametrize("value", ["Production", "prod", "production ", " PRODUCTION", "staging",
+                                   "", "develop"])
+def test_any_environment_but_development_or_test_counts_as_production(
+        value, monkeypatch, tmp_path, fresh_settings):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CAIRNLY_ENV", value)
+    monkeypatch.setenv("ALLOW_ANTHROPIC", "true")
+    with pytest.raises(ValueError, match="CAIRNLY_ENV=production"):
+        fresh_settings()
+
+
+@pytest.mark.parametrize("value", ["development", "Development ", "TEST", " test"])
+def test_development_and_test_allow_the_claude_api_locally(
+        value, monkeypatch, tmp_path, fresh_settings):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CAIRNLY_ENV", value)
+    monkeypatch.setenv("ALLOW_ANTHROPIC", "true")
+    s = fresh_settings()
+    assert s.allow_anthropic is True and s.environment == value.strip().lower()
+
+
 def test_claude_provider_needs_allow_anthropic(monkeypatch, tmp_path, fresh_settings):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("ALLOW_ANTHROPIC", raising=False)

@@ -4,7 +4,9 @@ One frozen dataclass, read once. Defaults match the local Docker Compose + Ollam
 fresh clone works without editing anything.
 
 Claude is local only. The Claude provider needs ALLOW_ANTHROPIC=true, and a production server
-(CAIRNLY_ENV=production) refuses to start with it, so no public deploy can ever call Claude.
+refuses to start with it, so no public deploy can ever call Claude. The check fails closed:
+CAIRNLY_ENV counts as production unless it is "development" or "test" (any case, spaces
+ignored), so "Production", "prod" or a typo can never let Claude through.
 cairnly never reads the Anthropic key itself: the SDK picks it up from the developer's shell.
 """
 
@@ -15,6 +17,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 TRUE_WORDS = ("1", "true", "yes")
+NON_PRODUCTION = ("development", "test")  # every other CAIRNLY_ENV value means production
 
 
 @dataclass(frozen=True)
@@ -27,7 +30,7 @@ class Settings:
     ollama_chat_model: str
     anthropic_model: str
     top_k: int
-    environment: str = "development"  # "production" on the public deploy
+    environment: str = "development"  # lowercased; "production" on the public deploy
     allow_anthropic: bool = False  # the Claude provider; never true in production
     cors_origins: tuple[str, ...] = ("http://localhost:3010",)
     trust_proxy: bool = False  # trust the last X-Forwarded-For entry (we sit behind one proxy)
@@ -77,11 +80,17 @@ def flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in TRUE_WORDS
 
 
+def is_production(s: Settings) -> bool:
+    return s.environment not in NON_PRODUCTION
+
+
 def validate(s: Settings) -> Settings:
     """Refuse settings that would let a server call Claude when it must not."""
-    if s.environment == "production" and s.allow_anthropic:
-        raise ValueError("ALLOW_ANTHROPIC must not be set when CAIRNLY_ENV=production: "
-                         "the Claude API is for local development only")
+    if is_production(s) and s.allow_anthropic:
+        raise ValueError(f"ALLOW_ANTHROPIC must not be set when CAIRNLY_ENV=production "
+                         f"(CAIRNLY_ENV={s.environment!r} counts as production; only "
+                         f"{' or '.join(NON_PRODUCTION)} do not): the Claude API is for local "
+                         f"development only")
     if s.llm_provider == "anthropic" and not s.allow_anthropic:
         raise ValueError("LLM_PROVIDER=anthropic needs ALLOW_ANTHROPIC=true "
                          "(local development only)")
@@ -102,7 +111,7 @@ def get_settings() -> Settings:
         ollama_chat_model=env("OLLAMA_CHAT_MODEL", "qwen3:8b"),
         anthropic_model=env("ANTHROPIC_MODEL", "claude-opus-5-5"),
         top_k=int(env("TOP_K", "6")),
-        environment=env("CAIRNLY_ENV", "development"),
+        environment=env("CAIRNLY_ENV", "development").strip().lower(),
         allow_anthropic=flag("ALLOW_ANTHROPIC"),
         cors_origins=tuple(o.strip() for o in origins.split(",") if o.strip()),
         trust_proxy=flag("TRUST_PROXY"),
