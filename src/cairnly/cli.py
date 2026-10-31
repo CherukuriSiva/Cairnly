@@ -55,6 +55,8 @@ def cmd_ask(args: argparse.Namespace) -> None:
                 print(event["text"], end="", flush=True)
             elif event["type"] == "sources":
                 sources = event["sources"]
+            elif event["type"] in ("retract", "error"):
+                print(f"\n{event['message']}", file=sys.stderr)
     print("\n")
     for src in sources:
         print(f"[{src['n']}] {src['citation']}")
