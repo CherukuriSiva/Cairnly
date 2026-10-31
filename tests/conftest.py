@@ -30,6 +30,15 @@ def fake_embedder():
 
 
 @pytest.fixture
+def fresh_settings():
+    """Settings are cached: re-read them after a test changes the environment, and forget that
+    environment again afterwards. Call the returned function after setting the env vars."""
+    get_settings.cache_clear()
+    yield lambda: (get_settings.cache_clear(), get_settings())[1]
+    get_settings.cache_clear()
+
+
+@pytest.fixture
 def conn():
     """A connection whose tables live in a fresh schema that is dropped afterwards."""
     try:

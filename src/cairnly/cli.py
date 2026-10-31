@@ -1,6 +1,7 @@
 """Command line: `cairnly <command>`. Each command is a thin wrapper over one module."""
 
 import argparse
+import sys
 from pathlib import Path
 
 
@@ -131,7 +132,21 @@ def main(argv: list[str] | None = None) -> None:
     p.set_defaults(func=cmd_serve)
 
     args = parser.parse_args(argv)
+    if getattr(args, "provider", None):
+        require_provider(args.provider)
     args.func(args)
+
+
+def require_provider(provider: str) -> None:
+    """Stop with exit code 2 when the chosen provider is turned off (Claude without
+    ALLOW_ANTHROPIC), before any database or model work starts."""
+    from cairnly.llm import ProviderDisabled, check_provider
+
+    try:
+        check_provider(provider)
+    except ProviderDisabled as exc:
+        print(exc, file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
