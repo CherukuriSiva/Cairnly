@@ -5,9 +5,23 @@ Everything in this folder is public. The website builds its pages from it, and
 citation always come from one source.
 
 The lessons, insights and roadmaps were imported on 2026-10-31 from the
-author's own GradStack lessons. Only four front-matter keys were dropped
-(`isFreePreview`, `isPublicShowcase`, `stage`, `order`), because nothing here
-is paid and the order now lives in `syllabus.yaml`.
+author's own GradStack lessons. These are all the edits made to the imported
+files:
+
+- Four front-matter keys were dropped from every file (`isFreePreview`,
+  `isPublicShowcase`, `stage`, `order`), because nothing here is paid and the
+  order now lives in `syllabus.yaml`.
+- `lessons/full-stack/capstone-content-site.mdx`: the one line naming
+  GradStack now reads "Share the live URL with a friend or mentor for review".
+- Two MDX escapes, because MDX reads `<` as a tag and `{` as code:
+  `lessons/dsa/pattern-recognition.mdx` (`<=` became `\<=`) and
+  `lessons/ai-engineering/formatting-data-for-sft.mdx` (`{\"text\": ...}` became
+  `\{"text": ...}`).
+- Two examples moved to a neutral customer-support domain:
+  `lessons/ai-engineering/relevance-filtering-corpus.mdx` (a customer-support
+  assistant and `SUPPORT_KEYWORDS`) and
+  `lessons/ai-engineering/formatting-data-for-sft.mdx` (module `support_qa`).
+- 24 lessons got a new `<BookNote>` block in our own words (see below).
 
 ## Layout
 

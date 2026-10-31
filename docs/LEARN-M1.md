@@ -121,5 +121,5 @@ uv run cairnly serve & (cd web && npm run dev)     # then open http://localhost:
 
 ## What M1 does not do yet
 
-No evaluation numbers (M2), no tracing (M2), no guardrails beyond the prompt rule (M3), no
-cache or rate limits (M3), single tenant only (M6). Each is a later milestone on purpose.
+No evaluation numbers (M2), no tracing (M2), no guardrails beyond the prompt rule (M4), no
+cache or rate limits (M4), single tenant only (M7). Each is a later milestone on purpose.

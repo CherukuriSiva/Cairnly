@@ -6,9 +6,12 @@ graduates: every lesson is a public page, and every chat answer links to the sec
 ## 1. Content as MDX (`content/`, `mdx.py`)
 
 All 162 files (126 lessons, 29 insights, 7 roadmaps) were imported once from the author's own
-GradStack lessons into `content/`. Only four front-matter keys were dropped: two about paid
-access and two about ordering. Nothing is paid any more, and the order now lives in the
-syllabus.
+GradStack lessons into `content/`. Four front-matter keys were dropped from every file: two
+about paid access and two about ordering. Nothing is paid any more, and the order now lives
+in the syllabus. Beyond that, a few files were edited by hand: the one line naming GradStack
+in the full-stack capstone lesson was reworded, two lessons got MDX escapes (below), two
+lessons had their examples moved to a neutral customer-support domain, and 24 lessons got a
+book note (section 8). `content/README.md` lists every edit by file.
 
 The files stay as **MDX**: markdown plus components like `<WhyThisMatters>`. The website renders
 the components; the Python side needs plain text, so `mdx.py` converts each component into a
