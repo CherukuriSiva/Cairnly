@@ -1,6 +1,6 @@
 # ADR 0011: Raise the confidence gate to 0.70 for the full public content
 
-Status: accepted (M3). Re-measured in [ADR 0016](0016-written-eval-set.md)
+Status: Superseded by [ADR 0016](0016-written-eval-set.md)
 
 ## Context
 

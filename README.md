@@ -12,13 +12,14 @@ Built in public, one milestone at a time. **Now: M4 (production ready).**
 
 | | Recall@5 | MRR | Off-topic questions answered | Faithfulness |
 |---|---|---|---|---|
-| Lessons, all content (627 questions: 127 quiz + 500 written) | **0.971** | **0.914** | **0%** (0 of 150) | 97.5% (M2) |
+| Lessons, all content (627 questions: 127 quiz + 500 written) | **0.971** | **0.914** | **2.7%** (4 of 150) | 97.5% (M2) |
 | Follow-ups (15, qwen3:8b rewrite) | rewritten = standalone (0.867 to 0.933 across runs) | | | |
 
-The confidence gate (0.70) refuses 15.3% of those 627 questions, all of them written ones (96
-of 500): short questions like "What is a jailbreak?" score below off-topic ones like a piano
-question, so a lower cutoff would start answering cooking and Excel questions
-([ADR 0016](docs/adr/0016-written-eval-set.md)).
+The confidence gate (0.66) refuses 5.1% of those 627 questions, all of them written ones (32
+of 500), and answers 4 of the 150 off-topic questions (piano practice, sourdough, portrait
+drawing, declining an invitation). Short questions score close to off-topic ones, so no cutoff
+separates them cleanly: 0.70 answered no off-topic question but refused 96 real ones, and
+0.64 would answer 12 off-topic questions ([ADR 0016](docs/adr/0016-written-eval-set.md)).
 
 The input guard (M4) blocks 0 of 955 real learner questions and misses 9 of 155 attacks in its
 tuning set. On 11 fresh attacks it was never tuned on, it misses 8, so it is a first filter,
@@ -29,7 +30,7 @@ M2 added a cross-encoder reranker and a confidence gate calibrated from evals (R
 0.88 → 0.94). M3 measured the gate again on all public content with 40 off-topic questions
 and raised it to 0.70 ([ADR 0011](docs/adr/0011-recalibrated-confidence-gate.md)). Cycle 4
 added 500 written learner questions (3 to 5 per lesson) and 110 more off-topic questions, and
-re-measured: the gate stays at 0.70 ([ADR 0016](docs/adr/0016-written-eval-set.md)). The
+re-measured: the gate moved down to 0.66 ([ADR 0016](docs/adr/0016-written-eval-set.md)). The
 faithfulness number is from M2 and was not re-run since. How it was all measured:
 [LEARN-M2](docs/LEARN-M2.md), [LEARN-M3](docs/LEARN-M3.md).
 
