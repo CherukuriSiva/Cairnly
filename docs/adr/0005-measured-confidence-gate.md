@@ -2,7 +2,8 @@
 
 Status: accepted (M2)
 
-Note: the lessons gate was re-measured with off-topic questions in ADR 0011.
+Note: the lessons gate was re-measured with off-topic questions in ADR 0011, and again with a
+written question set in ADR 0016.
 
 ## Context
 
