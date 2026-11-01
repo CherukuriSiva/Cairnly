@@ -15,7 +15,7 @@
 lessons:
   title: AI engineering lessons
   path: content
-  min_score: 0.70
+  min_score: 0.66
   prompt: answer-learner-v1
   rerank: true
   questions: evals/questions

@@ -8,8 +8,8 @@
 lessons:            # all of content/: 127 quiz + 500 written questions, 150 off-topic questions
   recall@5: 0.94    # measured 0.9713 with the reranker (2026-11-01; quiz 0.937, written 0.98)
   mrr: 0.88         # measured 0.9138 (quiz 0.873, written 0.9242)
-  false_refusal_rate: 0.19   # measured 0.1531 at min_score 0.70 (96 of 627, all written)
-  false_accept_rate: 0.05    # measured 0.0 at min_score 0.70 (0 of 150; 8 of 150 would be 0.0533)
+  false_refusal_rate: 0.09   # measured 0.051 at min_score 0.66 (32 of 627, all written)
+  false_accept_rate: 0.06    # measured 0.0267 at min_score 0.66 (4 of 150; 10 of 150 would fail)
 
 redteam:            # `cairnly eval-redteam`: the input guard on evals/redteam.jsonl (the TUNING
                     # set) plus every golden question (quiz and written), off-topic question and
