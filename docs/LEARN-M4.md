@@ -248,7 +248,7 @@ A reader who closes the tab mid-answer is a `WARNING`. Every call into the Langf
 its own errors, because a tracing bug must never cost an answer. The API flushes the last traces
 when it shuts down.
 
-## 9. The chat explains itself (`web/components/Chat.tsx`, `web/lib/ask.ts`)
+## 9. The chat explains itself (`web/components/chat/Chat.tsx`, `web/lib/ask.ts`)
 
 - **Cold start.** If no token has arrived after 5 seconds, "Searching…" becomes "Waking up the
   model, the first answer can take up to a minute…". The first token clears it.

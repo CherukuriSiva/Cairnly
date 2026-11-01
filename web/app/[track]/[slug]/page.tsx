@@ -8,6 +8,7 @@ import { TrackNav } from "@/components/lesson/TrackNav";
 import { slugify } from "@/lib/anchors";
 import { getLesson } from "@/lib/content";
 import { renderMdx } from "@/lib/mdx";
+import { askHref } from "@/lib/starters";
 import { type Entry, findEntry, flatLessons, getTrack, neighbours, resolveTrack } from "@/lib/syllabus";
 
 export const runtime = "nodejs";
@@ -30,8 +31,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 function askUrl(title: string, track: string): string {
-  const q = encodeURIComponent(`Explain the main ideas of "${title}"`);
-  return `/?q=${q}&track=${track}`;
+  return askHref(`Explain the main ideas of "${title}"`, track);
 }
 
 function NeighbourCard({ entry, label, currentTrack }: { entry?: Entry; label: string; currentTrack: string }) {

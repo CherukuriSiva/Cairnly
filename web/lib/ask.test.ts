@@ -1,14 +1,109 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ask,
+  AskError,
   buildAskBody,
   closeTurn,
   ENDED_EARLY,
+  errorKind,
   errorMessage,
   getSessionId,
+  headerTimeout,
   MAX_ANSWER_CHARS,
   parseFrames,
+  shouldAutoRetry,
+  TIMEOUT_MESSAGE,
   type PastTurn,
 } from "@/lib/ask";
+
+describe("errorKind", () => {
+  it("classifies the statuses the chat treats differently", () => {
+    expect(errorKind(503)).toBe("waking");
+    expect(errorKind(429)).toBe("rate");
+    expect(errorKind(403)).toBe("forbidden");
+    expect(errorKind(500)).toBe("http");
+    expect(errorKind(404)).toBe("http");
+  });
+});
+
+describe("shouldAutoRetry", () => {
+  it("retries a cold start or a network failure once, after the first attempt", () => {
+    expect(shouldAutoRetry("waking", 1)).toBe(true);
+    expect(shouldAutoRetry("network", 1)).toBe(true);
+    expect(shouldAutoRetry("waking", 2)).toBe(false);
+    expect(shouldAutoRetry("network", 2)).toBe(false);
+  });
+
+  it("never retries limits, refusals, timeouts or other errors on its own", () => {
+    for (const kind of ["rate", "forbidden", "timeout", "http"] as const) {
+      expect(shouldAutoRetry(kind, 1)).toBe(false);
+    }
+  });
+});
+
+describe("headerTimeout", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("aborts after the time limit and says it timed out", () => {
+    const timer = headerTimeout(undefined, 1000);
+    vi.advanceTimersByTime(999);
+    expect(timer.signal.aborted).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(timer.signal.aborted).toBe(true);
+    expect(timer.timedOut()).toBe(true);
+  });
+
+  it("never aborts once cleared (the headers arrived)", () => {
+    const timer = headerTimeout(undefined, 1000);
+    timer.clear();
+    vi.advanceTimersByTime(60_000);
+    expect(timer.signal.aborted).toBe(false);
+    expect(timer.timedOut()).toBe(false);
+  });
+
+  it("follows the caller's Stop without calling it a timeout", () => {
+    const stop = new AbortController();
+    const timer = headerTimeout(stop.signal, 1000);
+    stop.abort();
+    expect(timer.signal.aborted).toBe(true);
+    expect(timer.timedOut()).toBe(false);
+    timer.clear();
+  });
+});
+
+describe("ask errors", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const body = buildAskBody("q", [], null, "4f2c9a1e-1b2c-4d5e-8f90-123456789abc");
+
+  it("throws a waking AskError with the status on 503", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail: "Starting up" }), { status: 503 }));
+    const error = await ask(body, () => {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AskError);
+    expect(error).toMatchObject({ kind: "waking", status: 503, message: "Starting up" });
+  });
+
+  it("turns a failed fetch into a network AskError", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    await expect(ask(body, () => {})).rejects.toMatchObject({ kind: "network" });
+  });
+
+  it("times out when no response arrives in time", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))),
+    );
+    const pending = ask(body, () => {}, undefined, 5000).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await pending).toMatchObject({ kind: "timeout", message: TIMEOUT_MESSAGE });
+    vi.useRealTimers();
+  });
+});
 
 const turn = (n: number, status: PastTurn["status"] = "done"): PastTurn => ({
   question: `q${n}`,

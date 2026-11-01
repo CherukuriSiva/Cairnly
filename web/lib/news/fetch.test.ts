@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { getNews, loadSource, mergeGroup, type Fetcher, type LastGood } from "./fetch";
+import { getNews, latestAcross, loadSource, mergeGroup, type Fetcher, type LastGood } from "./fetch";
 import type { Source } from "./sources";
-import type { SourceResult } from "./types";
+import type { NewsGroup, NewsItem, SourceResult } from "./types";
 
 const feed = (items: { title: string; link: string; date?: string }[]) =>
   `<rss><channel>${items
@@ -110,5 +110,33 @@ describe("mergeGroup", () => {
 
   it("only takes items of the asked group", () => {
     expect(mergeGroup([result("A", [["x", "https://e.example/x", ""]])], "papers")).toEqual([]);
+  });
+});
+
+describe("latestAcross", () => {
+  const item = (group: NewsGroup, title: string, url: string, date: string): NewsItem => ({
+    id: url,
+    source: "S",
+    group,
+    title,
+    url,
+    date,
+    summary: "",
+  });
+
+  it("takes the newest items across groups, without repeats, undated last", () => {
+    const news: Record<NewsGroup, NewsItem[]> = {
+      community: [item("community", "hn", "https://e.example/hn", "2026-10-30T00:00:00.000Z")],
+      papers: [
+        item("papers", "paper", "https://e.example/p", "2026-10-31T00:00:00.000Z"),
+        item("papers", "undated", "https://e.example/u", ""),
+      ],
+      blogs: [
+        item("blogs", "blog", "https://e.example/b", "2026-10-29T00:00:00.000Z"),
+        item("blogs", "same link", "https://e.example/p", "2026-10-31T00:00:00.000Z"),
+      ],
+    };
+    expect(latestAcross(news, 3).map((i) => i.title)).toEqual(["paper", "hn", "blog"]);
+    expect(latestAcross(news, 10).map((i) => i.title)).toEqual(["paper", "hn", "blog", "undated"]);
   });
 });

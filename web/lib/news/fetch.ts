@@ -81,6 +81,16 @@ export function mergeGroup(results: SourceResult[], group: NewsGroup): NewsItem[
   return merged.sort(byDateDesc).slice(0, GROUP_CAPS[group]);
 }
 
+/** The newest items across every group (the landing page's news strip), without repeats. */
+export function latestAcross(news: Record<NewsGroup, NewsItem[]>, count: number): NewsItem[] {
+  const seen = new Set<string>();
+  return Object.values(news)
+    .flat()
+    .filter((item) => !seen.has(item.url) && seen.add(item.url))
+    .sort(byDateDesc)
+    .slice(0, count);
+}
+
 /** Fetch all sources in parallel and return them grouped for the page. */
 export async function getNews(
   fetcher: Fetcher = fetchText,

@@ -61,7 +61,7 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Limits | Per-IP and site-wide rate limits, 4 answers at once, first-token and answer time limits | `limits.py` |
 | Providers | Ollama (local, or on a Modal GPU in production); the Claude API for local development only | `llm.py`, `ollama.py` |
 | API | FastAPI: `/health`, `/config`, `/search`, streaming `/ask` (Server-Sent Events) with history and track | `api.py` |
-| Chat | Next.js chat with clickable citations, lesson links, a link to the full lesson under each answer, follow-ups, a track scope and a cold-start notice | `web/components/Chat.tsx` |
+| Chat | Next.js chat at `/ask` with clickable citations, source cards, a link to the full lesson under each answer, follow-ups, a track scope, and a friendly cold-start card with one automatic retry | `web/components/chat/` |
 | Evals | Golden set of quiz plus written questions (reported per source), off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
 | Tracing | One Langfuse trace per question (guard, rewrite, retrieve, generate, output check), with no user text by default ([PRIVACY.md](PRIVACY.md)) | `tracing.py` |
 | Deploy | Vercel + Modal (API and Ollama GPU) + Neon on free plans, Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy | [infra/](infra/README.md), `deploy/` |
@@ -128,7 +128,7 @@ curl -s localhost:8010/config        # {"providers":["ollama"],"default_provider
 uv run cairnly ask "What is RAG and when does it beat pure prompting?"
 ```
 
-Then open http://localhost:3010 and click a starter question. The answer streams in with
+Then open http://localhost:3010/ask and click a starter question. The answer streams in with
 `[n]` citations that open the lesson section they came from.
 
 ### Common problems
@@ -142,7 +142,7 @@ Then open http://localhost:3010 and click a starter question. The answer streams
 | The chat cannot reach the API | Start `uv run cairnly serve`; for another address set `NEXT_PUBLIC_API_URL` and add the site to `CORS_ORIGINS` |
 | `429 Too Many Requests` | The local rate limits from `.env` apply to you too; raise `RATE_LIMIT_PER_MINUTE` for testing |
 
-`http://localhost:3010/?q=your+question&track=ai-engineering` opens the chat with a question
+`http://localhost:3010/ask?q=your+question&track=ai-engineering` opens the chat with a question
 already asked and the search limited to one track. Every lesson page has an "Ask cairnly
 about this lesson" button that does this for you.
 

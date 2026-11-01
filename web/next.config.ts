@@ -1,13 +1,15 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
-// On Vercel the News page's function must carry content/news, which lies outside web/, so
-// tracing starts at the repo root. Only there: a repo-root trace moves standalone's server.js
-// to standalone/web/, which the Docker image (web/Dockerfile) does not expect.
+// The hourly pages (/ and /news) re-render at runtime, and so does the root layout around them
+// (header track ids, footer links), all reading content/, which lies outside web/. On Vercel
+// their functions must carry it, so tracing starts at the repo root. Only there: a repo-root
+// trace moves standalone's server.js to standalone/web/, which the Docker image (web/Dockerfile)
+// does not expect; the image copies content/ itself.
 const vercelTracing: NextConfig = process.env.VERCEL
   ? {
       outputFileTracingRoot: path.join(process.cwd(), ".."),
-      outputFileTracingIncludes: { "/news": ["../content/news/**"] },
+      outputFileTracingIncludes: { "/": ["../content/**"], "/news": ["../content/**"] },
     }
   : {};
 

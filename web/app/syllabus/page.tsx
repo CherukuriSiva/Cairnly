@@ -16,7 +16,7 @@ export default function SyllabusPage() {
       <p className="mt-3" style={{ color: "var(--muted)" }}>
         Six tracks for new graduates who want to become AI engineers. Start with ML Foundations
         if machine learning is new to you, or jump to the track you need. Every lesson is open
-        to read, and the chat on the home page answers questions with links back to them.
+        to read, and Ask cairnly answers questions with links back to them.
       </p>
       {tracks.map((track) => {
         const count = track.modules.reduce((n, m) => n + m.lessons.length, 0);

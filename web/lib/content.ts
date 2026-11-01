@@ -1,7 +1,7 @@
 // Build-time access to the MDX content in ../content (the same files `cairnly ingest` indexes).
-// Only server code imports this: pages are statically generated at build time. The one exception
-// is the News page, which re-reads content/news/linkedin.yaml on each ISR refresh (so the web
-// image ships content/news).
+// Only server code imports this: pages are statically generated at build time. The exceptions
+// are the hourly pages (/ and /news) and the root layout around them, which re-read content on
+// each ISR refresh (so the web image ships content/, see web/Dockerfile and next.config.ts).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -23,6 +23,9 @@ export interface Insight {
   slug: string;
   title: string;
   summary: string;
+  /** YYYY-MM-DD, or "" when the front matter has none. */
+  publishedAt: string;
+  readingMinutes: number;
   body: string;
 }
 
@@ -30,8 +33,18 @@ export interface Roadmap {
   slug: string;
   title: string;
   summary: string;
+  /** Who it is for (lib/roadmaps.ts maps it to a persona). */
+  audience: string;
   timeHorizon: string;
   body: string;
+}
+
+const WORDS_PER_MINUTE = 220;
+
+/** Reading time of an MDX body in whole minutes, at least 1. */
+export function readingMinutes(body: string): number {
+  const words = body.split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
 }
 
 /** Every .mdx file under a folder, as paths relative to it, sorted. */
@@ -80,6 +93,9 @@ export function getInsights(): Insight[] {
     slug: text(data.slug),
     title: text(data.title),
     summary: text(data.summary),
+    // YAML reads an unquoted date as a Date.
+    publishedAt: data.publishedAt instanceof Date ? data.publishedAt.toISOString().slice(0, 10) : text(data.publishedAt),
+    readingMinutes: readingMinutes(body),
     body,
   }));
   return insights;
@@ -90,6 +106,7 @@ export function getRoadmaps(): Roadmap[] {
     slug: text(data.slug),
     title: text(data.title),
     summary: text(data.summary),
+    audience: text(data.audience),
     timeHorizon: text(data.timeHorizon),
     body,
   }));

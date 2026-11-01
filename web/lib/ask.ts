@@ -176,20 +176,94 @@ export function getSessionId(): string {
   }
 }
 
+/** Why a request failed: the chat shows a different card for each. */
+export type AskErrorKind = "waking" | "rate" | "forbidden" | "network" | "timeout" | "http";
+
+/** A failed /ask request. `message` is the text the reader may see (errorMessage for HTTP
+ * errors); `status` is set for HTTP errors only. */
+export class AskError extends Error {
+  constructor(
+    message: string,
+    readonly kind: AskErrorKind,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "AskError";
+  }
+}
+
+/** 503 means the model is still starting (a cold start), 429 a rate limit, 403 a turned-off
+ * feature; anything else is a plain HTTP error. */
+export function errorKind(status: number): AskErrorKind {
+  if (status === 503) return "waking";
+  if (status === 429) return "rate";
+  if (status === 403) return "forbidden";
+  return "http";
+}
+
+export const ASK_TIMEOUT_MS = 30_000;
+export const AUTO_RETRY_DELAY_MS = 3_000;
+export const NETWORK_MESSAGE = "Could not reach cairnly.";
+export const TIMEOUT_MESSAGE = "cairnly didn't answer in time.";
+
+/** One automatic retry, only for a cold start or a network failure, and only after the first
+ * attempt (`attempt` counts the attempts made so far, starting at 1). */
+export function shouldAutoRetry(kind: AskErrorKind, attempt: number): boolean {
+  return attempt === 1 && (kind === "waking" || kind === "network");
+}
+
+/**
+ * A signal that aborts when `outer` aborts or when `ms` pass first. Call `clear()` as soon as
+ * the response headers arrive, so a live stream is never cut; `timedOut()` tells the two
+ * abort causes apart.
+ */
+export function headerTimeout(
+  outer: AbortSignal | undefined,
+  ms: number,
+): { signal: AbortSignal; clear: () => void; timedOut: () => boolean } {
+  const controller = new AbortController();
+  let expired = false;
+  const onAbort = () => controller.abort(outer?.reason);
+  if (outer?.aborted) controller.abort(outer.reason);
+  else outer?.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(() => {
+    expired = true;
+    controller.abort(new DOMException("timed out", "TimeoutError"));
+  }, ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer), timedOut: () => expired };
+}
+
+/**
+ * POST /ask and hand each streamed event to `onEvent`. Throws an AskError for an HTTP error,
+ * a network failure or no response within `timeoutMs`; a Stop (the caller's `signal`)
+ * surfaces as the browser's AbortError.
+ */
 export async function ask(
   body: AskBody,
   onEvent: (event: AskEvent) => void,
   signal?: AbortSignal,
+  timeoutMs: number = ASK_TIMEOUT_MS,
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/ask`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
+  const timer = headerTimeout(signal, timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: timer.signal,
+    });
+  } catch (err) {
+    if (timer.timedOut()) throw new AskError(TIMEOUT_MESSAGE, "timeout");
+    if (signal?.aborted) throw err;
+    if (err instanceof TypeError) throw new AskError(NETWORK_MESSAGE, "network");
+    throw err;
+  } finally {
+    timer.clear();
+  }
   if (!res.ok || !res.body) {
     const detail = [403, 429, 503].includes(res.status) ? await readDetail(res) : null;
-    throw new Error(errorMessage(res.status, detail, res.headers.get("Retry-After")));
+    throw new AskError(errorMessage(res.status, detail, res.headers.get("Retry-After")), errorKind(res.status), res.status);
   }
 
   const reader = res.body.getReader();
