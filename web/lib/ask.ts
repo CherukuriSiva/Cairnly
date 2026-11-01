@@ -54,6 +54,24 @@ export interface PastTurn {
   guard?: string; // the safety rule that refused it; such a turn is never sent back as history
 }
 
+/** A turn as the chat shows it while the answer streams in. */
+export interface StreamedTurn extends PastTurn {
+  meta?: string; // the line under the answer: model and match, or the error message
+  waking?: boolean;
+}
+
+export const ENDED_EARLY = "The answer ended early. Please try again.";
+
+/**
+ * The turn once the answer stream has closed. Every normal answer ends with a done or error
+ * event; a turn still "streaming" lost its stream (a proxy cut it, or the server stopped), so
+ * it becomes an error instead of showing "Searching…" and a Stop button forever.
+ */
+export function closeTurn<T extends StreamedTurn>(turn: T): T {
+  if (turn.status !== "streaming") return turn;
+  return { ...turn, status: "error", meta: ENDED_EARLY, waking: false };
+}
+
 export interface AskBody {
   question: string;
   history: { question: string; answer: string }[];

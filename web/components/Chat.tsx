@@ -4,22 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import {
   ask,
   buildAskBody,
+  closeTurn,
   fetchConfig,
   getSessionId,
   PROVIDER_LABELS,
   type AskEvent,
-  type PastTurn,
   type Provider,
   type Source,
+  type StreamedTurn,
 } from "@/lib/ask";
 import { inlineTokens } from "@/lib/inline";
 
-interface Turn extends PastTurn {
+interface Turn extends StreamedTurn {
   sources: Source[];
-  meta?: string;
   searched?: string; // the rewritten query, shown when it differs from the question
   notice?: string;
-  waking?: boolean; // no token yet after WAKING_MS: the model is probably starting up
+  // waking (from StreamedTurn): no token yet after WAKING_MS, the model is probably starting up
 }
 
 const WAKING_MS = 5000;
@@ -128,6 +128,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     };
     try {
       await ask(body, onEvent, abortRef.current.signal);
+      update(closeTurn); // the stream closed without a done or error event
     } catch (err) {
       update((t) => ({ ...t, status: "error", meta: (err as Error).message, waking: false }));
     } finally {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAskBody,
+  closeTurn,
+  ENDED_EARLY,
   errorMessage,
   getSessionId,
   MAX_ANSWER_CHARS,
@@ -126,5 +128,19 @@ describe("parseFrames", () => {
 
   it("ignores frames without a data line", () => {
     expect(parseFrames(": keep-alive\n\n").events).toEqual([]);
+  });
+});
+
+describe("closeTurn", () => {
+  it("fails a turn whose stream closed without a done or error event", () => {
+    const cut = { question: "q", answer: "half an ans", status: "streaming" as const, waking: true };
+    expect(closeTurn(cut)).toEqual({ ...cut, status: "error", meta: ENDED_EARLY, waking: false });
+  });
+
+  it("leaves a finished, refused or failed turn as it is", () => {
+    for (const status of ["done", "refused", "error"] as const) {
+      const t = { question: "q", answer: "a", status, meta: "model · best match 0.80" };
+      expect(closeTurn(t)).toBe(t);
+    }
   });
 });
