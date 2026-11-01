@@ -41,7 +41,7 @@ API_ENV = {
     "CAIRNLY_ENV": "production",  # refuses ALLOW_ANTHROPIC, so Claude can never be switched on
     "LLM_PROVIDER": "ollama",  # the Modal GPU app
     "TRUST_PROXY": "0",  # Modal hands the API the real caller's address; never trust the header
-    "CORS_ORIGINS": "https://cairnly.vercel.app",  # the Vercel production site
+    "CORS_ORIGINS": "https://cairnly-blond.vercel.app",  # the Vercel production site
     "LANGFUSE_TRACING_ENVIRONMENT": "production",  # tells production traces apart in Langfuse
 }
 
@@ -49,8 +49,9 @@ SECRETS = [modal.Secret.from_name("cairnly-api")]
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    # The locked dependencies (without cairnly itself), with the Dockerfile's uv version.
-    .uv_sync(str(REPO), extras=["rerank"], uv_version="0.12.23")
+    # The locked dependencies (without cairnly itself and without the dev group), with the
+    # Dockerfile's uv version.
+    .uv_sync(str(REPO), extras=["rerank"], extra_options="--no-dev", uv_version="0.12.23")
     .add_local_file(REPO / "pyproject.toml", f"{ROOT}/pyproject.toml", copy=True)
     .add_local_file(REPO / "uv.lock", f"{ROOT}/uv.lock", copy=True)
     .add_local_file(REPO / "README.md", f"{ROOT}/README.md", copy=True)

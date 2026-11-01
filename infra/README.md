@@ -59,8 +59,8 @@ Run every command from the repo root.
    variable `NEXT_PUBLIC_API_URL` = the API URL for Production, then deploy. Every push to
    `main` deploys again. A CLI deploy (`npx vercel@latest deploy --prod` from the repo root)
    uploads only `web/` and `content/` ([.vercelignore](../.vercelignore)).
-8. **CORS:** if the site's production domain is not `https://cairnly.vercel.app`, set it in
-   `CORS_ORIGINS` in `deploy/modal_api.py` and deploy the API again.
+8. **CORS:** `CORS_ORIGINS` in `deploy/modal_api.py` is the site's production domain,
+   `https://cairnly-blond.vercel.app`. If yours differs, set it there and deploy the API again.
 9. **Smoke test:** `curl <api>/health` answers 200, `curl <api>/config` lists only Ollama, and
    a question in the chat on the site gets a cited answer.
 
@@ -68,7 +68,7 @@ Run every command from the repo root.
 |---|---|
 | Ship a new API version | `uvx modal deploy deploy/modal_api.py` |
 | Ship a new site version | Push to `main`; Vercel builds it |
-| Lessons changed | Push, then `uvx modal run deploy/modal_api.py::ingest`; only changed files are re-embedded |
+| Lessons, `syllabus.yaml`, `kbs.yaml` or `prompts/` changed | Push (the site), then `uvx modal deploy deploy/modal_api.py` (the API image holds its own copy of these files), then `uvx modal run deploy/modal_api.py::ingest`; only changed files are re-embedded |
 | Rotate a key | Edit the value in the `cairnly-api` secret, then `uvx modal deploy deploy/modal_api.py` so new containers read it; run `check` |
 | Stop everything | `uvx modal app stop cairnly-api` and `uvx modal app stop cairnly-ollama`; the site then answers questions with an error |
 | First question after a quiet period is slow | Expected: the API container and then the GPU wake up. The API waits up to 90 s for the first token; Modal ends a web request after 150 s, so a slower start ends with "did not respond in time" |
