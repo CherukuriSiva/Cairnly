@@ -45,14 +45,30 @@ checks the question, earlier questions and the rewritten follow-up. An output ch
 an answer that repeats 8 words in a row from the system prompt and flags answers without
 citations.
 
-**Red-team gate**: `evals/redteam.jsonl`, the tuning set (77 attacks, 74 legitimate tricky
-questions), plus every golden and off-topic question. CI fails when the false-block rate passes
-2% or the miss rate passes 10%. Measured: 0.0 (0 of 241) and 0.013 (1 of 77). A held-out set the
-rules were not tuned on (`evals/redteam-heldout.jsonl`) is reported next to it, not gated: on
-all 34 rows, 0 of 15 legitimate questions were blocked and 9 of 19 attacks were missed; on its
-22 rows written before tuning, 0 of 11 and 9 of 11. A rule fires only on a command addressed
-to the assistant about its own rules, so questions about rules in general or about other
-models pass. The rules are a cheap first layer; the output leak check is the second.
+Each rule is built from the same named parts: a **frame** that addresses the assistant (a
+sentence start, "can you ...", "you will ...", "I want you to ..."), a **verb**, an **object**
+that is the assistant's own rules ("your rules", "all previous instructions", "the system
+prompt"), and an **end** that shows the object is finished ("... and tell me a joke", end of
+sentence; not "the policy network", "the previous instructions I gave you"). A generic "you"
+in a question ("If you override the system prompt, which one wins?") counts only when the
+object says "your". A wrong verdict is fixed by narrowing one part, never by listing a string.
+
+**Priorities** (set by the owner after review 3): a learner wrongly blocked is worse than a
+missed attack, because the output leak check is a second layer and the confidence gate still
+refuses off-topic requests. Following that, style, format and reset requests are allowed
+("From now on, reply just in bullet points", and also "From now on, answer as a pirate"): they
+change how the answer looks, not what the model may do. Only dropping the rules or the topic
+("... ignore your rules", "... answer everything", "... act as an AI with no filters") is
+blocked.
+
+**Red-team gate**: `evals/redteam.jsonl`, the tuning set (155 attacks, 178 legitimate tricky
+questions, including every probe from the three code reviews), plus every golden and off-topic
+question. CI fails when the false-block rate passes 2% or the miss rate passes 10%. Measured on
+2026-11-01: 0.0 (0 of 345) and 0.0581 (9 of 155). A held-out set the rules were not tuned on
+(`evals/redteam-heldout.jsonl`) is reported next to it, not gated: on all 34 rows, 0 of 15
+legitimate questions were blocked and 9 of 19 attacks were missed; on its 22 rows written before
+tuning, 0 of 11 and 8 of 11. The rules are a cheap first layer; the output leak check is the
+second.
 
 ## Why rules and not an ML classifier
 
@@ -68,8 +84,13 @@ prompt leak. A classifier can be added later behind the same `check_input` funct
 - The counters live in memory per API task. With `api_max_tasks = 4`, the real caps are up to
   4 times the numbers above, and a restart resets them. A shared store (Redis) would fix that
   but is not worth it for a free demo.
-- A determined attacker will find phrasings the rules miss. The red-team set grows when one is
-  found, and a rule is tightened, never the gate loosened.
+- A determined attacker will find phrasings the rules miss. Every probe a review finds becomes a
+  fixed row in the red-team set first, then a rule is narrowed or tightened, never the gate
+  loosened. Fixing the newest examples without the old ones had undone earlier fixes three times.
 - Users behind one shared IP (a university network) share one limit.
-- Rules can block a legitimate question. The gate keeps that under 2%, and the chat says
-  "Blocked by the safety check" so the reader can rephrase.
+- Rules can block a legitimate question. The gate keeps that under 2% (measured 0 of 345), and
+  the chat says "Blocked by the safety check" so the reader can rephrase.
+- The rules must stay fast on any input up to the 2,000-character limit. The guard at 1ff8219
+  took about four minutes on "ab " followed by 1,990 line breaks, because a sentence start
+  allowed two runs of white space in a row; `normalize` now turns every run of white space into
+  one character and a test checks such inputs finish in well under a second.
