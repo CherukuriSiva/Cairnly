@@ -8,6 +8,8 @@
 #   prompt     prompt version from prompts/ (versioned so evals can compare them)
 #   notice     shown with every answer in the UI
 #   rerank     re-order candidates with a cross-encoder (measured lift; see src/cairnly/rerank.py)
+#   questions  folder of written eval questions (one .jsonl per track) that `cairnly eval` adds
+#              to the quiz questions; see docs/adr/0016-written-eval-set.md
 
 lessons:
   title: AI engineering lessons
@@ -15,3 +17,4 @@ lessons:
   min_score: 0.70
   prompt: answer-learner-v1
   rerank: true
+  questions: evals/questions

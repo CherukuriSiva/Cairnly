@@ -1,12 +1,15 @@
+from dataclasses import replace
 
 import pytest
 
 from cairnly.evals import (
     FOLLOWUPS_FILE,
     GoldenItem,
+    by_source,
     check_gates,
     followup_report,
     gate_metrics,
+    golden_for,
     judge,
     lessons_golden,
     load_jsonl,
@@ -14,8 +17,9 @@ from cairnly.evals import (
     retrieval_metrics,
     run_retrieval,
     suggest_min_score,
+    written_golden,
 )
-from cairnly.kb import ROOT
+from cairnly.kb import ROOT, KnowledgeBase
 from cairnly.search import Hit, SearchResult
 
 
@@ -97,6 +101,61 @@ def test_run_retrieval_skips_excluded_trails_when_ranking():
     [result] = run_retrieval([item], lambda q: SearchResult(hits, 0.8))
 
     assert result.rank == 2  # the quiz hit does not count; the teaching section is rank 2
+
+
+def test_written_golden_reads_rows_as_written_items_without_the_quiz(tmp_path):
+    (tmp_path / "dsa.jsonl").write_text(
+        '{"id": "w-heaps-1", "question": "What is a heap?", '
+        '"gold": ["lessons/dsa/heaps.mdx", "lessons/dsa/queues.mdx"], "section": "Heaps"}\n\n')
+
+    [item] = written_golden(tmp_path)
+
+    assert (item.id, item.question, item.source) == ("w-heaps-1", "What is a heap?", "written")
+    assert item.gold == {"lessons/dsa/heaps.mdx", "lessons/dsa/queues.mdx"}
+    assert item.exclude_trails == ("Quick quiz",)
+
+
+def test_golden_for_puts_quiz_items_before_the_written_ones(tmp_path):
+    lesson = tmp_path / "content" / "lessons" / "rag.mdx"
+    lesson.parent.mkdir(parents=True)
+    lesson.write_text("**Q: Why retrieve first?**\n")
+    (tmp_path / "questions").mkdir()
+    (tmp_path / "questions" / "a.jsonl").write_text(
+        '{"id": "w-rag-1", "question": "What is RAG?", "gold": ["lessons/rag.mdx"], '
+        '"section": "Idea"}\n')
+    kb = KnowledgeBase("t", "T", str(tmp_path / "content"), 0.7, "p",
+                       questions=str(tmp_path / "questions"))
+
+    items = golden_for(kb)
+
+    assert [(i.question, i.source) for i in items] == [("Why retrieve first?", "quiz"),
+                                                        ("What is RAG?", "written")]
+    assert [i.source for i in golden_for(replace(kb, questions=""))] == ["quiz"]
+
+
+def test_by_source_splits_metrics_per_source_against_the_same_off_topic_scores():
+    quiz = GoldenItem("q", "?", frozenset(["a.md"]))
+    written = [GoldenItem(f"w{n}", "?", frozenset(["a.md"]), source="written") for n in (1, 2)]
+    hits = {"q": [_hit("a.md")], "w1": [_hit("b.md"), _hit("a.md")], "w2": [_hit("b.md")]}
+    sims = {"q": 0.9, "w1": 0.75, "w2": 0.6}
+    results = [run_retrieval([i], lambda q, i=i: SearchResult(hits[i.id], sims[i.id]))[0]
+               for i in [quiz, *written]]
+
+    report = by_source(results, off_topic=[0.65], k=5, min_score=0.7)
+
+    assert set(report) == {"quiz", "written"}
+    assert (report["quiz"]["questions"], report["quiz"]["recall@5"]) == (1, 1.0)
+    assert report["written"]["recall@5"] == 0.5 and report["written"]["mrr"] == 0.25
+    assert report["written"]["false_refusal_rate"] == 0.5  # 0.6 refused at 0.7
+    assert report["quiz"]["false_accept_rate"] == report["written"]["false_accept_rate"] == 0.0
+
+
+def test_gate_metrics_reports_the_rates_at_the_rounded_suggestion():
+    g = gate_metrics([0.8, 0.664], [0.6, 0.662], min_score=0.7)
+
+    assert g["suggested_min_score"] == 0.664
+    assert g["at_suggested"] == {"min_score": 0.66, "false_refusal_rate": 0.0,
+                                 "false_accept_rate": 0.5}  # 0.662 passes at the rounded 0.66
 
 
 def test_retrieval_metrics_recall_and_mrr():

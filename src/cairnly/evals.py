@@ -1,8 +1,12 @@
 """Measure answer quality on golden sets: questions whose right sources are known.
 
-Golden set (no invented questions; it comes from the lessons themselves):
-- lessons: each lesson's quiz question; gold = that lesson. The quiz section itself is
+Golden set, one combined list reported as a whole and per source:
+- quiz: each lesson's quiz question; gold = that lesson. The quiz section itself is
   excluded from results ("answer key left out"), so retrieval must find the teaching sections.
+- written: 3 to 5 learner questions per lesson in the knowledge base's `questions` folder
+  (evals/questions/<track>.jsonl), written in our own words; gold = the lesson that answers it
+  (plus `section`, the heading that answers it, checked by a test but not used in scoring).
+  The same quiz exclusion applies.
 
 Metrics:
 - Recall@k         share of questions with a gold source in the top k results
@@ -14,9 +18,10 @@ Metrics:
 - faithfulness     (--judge) share of answers an LLM judge finds fully supported by sources
 
 Red team (`cairnly eval-redteam`): the input guard (guard.py) on evals/redteam.jsonl, attacks
-labelled "block" and tricky but legitimate questions labelled "allow". Every golden quiz
-question and off-topic question must pass the guard too (the off-topic ones are refused later
-by the confidence gate, not by the guard). No database and no model are needed, so CI runs it.
+labelled "block" and tricky but legitimate questions labelled "allow". Every golden question
+(quiz and written) and off-topic question must pass the guard too (the off-topic ones are
+refused later by the confidence gate, not by the guard). No database and no model are needed,
+so CI runs it.
 - false-block rate  legitimate questions the guard blocked
 - miss rate         attacks the guard let through
 The rules were tuned on that set, so its rates flatter the guard. evals/redteam-heldout.jsonl
@@ -56,6 +61,7 @@ class GoldenItem:
     question: str
     gold: frozenset[str]  # document paths that count as correct
     exclude_trails: tuple[str, ...] = ()
+    source: str = "quiz"  # "quiz" (lesson quiz lines) or "written" (evals/questions)
 
 
 @dataclass
@@ -92,8 +98,21 @@ def off_topic_questions(path: Path = OFF_TOPIC_FILE) -> list[str]:
     return [row["question"] for row in load_jsonl(path)]
 
 
+def written_golden(directory: Path) -> list[GoldenItem]:
+    """Written questions from the *.jsonl files in `directory`, one {"id", "question", "gold",
+    "section"} row per line; gold paths are relative to the ingested folder, like the quiz's."""
+    quiz_title = section_titles()["MiniQuiz"]
+    return [GoldenItem(row["id"], row["question"], frozenset(row["gold"]),
+                       exclude_trails=(quiz_title,), source="written")
+            for path in sorted(directory.glob("*.jsonl")) for row in load_jsonl(path)]
+
+
 def golden_for(kb: KnowledgeBase, path: str | None = None) -> list[GoldenItem]:
-    return lessons_golden(Path(path or kb.path), root=Path(kb.path))
+    """Quiz questions (from `path`, else the KB's folder), then the KB's written questions."""
+    items = lessons_golden(Path(path or kb.path), root=Path(kb.path))
+    if kb.questions:
+        items += written_golden(ROOT / kb.questions)
+    return items
 
 
 # ---- metrics -------------------------------------------------------------------------------
@@ -118,7 +137,7 @@ def retrieval_metrics(results: list[ItemResult], k: int) -> dict:
     }
 
 
-def gate_metrics(on_topic: list[float], off_topic: list[float], min_score: float) -> dict:
+def gate_rates(on_topic: list[float], off_topic: list[float], min_score: float) -> dict:
     """How the confidence gate behaves: refusing real questions vs. accepting foreign ones."""
     refused = sum(s < min_score for s in on_topic)
     accepted = sum(s >= min_score for s in off_topic)
@@ -126,7 +145,18 @@ def gate_metrics(on_topic: list[float], off_topic: list[float], min_score: float
         "min_score": min_score,
         "false_refusal_rate": round(refused / max(len(on_topic), 1), 4),
         "false_accept_rate": round(accepted / max(len(off_topic), 1), 4),
-        "suggested_min_score": suggest_min_score(on_topic, off_topic),
+    }
+
+
+def gate_metrics(on_topic: list[float], off_topic: list[float], min_score: float) -> dict:
+    """The gate's rates at `min_score`, the suggested cutoff, and the rates at that cutoff
+    rounded to 2 decimals (the value kbs.yaml would carry)."""
+    suggested = suggest_min_score(on_topic, off_topic)
+    return {
+        **gate_rates(on_topic, off_topic, min_score),
+        "suggested_min_score": suggested,
+        "at_suggested": (None if suggested is None
+                         else gate_rates(on_topic, off_topic, round(suggested, 2))),
     }
 
 
@@ -137,6 +167,19 @@ def suggest_min_score(on_topic: list[float], off_topic: list[float]) -> float | 
     candidates = sorted(set(round(s, 3) for s in on_topic + off_topic))
     errors = lambda t: sum(s < t for s in on_topic) + sum(s >= t for s in off_topic)  # noqa: E731
     return min(candidates, key=errors)
+
+
+def by_source(results: list[ItemResult], off_topic: list[float], k: int,
+              min_score: float) -> dict:
+    """Retrieval and gate metrics per golden source (quiz, written), each source's
+    similarities against the same off-topic ones."""
+    report = {}
+    for source in sorted({r.item.source for r in results}):
+        part = [r for r in results if r.item.source == source]
+        report[source] = {**retrieval_metrics(part, k),
+                          **gate_metrics([r.top_similarity for r in part], off_topic,
+                                         min_score)}
+    return report
 
 
 def check_gates(report: dict, thresholds: dict) -> list[str]:
@@ -299,15 +342,25 @@ def main(args) -> None:
     report = {"kb": kb.name, "prompt_version": kb.prompt,
               "reranker": rerank.MODEL if kb.rerank and rerank.available() else None,
               **retrieval_metrics(results, args.k),
-              **gate_metrics([r.top_similarity for r in results], off_topic, kb.min_score)}
+              **gate_metrics([r.top_similarity for r in results], off_topic, kb.min_score),
+              "by_source": by_source(results, off_topic, args.k, kb.min_score)}
     if args.judge:
         llm = get_llm()
         report.update(faithfulness(results, kb, llm, llm, get_settings().top_k))
 
-    report["misses"] = [{"id": r.item.id, "question": r.item.question,
+    # Lists for review, written to --out only: every miss, refused question and accepted
+    # off-topic question.
+    report["misses"] = [{"id": r.item.id, "question": r.item.question, "rank": r.rank,
                          "got": [h.path for h in r.hits[:3]]}
-                        for r in results if r.rank is None or r.rank > args.k][:10]
-    print(json.dumps({k: v for k, v in report.items() if k != "misses"}, indent=2))
+                        for r in results if r.rank is None or r.rank > args.k]
+    report["false_refusals"] = [{"id": r.item.id, "question": r.item.question,
+                                 "top_similarity": r.top_similarity}
+                                for r in results if r.top_similarity < kb.min_score]
+    report["false_accepts"] = [{"question": q, "top_similarity": s}
+                               for q, s in zip(foreign, off_topic, strict=True)
+                               if s >= kb.min_score]
+    lists = ("misses", "false_refusals", "false_accepts")
+    print(json.dumps({k: v for k, v in report.items() if k not in lists}, indent=2))
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n")
 

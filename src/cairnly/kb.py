@@ -25,6 +25,7 @@ class KnowledgeBase:
     prompt: str
     notice: str = ""
     rerank: bool = False  # cross-encoder second stage (needs `uv sync --extra rerank`)
+    questions: str = ""  # folder of written eval questions (*.jsonl), relative to the repo root
 
 
 @lru_cache
