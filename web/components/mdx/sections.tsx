@@ -2,8 +2,14 @@
 // content/sections.json and every heading gets the `anchorId` set by lib/anchors.ts, so chat
 // citations can link straight to a section.
 
+import { Clock, EyeOff, Hourglass, Zap } from "lucide-react";
+import Link from "next/link";
+import { StoneMarker } from "@/components/roadmap/StoneMarker";
+import { DifficultyDot } from "@/components/ui/Badge";
 import { Callout, type CalloutVariant } from "@/components/ui/Callout";
-import { sectionTitles } from "@/lib/content";
+import { tint } from "@/components/ui/tokens";
+import { getLesson, sectionTitles } from "@/lib/content";
+import { stageLessons } from "@/lib/roadmapLessons";
 
 type Children = { children?: React.ReactNode };
 type Anchored = Children & { anchorId?: string };
@@ -73,70 +79,112 @@ export function SourceNote({ children }: Children) {
 }
 
 const QUADRANTS = [
-  { key: "now", label: "Learn now" },
-  { key: "soon", label: "Learn soon" },
-  { key: "later", label: "Learn later" },
-  { key: "ignore", label: "Ignore for now" },
+  { key: "now", label: "Learn now", icon: Zap, tone: "accent" },
+  { key: "soon", label: "Learn soon", icon: Clock, tone: "info" },
+  { key: "later", label: "Learn later", icon: Hourglass, tone: null },
+  { key: "ignore", label: "Ignore for now", icon: EyeOff, tone: null },
 ] as const;
 
 type Quadrant = (typeof QUADRANTS)[number]["key"];
 
+/** The 2×2 skill board: now (accent), soon (info), later (neutral), ignore (muted, struck). */
 export function SkillPriorityMatrix({
   anchorId,
   ...lists
 }: { anchorId?: string } & Partial<Record<Quadrant, string[]>>) {
   return (
-    <section className="my-8">
-      <h2 id={anchorId} className="scroll-mt-20 text-xl font-bold tracking-tight">
+    <section className="not-prose my-10">
+      <h2 id={anchorId} className="text-display-2">
         {titleOf("SkillPriorityMatrix")}
       </h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        {QUADRANTS.map((q) => (
-          <div
-            key={q.key}
-            className="rounded-xl border p-5"
-            style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
-          >
-            <h3
-              className="mb-2 text-sm font-semibold uppercase tracking-wider"
-              style={{ color: q.key === "ignore" ? "var(--muted)" : "var(--accent)" }}
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {QUADRANTS.map(({ key, label, icon: Icon, tone }) => {
+          const ignore = key === "ignore";
+          return (
+            <div
+              key={key}
+              className={`rounded-2xl border border-border p-5 ${tone ? "" : "bg-surface-2"}`}
+              style={tone ? { background: tint(tone) } : undefined}
             >
-              {q.label}
-            </h3>
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {(lists[q.key] ?? []).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
+              <h3 className="eyebrow flex items-center gap-2 text-xs font-semibold" style={{ color: tone ? `var(--${tone})` : "var(--muted)" }}>
+                <Icon size={14} aria-hidden="true" />
+                {label}
+              </h3>
+              <ul className={`mt-3 list-disc space-y-1.5 pl-5 text-sm marker:text-faint ${ignore ? "text-muted" : "text-text"}`}>
+                {(lists[key] ?? []).map((item) => (
+                  <li
+                    key={item}
+                    className={ignore ? "line-through decoration-[color-mix(in_srgb,currentColor_40%,transparent)]" : undefined}
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-export function RoadmapPhase({
-  anchorId,
-  title,
-  duration,
-  children,
-}: Anchored & { title: string; duration?: string }) {
+/** A lesson linked from a roadmap stage: difficulty dot, title, minutes. */
+function LessonChip({ lessonKey }: { lessonKey: string }) {
+  const [track, slug] = lessonKey.split("/");
+  const lesson = getLesson(track, slug);
+  if (!lesson) return null;
   return (
-    <section
-      className="my-6 rounded-xl border p-5 sm:p-6"
-      style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
-    >
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id={anchorId} className="scroll-mt-20 text-lg font-bold">
-          {title}
-        </h2>
-        {duration && (
-          <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
-            {duration}
-          </span>
-        )}
-      </div>
-      <div className="prose prose-sm max-w-none">{children}</div>
+    <li>
+      <Link
+        href={`/${track}/${slug}`}
+        className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-surface-1 px-3 py-1.5 text-sm text-text hover:border-accent"
+      >
+        <DifficultyDot difficulty={lesson.difficulty} />
+        <span className="min-w-0 truncate">{lesson.title}</span>
+        <span className="shrink-0 font-mono text-xs text-faint">{lesson.estimatedMinutes} min</span>
+      </Link>
+    </li>
+  );
+}
+
+type PhaseProps = Anchored & { title: string; duration?: string };
+
+/** One stage on the roadmap trail: a stone on the rail that fills as the reader reaches it,
+ * the duration, the title (keeping its anchor), the stage's notes and its lessons. */
+function TrailStage({ anchorId, title, duration, children, lessons }: PhaseProps & { lessons: string[] }) {
+  return (
+    <section className="trail-stage relative pb-12 pl-10 last:pb-4">
+      <span aria-hidden="true" className="trail-rail absolute bottom-0 left-[9px] top-6 w-0.5 bg-border" />
+      <StoneMarker />
+      {duration && <p className="eyebrow text-accent">{duration}</p>}
+      <h2 id={anchorId} className="text-display-2 mt-1">
+        {title}
+      </h2>
+      <div className="prose prose-reading mt-3 max-w-none">{children}</div>
+      {lessons.length > 0 && (
+        <div className="mt-5">
+          <h3 className="eyebrow text-faint">Lessons for this stage</h3>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {lessons.map((key) => (
+              <LessonChip key={key} lessonKey={key} />
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
+}
+
+/** RoadmapPhase without lessons (any page that is not a roadmap). */
+export function RoadmapPhase(props: PhaseProps) {
+  return <TrailStage {...props} lessons={[]} />;
+}
+
+/** RoadmapPhase for one roadmap: each stage shows its hand-picked lessons (lib/roadmapLessons). */
+export function roadmapPhaseFor(roadmapSlug: string) {
+  function Phase(props: PhaseProps) {
+    return <TrailStage {...props} lessons={stageLessons(roadmapSlug, props.title)} />;
+  }
+  Phase.displayName = "RoadmapPhase";
+  return Phase;
 }
