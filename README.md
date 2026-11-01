@@ -61,7 +61,7 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Limits | Per-IP and site-wide rate limits, 4 answers at once, first-token and answer time limits | `limits.py` |
 | Providers | Ollama (local, or on a Modal GPU in production); the Claude API for local development only | `llm.py`, `ollama.py` |
 | API | FastAPI: `/health`, `/config`, `/search`, streaming `/ask` (Server-Sent Events) with history and track | `api.py` |
-| Chat | Next.js chat with clickable citations, lesson links, follow-ups, a track scope and a cold-start notice | `web/components/Chat.tsx` |
+| Chat | Next.js chat with clickable citations, lesson links, a link to the full lesson under each answer, follow-ups, a track scope and a cold-start notice | `web/components/Chat.tsx` |
 | Evals | Golden set of quiz plus written questions (reported per source), off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
 | Tracing | One Langfuse trace per question (guard, rewrite, retrieve, generate, output check), with no user text by default ([PRIVACY.md](PRIVACY.md)) | `tracing.py` |
 | Deploy | Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy, Ollama on a Modal GPU | [infra/](infra/README.md), `deploy/` |

@@ -13,6 +13,7 @@ import {
   type Source,
   type StreamedTurn,
 } from "@/lib/ask";
+import { fullPageLink } from "@/lib/fullPage";
 import { inlineTokens } from "@/lib/inline";
 
 interface Turn extends StreamedTurn {
@@ -243,6 +244,7 @@ function SourceItem({ source, active }: { source: Source; active: boolean }) {
 
 function TurnView({ turn }: { turn: Turn }) {
   const [active, setActive] = useState<number | null>(null);
+  const link = fullPageLink(turn);
   return (
     <article className="space-y-3">
       <p className="font-medium">{turn.question}</p>
@@ -260,6 +262,15 @@ function TurnView({ turn }: { turn: Turn }) {
         )}
         {turn.status === "streaming" && turn.answer && <span className="animate-pulse">▍</span>}
       </div>
+      {link && (
+        <p>
+          <a href={link.href} target="_blank" rel="noopener noreferrer"
+            aria-label={`${link.label.replace(" →", "")}: ${link.title} (opens in a new tab)`}
+            className="text-sm font-medium text-[var(--accent)] underline decoration-[var(--line)] underline-offset-2 hover:decoration-[var(--accent)]">
+            {link.label}
+          </a>
+        </p>
+      )}
       {turn.sources.length > 0 && (
         <ol className="space-y-1 text-xs text-[var(--muted)]">
           {turn.sources.map((s) => (
