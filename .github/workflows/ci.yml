@@ -30,7 +30,8 @@ jobs:
       # Guard gate: wrong blocks and missed attacks on evals/redteam.jsonl (no DB, no model).
       - run: uv run cairnly eval-redteam --gate evals/gates.yaml
 
-  # Eval gate: real embeddings over all of content/ (127 quiz questions plus 40 off-topic ones);
+  # Eval gate: real embeddings over all of content/ (127 quiz questions, 500 written questions
+  # from evals/questions and 150 off-topic ones; about 2 minutes locally, docs/adr/0016);
   # fails the build if retrieval quality drops below evals/gates.yaml. Only the embedding model
   # is needed (no chat model, no key).
   eval:
