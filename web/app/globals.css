@@ -191,6 +191,7 @@ body {
   border-radius: 0.25rem;
   padding: 0.1em 0.3em;
   font-weight: 500;
+  overflow-wrap: anywhere; /* a long identifier wraps instead of widening the page on phones */
 }
 
 /* Anchored headings land below the sticky header when opened from a citation link. */

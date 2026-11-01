@@ -82,7 +82,7 @@ Details that keep it safe and cheap:
 
 ## 6. Scoped chat (`track`)
 
-"Ask cairnly about this lesson" opens `/?q=...&track=ai-engineering`. The chat asks the
+"Ask cairnly about this lesson" opens `/ask?q=...&track=ai-engineering` (older `/?q=` links forward there). The chat asks the
 question and shows a "Scoped to AI Engineering ×" chip; while it is there, search only returns
 chunks whose document is in that track (`d.meta->>'track'`). Clicking × removes the scope. An
 unknown track is a 422 from the API, not a silent empty search.

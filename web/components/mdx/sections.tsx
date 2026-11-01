@@ -134,7 +134,7 @@ function LessonChip({ lessonKey }: { lessonKey: string }) {
   const lesson = getLesson(track, slug);
   if (!lesson) return null;
   return (
-    <li>
+    <li className="max-w-full">
       <Link
         href={`/${track}/${slug}`}
         className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-surface-1 px-3 py-1.5 text-sm text-text hover:border-accent"
