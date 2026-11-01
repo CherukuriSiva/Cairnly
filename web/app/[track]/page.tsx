@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { LessonList } from "@/components/LessonList";
-import { slugify } from "@/lib/anchors";
-import { getTrack, getTracks, resolveTrack } from "@/lib/syllabus";
+import { TrackProgress } from "@/components/progress/TrackProgress";
+import { ModuleList } from "@/components/syllabus/ModuleList";
+import { trackIcon } from "@/components/ui/icons";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { lessonKey } from "@/lib/progress";
+import { lessonStats } from "@/lib/stats";
+import { getTrack, getTracks, trackSummary } from "@/lib/syllabus";
+import { numberLessons } from "@/lib/syllabusFilter";
 
 export const dynamicParams = false;
 
@@ -22,20 +27,20 @@ export default async function TrackPage({ params }: Params) {
   const { track: id } = await params;
   const found = getTrack(id);
   if (!found) notFound();
-  const track = resolveTrack(found);
+  const track = trackSummary(found);
+  const lessons = track.modules.flatMap((m) => m.lessons);
+  const stats = lessonStats(lessons);
+  const Icon = trackIcon(track.id);
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 sm:px-8">
-      <h1 className="text-3xl font-bold tracking-tight">{track.title}</h1>
-      <p className="mt-2" style={{ color: "var(--muted)" }}>
-        {track.tagline}
-      </p>
-      {track.modules.map((module) => (
-        <section key={module.title} id={slugify(module.title)} className="mt-10 scroll-mt-20">
-          <h2 className="text-lg font-semibold">{module.title}</h2>
-          <LessonList lessons={module.lessons} />
-        </section>
-      ))}
+    <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
+      <Icon size={28} aria-hidden="true" className="text-accent" />
+      <SectionHeader eyebrow={`Track · ${stats.lessons} lessons · ${stats.hours} h`} title={track.title} description={track.tagline} className="mt-4">
+        <TrackProgress keys={lessons.map((l) => lessonKey(l.track, l.slug))} className="mt-6 max-w-xs" />
+      </SectionHeader>
+      <div className="mt-10">
+        <ModuleList modules={numberLessons(track.modules)} anchors />
+      </div>
     </main>
   );
 }

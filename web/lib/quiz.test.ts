@@ -35,3 +35,47 @@ describe("remarkQuiz", () => {
     expect(items("- done ✅\n")).toEqual([{ text: "done ✅", correct: false }]);
   });
 });
+
+/** The quiz attributes of every list item: [group, index, correct] or null for a non-option. */
+function options(mdx: string): ([string, string, boolean] | null)[] {
+  const processor = unified().use(remarkParse).use(remarkMdx).use(remarkGfm).use(remarkQuiz);
+  const tree = processor.runSync(processor.parse(mdx)) as Root;
+  const out: ([string, string, boolean] | null)[] = [];
+  visit(tree, "listItem", (item: ListItem) => {
+    const props = item.data?.hProperties ?? {};
+    out.push(
+      props["data-quiz-option"] === "true"
+        ? [String(props["data-quiz-group"]), String(props["data-quiz-index"]), props["data-correct"] === "true"]
+        : null,
+    );
+  });
+  return out;
+}
+
+describe("remarkQuiz options", () => {
+  it("marks every option of a question with its group and index", () => {
+    expect(options("<MiniQuiz>\n**Q: one**\n\n- A) no\n- B) yes ✅\n- C) no\n</MiniQuiz>\n")).toEqual([
+      ["0", "0", false],
+      ["0", "1", true],
+      ["0", "2", false],
+    ]);
+  });
+
+  it("numbers several questions in one quiz independently", () => {
+    const mdx =
+      "<MiniQuiz>\n**Q1**\n\n- a ✅\n- b\n\n**Q2**\n\n- c\n- d ✅\n\n**Q3**\n\n- e\n- f\n- g ✅\n</MiniQuiz>\n";
+    expect(options(mdx)).toEqual([
+      ["0", "0", true],
+      ["0", "1", false],
+      ["1", "0", false],
+      ["1", "1", true],
+      ["2", "0", false],
+      ["2", "1", false],
+      ["2", "2", true],
+    ]);
+  });
+
+  it("leaves a list without a correct option, and lists outside a quiz, unmarked", () => {
+    expect(options("<MiniQuiz>\n- a hint\n- another\n</MiniQuiz>\n\n- outside ✅\n")).toEqual([null, null, null]);
+  });
+});

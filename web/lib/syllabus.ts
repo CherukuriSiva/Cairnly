@@ -53,6 +53,25 @@ export function resolveTrack(track: Track): ResolvedTrack {
   };
 }
 
+/** What lists and client components need of a lesson (no body). */
+export type LessonSummary = Omit<Lesson, "body">;
+
+export interface TrackSummary extends Omit<Track, "modules"> {
+  modules: { title: string; lessons: LessonSummary[] }[];
+}
+
+/** A resolved track without lesson bodies, small enough to hand to a client component. */
+export function trackSummary(track: Track): TrackSummary {
+  const resolved = resolveTrack(track);
+  return {
+    ...resolved,
+    modules: resolved.modules.map((m) => ({
+      title: m.title,
+      lessons: m.lessons.map(({ body: _body, ...lesson }) => lesson),
+    })),
+  };
+}
+
 /** Every lesson in reading order across the whole syllabus. */
 export function flatLessons(all: Track[] = getTracks()): Entry[] {
   return all.flatMap((t) =>

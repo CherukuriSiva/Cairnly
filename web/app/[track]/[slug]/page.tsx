@@ -1,15 +1,22 @@
+import { MessageCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { mdxComponents } from "@/components/mdx";
 import { LessonDrawer } from "@/components/lesson/LessonDrawer";
 import { ScrollToActive } from "@/components/lesson/ScrollToActive";
-import { TrackNav } from "@/components/lesson/TrackNav";
+import { TrackNav, type NavTrack } from "@/components/lesson/TrackNav";
+import { mdxComponents } from "@/components/mdx";
+import { LessonScope, MarkDone } from "@/components/mdx/checklist";
+import { ReadingLayout } from "@/components/reading/ReadingLayout";
+import { Badge, DifficultyBadge, DurationBadge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
 import { slugify } from "@/lib/anchors";
-import { getLesson } from "@/lib/content";
+import { getLesson, sectionTitles } from "@/lib/content";
 import { renderMdx } from "@/lib/mdx";
+import { pageOutline } from "@/lib/outline";
+import { lessonKey } from "@/lib/progress";
 import { askHref } from "@/lib/starters";
-import { type Entry, findEntry, flatLessons, getTrack, neighbours, resolveTrack } from "@/lib/syllabus";
+import { type Entry, findEntry, flatLessons, getTrack, neighbours, trackSummary } from "@/lib/syllabus";
 
 export const runtime = "nodejs";
 export const dynamicParams = false;
@@ -37,18 +44,19 @@ function askUrl(title: string, track: string): string {
 function NeighbourCard({ entry, label, currentTrack }: { entry?: Entry; label: string; currentTrack: string }) {
   if (!entry) return <div className="hidden sm:block" />;
   const lesson = getLesson(entry.track, entry.slug);
+  if (!lesson) return <div className="hidden sm:block" />;
   const otherTrack = entry.track !== currentTrack ? getTrack(entry.track)?.title : undefined;
+  const next = label === "Next";
   return (
-    <Link
-      href={`/${entry.track}/${entry.slug}`}
-      className={`rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 hover:border-[var(--accent)] ${
-        label === "Next" ? "sm:text-right" : ""
-      }`}
-    >
-      <span className="block text-xs text-[var(--muted)]">{label}</span>
-      <span className="mt-1 block font-semibold">{lesson?.title}</span>
-      {otherTrack && <span className="mt-1 block text-xs text-[var(--muted)]">{otherTrack}</span>}
-    </Link>
+    <Card href={`/${entry.track}/${entry.slug}`} className={`flex flex-col p-4 ${next ? "sm:items-end sm:text-right" : ""}`}>
+      <span className="eyebrow text-faint">{next ? "Next →" : "← Previous"}</span>
+      <span className="mt-1.5 font-semibold text-text">{lesson.title}</span>
+      <span className={`mt-3 flex flex-wrap gap-2 ${next ? "sm:justify-end" : ""}`}>
+        <DifficultyBadge difficulty={lesson.difficulty} />
+        <DurationBadge minutes={lesson.estimatedMinutes} />
+      </span>
+      {otherTrack && <span className="mt-2 text-xs text-muted">Continues in {otherTrack}</span>}
+    </Card>
   );
 }
 
@@ -59,54 +67,67 @@ export default async function LessonPage({ params }: Params) {
   const entry = findEntry(trackId, slug);
   if (!lesson || !track || !entry) notFound();
 
-  const nav = <TrackNav track={resolveTrack(track)} active={slug} />;
+  const summary = trackSummary(track);
+  const navTrack: NavTrack = {
+    id: summary.id,
+    title: summary.title,
+    modules: summary.modules.map((m) => ({ title: m.title, lessons: m.lessons.map((l) => ({ slug: l.slug, title: l.title })) })),
+  };
+  const nav = <TrackNav track={navTrack} active={slug} />;
   const { prev, next } = neighbours(trackId, slug);
   const content = await renderMdx(lesson.body, mdxComponents);
+  const hasChecklist = lesson.body.includes("<CompletionChecklist");
+
+  const header = (
+    <header>
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+        <Link href="/syllabus" className="shrink-0 hover:text-text">Learn</Link>
+        <span aria-hidden="true">›</span>
+        <Link href={`/${track.id}`} className="shrink-0 hover:text-text">{track.title}</Link>
+        <span aria-hidden="true">›</span>
+        <Link href={`/${track.id}#${slugify(entry.module)}`} className="min-w-0 truncate hover:text-text">{entry.module}</Link>
+        <span aria-hidden="true" className="hidden sm:inline">›</span>
+        <span aria-current="page" className="hidden min-w-0 truncate sm:inline">{lesson.title}</span>
+      </nav>
+      <h1 className="text-display mt-5">{lesson.title}</h1>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Badge>{entry.module}</Badge>
+        <DifficultyBadge difficulty={lesson.difficulty} />
+        <DurationBadge minutes={lesson.estimatedMinutes} />
+      </div>
+      <Link
+        href={askUrl(lesson.title, track.id)}
+        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-strong"
+      >
+        <MessageCircle size={15} aria-hidden="true" />
+        Ask cairnly about this lesson
+      </Link>
+    </header>
+  );
 
   return (
-    <div className="mx-auto flex max-w-7xl">
-      <aside
-        className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 border-r lg:block"
-        style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
+    <LessonScope lessonKey={lessonKey(trackId, slug)}>
+      <ReadingLayout
+        header={header}
+        outline={pageOutline(lesson.body, sectionTitles())}
+        leftNav={<ScrollToActive className="relative h-full overflow-y-auto">{nav}</ScrollToActive>}
+        mobileNav={<LessonDrawer>{nav}</LessonDrawer>}
+        footer={
+          <>
+            {!hasChecklist && (
+              <div className="mt-10 border-t border-border pt-6">
+                <MarkDone />
+              </div>
+            )}
+            <nav aria-label="Previous and next lesson" className="mt-12 grid gap-3 sm:grid-cols-2">
+              <NeighbourCard entry={prev} label="Previous" currentTrack={track.id} />
+              <NeighbourCard entry={next} label="Next" currentTrack={track.id} />
+            </nav>
+          </>
+        }
       >
-        <ScrollToActive className="relative h-full overflow-y-auto">{nav}</ScrollToActive>
-      </aside>
-
-      <main className="mx-auto w-full min-w-0 max-w-3xl px-4 py-8 sm:px-8">
-        <LessonDrawer>{nav}</LessonDrawer>
-
-        <nav aria-label="Breadcrumb" className="text-xs" style={{ color: "var(--muted)" }}>
-          <Link href="/syllabus" className="hover:underline">Syllabus</Link>
-          {" › "}
-          <Link href={`/${track.id}`} className="hover:underline">{track.title}</Link>
-          {" › "}
-          <Link href={`/${track.id}#${slugify(entry.module)}`} className="hover:underline">
-            {entry.module}
-          </Link>
-          {" › "}
-          <span>{lesson.title}</span>
-        </nav>
-
-        <header className="mt-4">
-          <h1 className="text-3xl font-bold tracking-tight">{lesson.title}</h1>
-          <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
-            {entry.module} · {lesson.difficulty} · {lesson.estimatedMinutes} min
-          </p>
-          <Link
-            href={askUrl(lesson.title, track.id)}
-            className="mt-4 inline-block rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm text-white"
-          >
-            Ask cairnly about this lesson
-          </Link>
-        </header>
-
-        <article className="mt-8">{content}</article>
-
-        <nav aria-label="Previous and next lesson" className="mt-12 grid gap-3 sm:grid-cols-2">
-          <NeighbourCard entry={prev} label="Previous" currentTrack={track.id} />
-          <NeighbourCard entry={next} label="Next" currentTrack={track.id} />
-        </nav>
-      </main>
-    </div>
+        {content}
+      </ReadingLayout>
+    </LessonScope>
   );
 }

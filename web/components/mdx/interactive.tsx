@@ -1,35 +1,19 @@
 "use client";
 
-// Client-side MDX components: copyable code blocks, mermaid diagrams, the quiz reveal and
-// clickable checklist boxes. Nothing here saves state: it lives only while the page is open.
+// Client-side MDX components: copyable code blocks and mermaid diagrams. The quiz lives in
+// quiz.tsx and the saved checklist in checklist.tsx.
 
+import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-function CopyIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-/** `pre` override: language label, copy button and the highlighted code. */
+/** `pre` override: a header with the file name (a `title="..."` fence meta) or the language,
+ * a copy button, and the highlighted code scrolling sideways inside its own box. */
 export function CodeBlock({
   children,
+  title,
   "data-language": language,
   ...rest
-}: React.HTMLAttributes<HTMLPreElement> & { "data-language"?: string }) {
+}: React.HTMLAttributes<HTMLPreElement> & { "data-language"?: string; title?: string }) {
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -43,30 +27,27 @@ export function CodeBlock({
     }
   }
 
+  const label = title || (language && language !== "plaintext" ? language : "text");
   return (
-    <div className="not-prose my-5 overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)" }}>
-      <div
-        className="flex items-center justify-between border-b px-4 py-2"
-        style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
-      >
-        <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
-          {language || "code"}
-        </span>
+    <div className="not-prose my-6 max-w-full overflow-hidden rounded-xl border border-border bg-surface-1">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-2">
+        <span className={`min-w-0 truncate font-mono text-xs ${title ? "text-text" : "text-muted"}`}>{label}</span>
         <button
           type="button"
           onClick={copy}
-          className="flex items-center gap-1.5 rounded px-2 py-1 text-xs"
-          style={{ color: copied ? "var(--accent)" : "var(--muted)" }}
+          className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-surface-3 ${copied ? "text-accent" : "text-muted"}`}
         >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-          {copied ? "Copied!" : "Copy"}
+          {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+          <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+          <span className="sr-only"> code</span>
         </button>
       </div>
       <pre
         ref={preRef}
         data-language={language}
         {...rest}
-        className={`code-block overflow-x-auto p-4 text-sm leading-relaxed ${rest.className ?? ""}`}
+        tabIndex={0}
+        className={`code-block overflow-x-auto py-4 leading-relaxed ${rest.className ?? ""}`}
       >
         {children}
       </pre>
@@ -107,62 +88,5 @@ export function Diagram({ children }: { children?: React.ReactNode }) {
       </div>
       <div ref={targetRef} className="flex justify-center overflow-x-auto" />
     </div>
-  );
-}
-
-/** The quiz: options look neutral until "Reveal answer"; then the correct one is highlighted. */
-export function MiniQuiz({
-  anchorId,
-  title,
-  children,
-}: {
-  anchorId?: string;
-  title: string;
-  children?: React.ReactNode;
-}) {
-  const [revealed, setRevealed] = useState(false);
-  return (
-    <section
-      className="my-8 rounded-xl border p-5 sm:p-6"
-      style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
-    >
-      <h2
-        id={anchorId}
-        className="mb-3 scroll-mt-20 text-sm font-semibold uppercase tracking-wider"
-        style={{ color: "var(--accent)" }}
-      >
-        {title}
-      </h2>
-      <div className="quiz prose prose-sm max-w-none" data-revealed={revealed ? "true" : "false"}>
-        {children}
-      </div>
-      {!revealed && (
-        <button
-          type="button"
-          onClick={() => setRevealed(true)}
-          className="mt-3 rounded-md border px-3 py-1.5 text-sm"
-          style={{ borderColor: "var(--border)" }}
-        >
-          Reveal answer
-        </button>
-      )}
-    </section>
-  );
-}
-
-/** `input` override: task-list items become clickable checkboxes (not saved anywhere). */
-export function TaskCheckbox(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  const { type, checked, disabled: _disabled, ...rest } = props;
-  const [on, setOn] = useState(Boolean(checked));
-  if (type !== "checkbox") return <input type={type} defaultChecked={checked} {...rest} />;
-  return (
-    <input
-      {...rest}
-      type="checkbox"
-      checked={on}
-      onChange={(e) => setOn(e.target.checked)}
-      className="mr-2 h-4 w-4 cursor-pointer align-middle"
-      style={{ accentColor: "var(--accent)" }}
-    />
   );
 }

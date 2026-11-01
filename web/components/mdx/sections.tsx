@@ -2,66 +2,41 @@
 // content/sections.json and every heading gets the `anchorId` set by lib/anchors.ts, so chat
 // citations can link straight to a section.
 
+import { Callout, type CalloutVariant } from "@/components/ui/Callout";
 import { sectionTitles } from "@/lib/content";
 
 type Children = { children?: React.ReactNode };
 type Anchored = Children & { anchorId?: string };
-
-const TINT = "color-mix(in srgb, var(--accent) 12%, transparent)";
 
 /** The heading text a component shows, from content/sections.json. */
 export function titleOf(name: string): string {
   return sectionTitles()[name] ?? name;
 }
 
-/** One boxed lesson section: an uppercase heading and a prose body. */
-export function SectionBox({
-  anchorId,
-  name,
-  children,
-  edge = false,
-  label,
-}: Anchored & { name: string; edge?: boolean; label?: string }) {
-  const muted = name === "WhyThisMatters";
-  const italic = name === "InterviewExplanation";
-  return (
-    <section
-      className={`my-8 rounded-xl border p-5 sm:p-6 ${edge ? "border-l-4" : ""}`}
-      style={{
-        borderColor: "var(--border)",
-        borderLeftColor: edge ? "var(--accent)" : "var(--border)",
-        background: "var(--surface-1)",
-      }}
-    >
-      <div className="mb-3 flex items-center gap-2">
-        {label && (
-          <span
-            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest"
-            style={{ background: TINT, color: "var(--accent)" }}
-          >
-            {label}
-          </span>
-        )}
-        <h2
-          id={anchorId}
-          className="scroll-mt-20 text-sm font-semibold uppercase tracking-wider"
-          style={{ color: muted ? "var(--muted)" : "var(--accent)" }}
-        >
-          {titleOf(name)}
-        </h2>
-      </div>
-      <div className={`prose prose-sm max-w-none ${italic ? "italic" : ""}`}>{children}</div>
-    </section>
-  );
-}
+/** Which callout each boxed section component renders as. */
+export const SECTION_VARIANTS = {
+  WhatYouWillLearn: "learn",
+  WhyThisMatters: "why",
+  CommonMistakes: "warning",
+  InterviewExplanation: "interview",
+  TryItYourself: "tip",
+  WhatToDoNext: "tip",
+  KeyTakeaways: "summary",
+  InsightSummary: "summary",
+  ResumeBullet: "summary",
+  DebuggingChecklist: "warning",
+} as const satisfies Record<string, CalloutVariant>;
 
-/** Build the component for one boxed section name. */
-export function boxed(name: string) {
+export type BoxedSection = keyof typeof SECTION_VARIANTS;
+
+/** Build the component for one boxed section name: its callout, with the heading text from
+ * sections.json and the anchor from lib/anchors.ts. */
+export function boxed(name: BoxedSection) {
   function Box({ anchorId, children }: Anchored) {
     return (
-      <SectionBox anchorId={anchorId} name={name}>
+      <Callout variant={SECTION_VARIANTS[name]} title={titleOf(name)} anchorId={anchorId}>
         {children}
-      </SectionBox>
+      </Callout>
     );
   }
   Box.displayName = name;
@@ -71,14 +46,14 @@ export function boxed(name: string) {
 /** A short note on an idea from Chip Huyen's "AI Engineering", in our own words. */
 export function BookNote({ anchorId, children }: Anchored & { chapter?: string }) {
   return (
-    <SectionBox anchorId={anchorId} name="BookNote" label="Book" edge>
+    <Callout variant="why" title={titleOf("BookNote")} anchorId={anchorId} label="Book">
       {children}
-    </SectionBox>
+    </Callout>
   );
 }
 
 export function Body({ children }: Children) {
-  return <div className="prose max-w-none">{children}</div>;
+  return <div className="prose prose-reading max-w-none">{children}</div>;
 }
 
 export function Code({ children }: Children) {

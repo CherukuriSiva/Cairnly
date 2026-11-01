@@ -6,7 +6,7 @@
 // outside [a-z0-9] into "-", trim "-"; an empty result is "section". Headings (h1-h3) and
 // section components get ids in document order; repeats get -1, -2, ... (skipping used ids).
 
-import type { Heading, ListItem, Root, Text } from "mdast";
+import type { Heading, List, ListItem, Root, Text } from "mdast";
 import type { MdxJsxAttribute, MdxJsxFlowElement } from "mdast-util-mdx-jsx";
 import { toString } from "mdast-util-to-string";
 import { visit } from "unist-util-visit";
@@ -31,7 +31,8 @@ export function slugger(): (text: string) => string {
   };
 }
 
-function attr(node: MdxJsxFlowElement, name: string): string | undefined {
+/** A string attribute of an MDX element, or undefined. */
+export function attr(node: MdxJsxFlowElement, name: string): string | undefined {
   const found = node.attributes.find(
     (a): a is MdxJsxAttribute => a.type === "mdxJsxAttribute" && a.name === name,
   );
@@ -91,23 +92,33 @@ export function collectAnchors(tree: Root): string[] {
 
 export const CORRECT_MARK = "✅";
 
+function setProperties(item: ListItem, properties: Record<string, string>) {
+  item.data = { ...item.data, hProperties: { ...item.data?.hProperties, ...properties } };
+}
+
 /**
- * Remark plugin: in each <MiniQuiz>, removes the ✅ from the correct option and marks that list
- * item with `data-correct`, so the answer stays hidden until the reader reveals it.
+ * Remark plugin: in each <MiniQuiz>, every list that holds a ✅ option is one question. Each of
+ * its items is marked as an option (`data-quiz-option`, `data-quiz-group` = the question's
+ * index in that quiz, `data-quiz-index` = the option's index), and the correct one loses its
+ * ✅ and gets `data-correct`, so the answer stays hidden until the reader picks or reveals it.
  */
 export function remarkQuiz() {
   return (tree: Root) => {
     visit(tree, "mdxJsxFlowElement", (quiz: MdxJsxFlowElement) => {
       if (quiz.name !== "MiniQuiz") return;
-      visit(quiz, "listItem", (item: ListItem) => {
-        if (!toString(item).includes(CORRECT_MARK)) return;
-        visit(item, "text", (t: Text) => {
-          if (t.value.includes(CORRECT_MARK)) t.value = t.value.replaceAll(CORRECT_MARK, "").trimEnd();
+      let group = 0;
+      visit(quiz, "list", (list: List, _index, parent) => {
+        if (parent?.type === "listItem") return; // a nested list belongs to its option
+        if (!list.children.some((item) => toString(item).includes(CORRECT_MARK))) return;
+        list.children.forEach((item, index) => {
+          setProperties(item, { "data-quiz-option": "true", "data-quiz-group": String(group), "data-quiz-index": String(index) });
+          if (!toString(item).includes(CORRECT_MARK)) return;
+          visit(item, "text", (t: Text) => {
+            if (t.value.includes(CORRECT_MARK)) t.value = t.value.replaceAll(CORRECT_MARK, "").trimEnd();
+          });
+          setProperties(item, { "data-correct": "true" });
         });
-        item.data = {
-          ...item.data,
-          hProperties: { ...item.data?.hProperties, "data-correct": "true" },
-        };
+        group++;
       });
     });
   };
