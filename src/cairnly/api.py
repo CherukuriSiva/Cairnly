@@ -13,7 +13,11 @@ A client that goes away mid-answer: Starlette reads a sync generator in a worker
 never closes it, so the abandoned answer would hold its model stream, its database connection
 and its answer slot until garbage collection found it. AnswerStream therefore closes the
 generator itself when the response ends, however it ends (finished, client gone, error), and
-then frees the slot.
+then frees the slot. A generator cannot be closed in the middle of a step, so the cleanup waits
+for the step that is running to end: the next model piece while the answer streams, or at worst
+that step's own time limit (a follow-up's rewrite or the first token 90 s, the query
+embedding 120 s per read). Until then the model request is still open, so its slot stays held,
+which is the right count.
 """
 
 import json
@@ -169,8 +173,9 @@ def ask(req: AskRequest, request: Request) -> StreamingResponse:
 
 class AnswerStream(StreamingResponse):
     """The /ask event stream. When the response ends, however it ends, the generator is closed
-    (so the model stream and the database connection are let go at once) and the answer slot
-    is freed, even when the generator never started."""
+    (which closes the model stream and the database connection) and then the answer slot is
+    freed, even when the generator never started. The close waits for the step that is
+    running to end, which that step's time limit bounds (see finish_stream)."""
 
     def __init__(self, events: Iterator[str], slot: Slot):
         super().__init__(events, media_type="text/event-stream",

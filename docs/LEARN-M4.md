@@ -67,6 +67,12 @@ thread and, when the client goes away, simply stops reading. It never closes the
 its `finally` block, the model stream and the database connection wait for Python's garbage
 collector. The API's `AnswerStream` response therefore closes the generator itself when the
 response ends, however it ends, and then releases the slot. `release()` is safe to call twice.
+The close is not instant, though. A generator cannot be closed while it is in the middle of a
+step, so the API waits for the running step to end. While words are streaming, that is the next
+word. While the model is still silent, it can be a follow-up's rewrite or the first-token limit
+(90 seconds each) or the query embedding timeout (120 seconds per read). The slot stays held
+until then, and that is the right count: the model request is still open, so the GPU is still
+busy.
 Tests cover every path, one of them against a real Uvicorn server with the garbage collector
 switched off.
 
