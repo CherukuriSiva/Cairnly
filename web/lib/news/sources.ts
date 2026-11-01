@@ -59,3 +59,18 @@ export const GROUP_LABELS: Record<NewsGroup, string> = {
   papers: "Papers",
   blogs: "Blogs",
 };
+
+/** Brand colour of each source's dot on the News page (by source name; others use --faint). */
+export const SOURCE_COLORS: Record<string, string> = {
+  "Hacker News": "#ff6600",
+  arXiv: "#b31b1b",
+  "Hugging Face Papers": "#ffbf00",
+  "Hugging Face Blog": "#ffbf00",
+  OpenAI: "#10a37f",
+  "Google DeepMind": "#4285f4",
+  "Simon Willison": "#7c3aed",
+  "Chip Huyen": "#ec4899",
+  "Eugene Yan": "#14b8a6",
+  "Latent Space": "#f97316",
+  LinkedIn: "#0a66c2",
+};

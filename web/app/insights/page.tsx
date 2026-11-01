@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { InsightBrowser } from "@/components/insights/InsightBrowser";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CATEGORY_LABELS, getInsights } from "@/lib/content";
+import type { InsightCard } from "@/lib/insights";
 
 export const metadata: Metadata = {
   title: "Insights · cairnly",
@@ -8,34 +10,23 @@ export const metadata: Metadata = {
 };
 
 export default function InsightsPage() {
-  const insights = getInsights();
-  const categories = Object.keys(CATEGORY_LABELS).filter((c) => insights.some((i) => i.category === c));
+  const cards: InsightCard[] = getInsights().map(({ slug, title, summary, category, publishedAt, readingMinutes }) => ({
+    slug,
+    title,
+    summary,
+    category,
+    publishedAt,
+    readingMinutes,
+  }));
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 sm:px-8">
-      <h1 className="text-3xl font-bold tracking-tight">Insights</h1>
-      <p className="mt-3" style={{ color: "var(--muted)" }}>
-        Short summaries of recurring industry discussions, in our own words.
-      </p>
-      {categories.map((category) => (
-        <section key={category} className="mt-10">
-          <h2 className="text-lg font-semibold">{CATEGORY_LABELS[category]}</h2>
-          <ul className="mt-3 space-y-3">
-            {insights
-              .filter((i) => i.category === category)
-              .map((insight) => (
-                <li key={insight.slug}>
-                  <Link
-                    href={`/insights/${insight.slug}`}
-                    className="block rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 hover:border-[var(--accent)]"
-                  >
-                    <span className="block font-semibold">{insight.title}</span>
-                    <span className="mt-1 block text-sm text-[var(--muted)]">{insight.summary}</span>
-                  </Link>
-                </li>
-              ))}
-          </ul>
-        </section>
-      ))}
+    <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      <SectionHeader
+        eyebrow="Insights"
+        title="What the field is talking about"
+        description="Short summaries of recurring industry discussions, in our own words."
+        className="mb-10"
+      />
+      <InsightBrowser insights={cards} labels={CATEGORY_LABELS} />
     </main>
   );
 }
