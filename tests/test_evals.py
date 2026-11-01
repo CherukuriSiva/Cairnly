@@ -1,3 +1,5 @@
+import re
+from collections import Counter
 from dataclasses import replace
 
 import pytest
@@ -19,7 +21,8 @@ from cairnly.evals import (
     suggest_min_score,
     written_golden,
 )
-from cairnly.kb import ROOT, KnowledgeBase
+from cairnly.kb import ROOT, KnowledgeBase, get_kb
+from cairnly.mdx import section_titles
 from cairnly.search import Hit, SearchResult
 
 
@@ -56,6 +59,59 @@ def test_real_content_has_a_quiz_question_per_lesson():
     items = lessons_golden(ROOT / "content")
     assert len(items) >= 126
     assert all(next(iter(i.gold)).endswith(".mdx") for i in items)
+
+
+WRITTEN_EXCLUDED_SECTIONS = {"Quick quiz", "Checklist", "Resume bullet", "What to do next"}
+
+
+def _answer_sections(lesson: str) -> set[str]:
+    """`## ` headings inside <Body>, plus display titles of the components the lesson uses."""
+    body = re.search(r"<Body>(.*?)</Body>", lesson, re.S)
+    headings = set(re.findall(r"^## (.+?)\s*$", body.group(1) if body else "", re.M))
+    titles = {t for c, t in section_titles().items() if re.search(rf"<{c}[\s>]", lesson)}
+    return (headings | titles) - WRITTEN_EXCLUDED_SECTIONS
+
+
+def _eight_grams(text: str) -> set[tuple[str, ...]]:
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return {tuple(words[i:i + 8]) for i in range(len(words) - 7)}
+
+
+def _written_rows() -> list[dict]:
+    folder = ROOT / get_kb("lessons").questions
+    return [row for path in sorted(folder.glob("*.jsonl")) for row in load_jsonl(path)]
+
+
+def test_written_questions_are_unique_and_never_a_quiz_question():
+    rows = _written_rows()
+    assert 400 <= len(rows) <= 600
+    assert all(set(r) == {"id", "question", "gold", "section"} for r in rows)
+    assert len({r["id"] for r in rows}) == len(rows)
+    questions = {r["question"] for r in rows}
+    assert len(questions) == len(rows)
+    assert not questions & {i.question for i in lessons_golden(ROOT / "content")}
+
+
+def test_written_questions_cover_every_lesson_three_to_five_times():
+    counts = Counter(r["gold"][0] for r in _written_rows())
+    lessons = {p.relative_to(ROOT / "content").as_posix()
+               for p in (ROOT / "content" / "lessons").rglob("*.mdx")}
+    assert set(counts) == lessons
+    assert {lesson: n for lesson, n in counts.items() if not 3 <= n <= 5} == {}
+
+
+def test_written_questions_name_a_real_section_and_copy_no_lesson_text():
+    bad = []
+    for row in _written_rows():
+        if missing := [g for g in row["gold"] if not (ROOT / "content" / g).is_file()]:
+            bad.append((row["id"], "missing gold", missing))
+            continue
+        lesson = (ROOT / "content" / row["gold"][0]).read_text()
+        if row["section"] not in _answer_sections(lesson):
+            bad.append((row["id"], "unknown section", row["section"]))
+        if _eight_grams(row["question"]) & _eight_grams(lesson):
+            bad.append((row["id"], "8+ words copied from the lesson"))
+    assert bad == []
 
 
 def test_off_topic_set_has_40_unique_questions():
