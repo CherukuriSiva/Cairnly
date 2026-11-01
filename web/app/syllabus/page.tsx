@@ -3,7 +3,10 @@ import Link from "next/link";
 import { LessonList } from "@/components/LessonList";
 import { getTracks, resolveTrack } from "@/lib/syllabus";
 
-export const metadata: Metadata = { title: "Syllabus · cairnly" };
+export const metadata: Metadata = {
+  title: "Syllabus · cairnly",
+  description: "Six tracks and every cairnly lesson in reading order, from ML foundations to AI systems, DSA, full-stack and career.",
+};
 
 export default function SyllabusPage() {
   const tracks = getTracks().map(resolveTrack);

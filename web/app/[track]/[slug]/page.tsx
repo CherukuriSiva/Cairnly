@@ -21,7 +21,12 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { track, slug } = await params;
-  return { title: `${getLesson(track, slug)?.title ?? "Lesson"} · cairnly` };
+  const lesson = getLesson(track, slug);
+  if (!lesson) return { title: "Lesson · cairnly" };
+  return {
+    title: `${lesson.title} · cairnly`,
+    description: `${lesson.title}: a ${lesson.difficulty}, ${lesson.estimatedMinutes}-minute lesson in ${getTrack(track)?.title ?? track} on cairnly.`,
+  };
 }
 
 function askUrl(title: string, track: string): string {
@@ -36,7 +41,7 @@ function NeighbourCard({ entry, label, currentTrack }: { entry?: Entry; label: s
   return (
     <Link
       href={`/${entry.track}/${entry.slug}`}
-      className={`rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 hover:border-[var(--accent)] ${
+      className={`rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 hover:border-[var(--accent)] ${
         label === "Next" ? "sm:text-right" : ""
       }`}
     >
@@ -62,7 +67,7 @@ export default async function LessonPage({ params }: Params) {
     <div className="mx-auto flex max-w-7xl">
       <aside
         className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 border-r lg:block"
-        style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+        style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
       >
         <ScrollToActive className="relative h-full overflow-y-auto">{nav}</ScrollToActive>
       </aside>

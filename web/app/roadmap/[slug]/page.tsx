@@ -16,7 +16,8 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
-  return { title: `${getRoadmap(slug)?.title ?? "Roadmap"} · cairnly` };
+  const roadmap = getRoadmap(slug);
+  return { title: `${roadmap?.title ?? "Roadmap"} · cairnly`, description: roadmap?.summary };
 }
 
 export default async function RoadmapPage({ params }: Params) {

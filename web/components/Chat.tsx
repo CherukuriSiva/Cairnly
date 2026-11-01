@@ -151,7 +151,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
           <select
             value={provider}
             onChange={(e) => setProvider(e.target.value as Provider)}
-            className="shrink-0 rounded-md border border-[var(--line)] bg-[var(--panel)] px-2 py-1 pr-7 text-sm"
+            className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface-1)] px-2 py-1 pr-7 text-sm"
             aria-label="Model provider"
           >
             {providers.map((p) => (
@@ -171,7 +171,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
               <button
                 key={q}
                 onClick={() => submit(q)}
-                className="block w-full rounded-lg border border-[var(--line)] bg-[var(--panel)] px-4 py-3 text-left text-sm hover:border-[var(--accent)]"
+                className="block w-full rounded-lg border border-[var(--border)] bg-[var(--surface-1)] px-4 py-3 text-left text-sm hover:border-[var(--accent)]"
               >
                 {q}
               </button>
@@ -190,7 +190,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
               type="button"
               onClick={clearScope}
               aria-label={`Remove scope ${trackTitles[track]}`}
-              className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--accent)]"
+              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--accent)]"
             >
               Scoped to {trackTitles[track]} ×
             </button>
@@ -207,11 +207,11 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={turns.length ? "Ask a follow-up…" : "Ask a question…"}
-            className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-1)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
           />
           {busy ? (
             <button type="button" onClick={() => abortRef.current?.abort()}
-              className="rounded-lg border border-[var(--line)] px-4 text-sm">
+              className="rounded-lg border border-[var(--border)] px-4 text-sm">
               Stop
             </button>
           ) : (
@@ -232,7 +232,7 @@ function SourceItem({ source, active }: { source: Source; active: boolean }) {
       [{source.n}]{" "}
       {source.url ? (
         <a href={source.url} target="_blank" rel="noopener noreferrer"
-          className="font-medium underline decoration-[var(--line)] underline-offset-2 hover:text-[var(--accent)]">
+          className="font-medium underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">
           {label}
         </a>
       ) : (
@@ -248,7 +248,7 @@ function TurnView({ turn }: { turn: Turn }) {
   return (
     <article className="space-y-3">
       <p className="font-medium">{turn.question}</p>
-      <div className="whitespace-pre-wrap rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 text-sm leading-relaxed">
+      <div className="whitespace-pre-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-1)] p-4 text-sm leading-relaxed">
         {turn.answer ? (
           <Cited text={turn.answer} onCite={setActive} />
         ) : (
@@ -266,7 +266,7 @@ function TurnView({ turn }: { turn: Turn }) {
         <p>
           <a href={link.href} target="_blank" rel="noopener noreferrer"
             aria-label={`${link.label.replace(" →", "")}: ${link.title} (opens in a new tab)`}
-            className="text-sm font-medium text-[var(--accent)] underline decoration-[var(--line)] underline-offset-2 hover:decoration-[var(--accent)]">
+            className="text-sm font-medium text-[var(--accent)] underline decoration-[var(--border)] underline-offset-2 hover:decoration-[var(--accent)]">
             {link.label}
           </a>
         </p>
@@ -301,7 +301,7 @@ function Cited({ text, onCite }: { text: string; onCite: (n: number) => void }) 
         const n = Number(m[1]);
         return (
           <button key={i} onClick={() => onCite(n)}
-            className="mx-0.5 rounded bg-[var(--line)] px-1 align-super text-[10px] font-medium text-[var(--accent)]">
+            className="mx-0.5 rounded bg-[var(--border)] px-1 align-super text-[10px] font-medium text-[var(--accent)]">
             {n}
           </button>
         );
@@ -320,7 +320,7 @@ function Inline({ text }: { text: string }) {
         if (token.kind === "italic") return <em key={i}>{token.text}</em>;
         if (token.kind === "code")
           return (
-            <code key={i} className="rounded bg-[var(--line)] px-1 text-[0.9em]">
+            <code key={i} className="rounded bg-[var(--border)] px-1 text-[0.9em]">
               {token.text}
             </code>
           );

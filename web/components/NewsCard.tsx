@@ -25,7 +25,7 @@ interface NewsCardProps {
 export function NewsCard({ source, date, title, url, byline, summary }: NewsCardProps) {
   const when = formatDate(date);
   return (
-    <li className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 hover:border-[var(--accent)]">
+    <li className="rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 hover:border-[var(--accent)]">
       <div className="flex flex-wrap items-center gap-x-1 text-xs text-[var(--muted)]">
         <span className="font-mono text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--accent)" }}>
           {source}

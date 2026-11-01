@@ -28,9 +28,9 @@ export function SectionBox({
     <section
       className={`my-8 rounded-xl border p-5 sm:p-6 ${edge ? "border-l-4" : ""}`}
       style={{
-        borderColor: "var(--line)",
-        borderLeftColor: edge ? "var(--accent)" : "var(--line)",
-        background: "var(--panel)",
+        borderColor: "var(--border)",
+        borderLeftColor: edge ? "var(--accent)" : "var(--border)",
+        background: "var(--surface-1)",
       }}
     >
       <div className="mb-3 flex items-center gap-2">
@@ -89,7 +89,7 @@ export function SourceNote({ children }: Children) {
   return (
     <p
       className="mt-12 border-t pt-4 text-xs italic"
-      style={{ borderColor: "var(--line)", color: "var(--muted)" }}
+      style={{ borderColor: "var(--border)", color: "var(--muted)" }}
     >
       {children ??
         "Synthesized from recurring industry discussions across professional communities (2026). This is an original summary, not a reproduction of any single post."}
@@ -120,7 +120,7 @@ export function SkillPriorityMatrix({
           <div
             key={q.key}
             className="rounded-xl border p-5"
-            style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+            style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
           >
             <h3
               className="mb-2 text-sm font-semibold uppercase tracking-wider"
@@ -149,7 +149,7 @@ export function RoadmapPhase({
   return (
     <section
       className="my-6 rounded-xl border p-5 sm:p-6"
-      style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+      style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
     >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 id={anchorId} className="scroll-mt-20 text-lg font-bold">

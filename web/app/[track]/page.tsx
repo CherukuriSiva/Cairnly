@@ -14,7 +14,8 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { track } = await params;
-  return { title: `${getTrack(track)?.title ?? "Track"} · cairnly` };
+  const found = getTrack(track);
+  return { title: `${found?.title ?? "Track"} · cairnly`, description: found?.tagline };
 }
 
 export default async function TrackPage({ params }: Params) {

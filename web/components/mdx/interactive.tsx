@@ -44,10 +44,10 @@ export function CodeBlock({
   }
 
   return (
-    <div className="not-prose my-5 overflow-hidden rounded-xl border" style={{ borderColor: "var(--line)" }}>
+    <div className="not-prose my-5 overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)" }}>
       <div
         className="flex items-center justify-between border-b px-4 py-2"
-        style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+        style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
       >
         <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
           {language || "code"}
@@ -124,7 +124,7 @@ export function MiniQuiz({
   return (
     <section
       className="my-8 rounded-xl border p-5 sm:p-6"
-      style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+      style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
     >
       <h2
         id={anchorId}
@@ -141,7 +141,7 @@ export function MiniQuiz({
           type="button"
           onClick={() => setRevealed(true)}
           className="mt-3 rounded-md border px-3 py-1.5 text-sm"
-          style={{ borderColor: "var(--line)" }}
+          style={{ borderColor: "var(--border)" }}
         >
           Reveal answer
         </button>

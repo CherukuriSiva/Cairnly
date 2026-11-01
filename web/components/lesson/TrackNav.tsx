@@ -15,7 +15,7 @@ export function TrackNav({ track, active }: { track: NavTrack; active: string })
     <nav aria-label={`${track.title} lessons`} className="space-y-5 p-4">
       <Link
         href={`/${track.id}`}
-        className="block px-3 font-mono text-xs text-[var(--muted)] hover:text-[var(--ink)]"
+        className="block px-3 font-mono text-xs text-[var(--muted)] hover:text-[var(--text)]"
       >
         ← {track.title}
       </Link>
@@ -35,7 +35,7 @@ export function TrackNav({ track, active }: { track: NavTrack; active: string })
                     className={`block rounded-lg px-3 py-2 text-sm ${
                       current
                         ? "font-semibold text-[var(--accent)]"
-                        : "text-[var(--muted)] hover:text-[var(--ink)]"
+                        : "text-[var(--muted)] hover:text-[var(--text)]"
                     }`}
                     style={current ? { background: TINT } : undefined}
                   >

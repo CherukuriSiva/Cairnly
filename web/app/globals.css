@@ -1,29 +1,184 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Design tokens. Light is the default; the dark block follows the OS colour scheme. */
 :root {
   --bg: #fafaf9;
-  --panel: #ffffff;
-  --ink: #1c1917;
-  --muted: #78716c;
-  --line: #e7e5e4;
+  --surface-1: #ffffff;
+  --surface-2: #f5f5f4;
+  --surface-3: #e7e5e4;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --text: #1c1917;
+  --muted: #57534e;
+  --faint: #6b645e;
   --accent: #0f766e;
+  --accent-strong: #115e59;
+  --accent-ink: #ffffff;
+  --accent-glow: rgb(15 118 110 / 0.12);
+  --success: #15803d;
+  --warning: #b45309;
+  --info: #0369a1;
+  --interview: #6d28d9;
+  --easy: #15803d;
+  --medium: #b45309;
+  --hard: #be123c;
+  --tint: 10%; /* strength of tinted semantic backgrounds (components/ui/tokens.ts) */
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0c0a09;
-    --panel: #1c1917;
-    --ink: #f5f5f4;
+    --surface-1: #141210;
+    --surface-2: #1c1917;
+    --surface-3: #292524;
+    --border: #2e2a27;
+    --border-strong: #44403c;
+    --text: #f5f5f4;
     --muted: #a8a29e;
-    --line: #292524;
+    --faint: #8f8882;
     --accent: #2dd4bf;
+    --accent-strong: #5eead4;
+    --accent-ink: #042f2e;
+    --accent-glow: rgb(45 212 191 / 0.18);
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --info: #38bdf8;
+    --interview: #a78bfa;
+    --easy: #4ade80;
+    --medium: #fbbf24;
+    --hard: #fb7185;
+    --tint: 12%;
+    color-scheme: dark;
   }
+}
+
+/* Tailwind classes for the tokens: bg-surface-1, text-muted, border-border, text-accent, ... */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-interview: var(--interview);
+  --color-easy: var(--easy);
+  --color-medium: var(--medium);
+  --color-hard: var(--hard);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--bg);
-  color: var(--ink);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem; /* UI text 15px */
+  overflow-x: clip;
+}
+
+/* One focus ring everywhere. Never removed without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Type scale. */
+@utility text-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.25rem, 1.6rem + 3vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+
+@utility text-display-2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* The page background: a teal glow at the top and a faint dot grid fading out by 40vh. */
+.page-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(60rem 30rem at 50% -10%, var(--accent-glow), transparent);
+}
+
+.page-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, black, transparent 40vh);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 40vh);
+}
+
+/* Reduced motion: no transitions or animations anywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Typography: prose colours follow the tokens in light and dark mode. */
+.prose {
+  --tw-prose-body: var(--text);
+  --tw-prose-headings: var(--text);
+  --tw-prose-lead: var(--text);
+  --tw-prose-links: var(--accent);
+  --tw-prose-bold: var(--text);
+  --tw-prose-counters: var(--faint);
+  --tw-prose-bullets: var(--border-strong);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--muted);
+  --tw-prose-quote-borders: var(--border-strong);
+  --tw-prose-captions: var(--muted);
+  --tw-prose-kbd: var(--text);
+  --tw-prose-code: var(--text);
+  --tw-prose-pre-code: var(--text);
+  --tw-prose-pre-bg: transparent;
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+}
+
+/* Reading body: 17px, line-height 1.7. */
+.prose-reading {
+  font-size: 1.0625rem;
+  line-height: 1.7;
 }
 
 /* Inline code gets a light background instead of the plugin's literal backticks. */
@@ -32,46 +187,62 @@ body {
   content: none;
 }
 .prose :where(code):not(:where(pre code)) {
-  background: var(--line);
+  background: var(--surface-3);
   border-radius: 0.25rem;
   padding: 0.1em 0.3em;
   font-weight: 500;
 }
 
-/* Typography: prose colours follow the cairnly variables in light and dark mode. */
-.prose {
-  --tw-prose-body: var(--ink);
-  --tw-prose-headings: var(--ink);
-  --tw-prose-lead: var(--ink);
-  --tw-prose-links: var(--accent);
-  --tw-prose-bold: var(--ink);
-  --tw-prose-counters: var(--muted);
-  --tw-prose-bullets: var(--line);
-  --tw-prose-hr: var(--line);
-  --tw-prose-quotes: var(--muted);
-  --tw-prose-quote-borders: var(--line);
-  --tw-prose-captions: var(--muted);
-  --tw-prose-kbd: var(--ink);
-  --tw-prose-code: var(--ink);
-  --tw-prose-pre-code: var(--ink);
-  --tw-prose-pre-bg: transparent;
-  --tw-prose-th-borders: var(--line);
-  --tw-prose-td-borders: var(--line);
+/* Anchored headings land below the sticky header when opened from a citation link. */
+.prose :where(h1, h2, h3):not(:where(.not-prose *)),
+h2[id],
+h3[id] {
+  scroll-margin-top: 5rem;
 }
 
-.prose :where(h1, h2, h3):not(:where(.not-prose *)) {
-  scroll-margin-top: 5rem; /* below the sticky top bar when opened from a citation link */
+.prose :where(h2):not(:where(.not-prose *)) {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.75rem;
+  line-height: 1.2;
 }
 
+.prose :where(h3):not(:where(.not-prose *)) {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+/* Tables scroll inside their own box, with zebra rows and sticky header cells. */
 .prose :where(table):not(:where(.not-prose *)) {
   display: block;
+  max-width: 100%;
   overflow-x: auto;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  font-size: 0.9em;
 }
 
 .prose :where(th, td):not(:where(.not-prose *)) {
-  border: 1px solid var(--line);
-  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+}
+
+.prose :where(thead th):not(:where(.not-prose *)) {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  text-align: left;
+}
+
+.prose :where(tbody tr:nth-child(even)):not(:where(.not-prose *)) {
+  background: var(--surface-2);
+}
+
+.prose :where(tbody tr:last-child td):not(:where(.not-prose *)) {
+  border-bottom: 0;
 }
 
 .prose :where(li.task-list-item):not(:where(.not-prose *)) {
@@ -80,9 +251,16 @@ body {
 }
 
 /* Code: CodeBlock draws the frame; rehype-pretty-code sets both theme colours per token. */
+.prose :where(figure[data-rehype-pretty-code-figure]):not(:where(.not-prose *)) {
+  margin: 0;
+}
+
 .code-block {
   margin: 0;
-  background: var(--bg);
+  max-width: 100%;
+  background: var(--surface-1);
+  font-family: var(--font-mono);
+  font-size: 14px;
 }
 
 code[data-theme],
@@ -97,9 +275,90 @@ code[data-theme] span {
   }
 }
 
+/* Highlighted lines ({1,3-4} in the fence meta). */
+.code-block [data-highlighted-line] {
+  display: inline-block;
+  min-width: 100%;
+  margin-left: -1rem;
+  padding: 0 1rem 0 calc(1rem - 2px);
+  background: color-mix(in srgb, var(--accent) var(--tint), transparent);
+  border-left: 2px solid var(--accent);
+}
+
+/* Callouts (components/ui/Callout.tsx). Body text stays --text; only icons and markers are coloured. */
+.callout .prose {
+  --tw-prose-body: var(--text);
+}
+
+.callout > .prose > :first-child {
+  margin-top: 0;
+}
+
+.callout > .prose > :last-child {
+  margin-bottom: 0;
+}
+
+/* learn: check-circle list markers in the accent. */
+.callout-learn ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.callout-learn ul > li {
+  position: relative;
+  padding-left: 1.75rem;
+}
+
+.callout-learn ul > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3em;
+  width: 1.05rem;
+  height: 1.05rem;
+  background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* tip: ordered lists become numbered steps in accent circles. */
+.callout-tip ol {
+  list-style: none;
+  counter-reset: step;
+  padding-left: 0;
+}
+
+.callout-tip ol > li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 2.25rem;
+}
+
+.callout-tip ol > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0.1em;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 600 0.75rem/1.5rem var(--font-mono);
+  text-align: center;
+}
+
+/* interview: the answer reads as a spoken quote. */
+.callout-quote {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
 /* Quiz: the correct option is marked only after "Reveal answer". */
 .quiz[data-revealed="true"] li[data-correct] {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) var(--tint), transparent);
   color: var(--accent);
   border-radius: 0.375rem;
   padding: 0.125rem 0.5rem;

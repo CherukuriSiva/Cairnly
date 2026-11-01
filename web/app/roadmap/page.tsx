@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getRoadmaps } from "@/lib/content";
 
-export const metadata: Metadata = { title: "Roadmaps · cairnly" };
+export const metadata: Metadata = {
+  title: "Roadmaps · cairnly",
+  description: "Step-by-step roadmaps into AI engineering for students, career switchers and working professionals.",
+};
 
 export default function RoadmapsPage() {
   return (
@@ -16,7 +19,7 @@ export default function RoadmapsPage() {
           <li key={roadmap.slug}>
             <Link
               href={`/roadmap/${roadmap.slug}`}
-              className="block rounded-xl border border-[var(--line)] bg-[var(--panel)] p-5 hover:border-[var(--accent)]"
+              className="block rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5 hover:border-[var(--accent)]"
             >
               <span className="font-mono text-xs uppercase tracking-widest text-[var(--muted)]">
                 {roadmap.timeHorizon}

@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CATEGORY_LABELS, getInsights } from "@/lib/content";
 
-export const metadata: Metadata = { title: "Insights · cairnly" };
+export const metadata: Metadata = {
+  title: "Insights · cairnly",
+  description: "Short summaries of recurring AI engineering discussions, in our own words.",
+};
 
 export default function InsightsPage() {
   const insights = getInsights();
@@ -23,7 +26,7 @@ export default function InsightsPage() {
                 <li key={insight.slug}>
                   <Link
                     href={`/insights/${insight.slug}`}
-                    className="block rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 hover:border-[var(--accent)]"
+                    className="block rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-4 hover:border-[var(--accent)]"
                   >
                     <span className="block font-semibold">{insight.title}</span>
                     <span className="mt-1 block text-sm text-[var(--muted)]">{insight.summary}</span>

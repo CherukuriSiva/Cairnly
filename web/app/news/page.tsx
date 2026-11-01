@@ -5,7 +5,10 @@ import { loadLinkedInPicks } from "@/lib/news/linkedin";
 import { GROUP_LABELS } from "@/lib/news/sources";
 import type { NewsGroup } from "@/lib/news/types";
 
-export const metadata: Metadata = { title: "News · cairnly" };
+export const metadata: Metadata = {
+  title: "News · cairnly",
+  description: "Fresh AI engineering reading from open sources, refreshed every hour.",
+};
 
 // Rebuilt in the background at most once an hour; every other page stays fully static.
 export const revalidate = 3600;

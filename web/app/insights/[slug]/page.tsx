@@ -16,7 +16,8 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
-  return { title: `${getInsight(slug)?.title ?? "Insight"} · cairnly` };
+  const insight = getInsight(slug);
+  return { title: `${insight?.title ?? "Insight"} · cairnly`, description: insight?.summary };
 }
 
 export default async function InsightPage({ params }: Params) {
