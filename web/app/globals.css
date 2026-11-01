@@ -17,11 +17,11 @@
   --accent-ink: #ffffff;
   --accent-glow: rgb(15 118 110 / 0.12);
   --success: #15803d;
-  --warning: #b45309;
+  --warning: #92400e;
   --info: #0369a1;
   --interview: #6d28d9;
   --easy: #15803d;
-  --medium: #b45309;
+  --medium: #92400e;
   --hard: #be123c;
   --tint: 10%; /* strength of tinted semantic backgrounds (components/ui/tokens.ts) */
   color-scheme: light;

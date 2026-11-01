@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!lesson) return { title: "Lesson · cairnly" };
   return {
     title: `${lesson.title} · cairnly`,
-    description: `${lesson.title}: a ${lesson.difficulty}, ${lesson.estimatedMinutes}-minute lesson in ${getTrack(track)?.title ?? track} on cairnly.`,
+    description: `${lesson.title}: ${lesson.difficulty === "easy" ? "an" : "a"} ${lesson.difficulty}, ${lesson.estimatedMinutes}-minute lesson in ${getTrack(track)?.title ?? track} on cairnly.`,
   };
 }
 

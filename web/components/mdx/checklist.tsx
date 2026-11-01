@@ -138,10 +138,13 @@ export function TaskCheckbox(props: React.InputHTMLAttributes<HTMLInputElement>)
   const ref = useRef<HTMLInputElement>(null);
   const [index, setIndex] = useState(-1);
   const [own, setOwn] = useState(Boolean(checked));
+  const [label, setLabel] = useState<string>();
 
   useLayoutEffect(() => {
     const boxes = list?.container.current?.querySelectorAll('input[type="checkbox"]');
     if (boxes && ref.current) setIndex(Array.prototype.indexOf.call(boxes, ref.current));
+    // GFM task boxes have no <label>: name each box after its list item's text.
+    setLabel(ref.current?.closest("li")?.textContent?.trim() || undefined);
   }, [list]);
 
   if (type !== "checkbox") return <input type={type} defaultChecked={checked} {...rest} />;
@@ -151,6 +154,7 @@ export function TaskCheckbox(props: React.InputHTMLAttributes<HTMLInputElement>)
       {...rest}
       ref={ref}
       type="checkbox"
+      aria-label={label}
       checked={inList ? list.checked.includes(index) : own}
       onChange={(e) => (inList ? list.toggle(index, e.target.checked) : setOwn(e.target.checked))}
       className="mr-2 h-4 w-4 cursor-pointer align-middle"

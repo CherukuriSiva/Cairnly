@@ -27,7 +27,7 @@ export async function renderMdx(
         rehypePlugins: [
           [
             rehypePrettyCode,
-            { theme: { light: "github-light", dark: "github-dark" }, keepBackground: false },
+            { theme: { light: "github-light-default", dark: "github-dark-default" }, keepBackground: false },
           ],
         ],
       },
