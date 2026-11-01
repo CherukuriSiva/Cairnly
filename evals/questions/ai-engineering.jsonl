@@ -2,7 +2,7 @@
 {"id": "w-agent-memory-2", "question": "Why should an agent keep the original task when it trims its history?", "gold": ["lessons/ai-engineering/agent-memory.mdx"], "section": "Keeping it in budget"}
 {"id": "w-agent-memory-3", "question": "My agent's tool results are huge JSON dumps and the context fills up after three steps. What should I do?", "gold": ["lessons/ai-engineering/agent-memory.mdx"], "section": "Common mistakes"}
 {"id": "w-agent-memory-4", "question": "How do I implement basic memory for an agent loop?", "gold": ["lessons/ai-engineering/agent-memory.mdx"], "section": "The simplest memory: a message list"}
-{"id": "w-ai-app-mental-model-1", "question": "RAG or fine-tuning?", "gold": ["lessons/ai-engineering/ai-app-mental-model.mdx"], "section": "The decision framework"}
+{"id": "w-ai-app-mental-model-1", "question": "RAG or fine-tuning?", "gold": ["lessons/ai-engineering/ai-app-mental-model.mdx", "insights/ai-engineering/fine-tuning-vs-rag.mdx", "lessons/ai-engineering/interviewer-questions-ai.mdx"], "section": "The decision framework"}
 {"id": "w-ai-app-mental-model-2", "question": "Can RAG change the tone or style of a model's answers?", "gold": ["lessons/ai-engineering/ai-app-mental-model.mdx"], "section": "The three strategies"}
 {"id": "w-ai-app-mental-model-3", "question": "Our support bot for a SaaS product keeps making up pricing details. What should we add to fix that?", "gold": ["lessons/ai-engineering/ai-app-mental-model.mdx"], "section": "Real-world example"}
 {"id": "w-ai-app-mental-model-4", "question": "Which approach handles knowledge that changes every week: prompting, RAG or fine-tuning?", "gold": ["lessons/ai-engineering/ai-app-mental-model.mdx"], "section": "The combination matrix"}
