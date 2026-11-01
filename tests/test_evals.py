@@ -114,9 +114,9 @@ def test_written_questions_name_a_real_section_and_copy_no_lesson_text():
     assert bad == []
 
 
-def test_off_topic_set_has_40_unique_questions():
+def test_off_topic_set_has_150_unique_questions():
     questions = off_topic_questions()
-    assert len(questions) == 40 == len(set(questions))
+    assert len(questions) == 150 == len(set(questions))
 
 
 def test_followup_set_is_well_formed_and_gold_lessons_exist():
