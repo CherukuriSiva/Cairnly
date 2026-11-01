@@ -2,7 +2,8 @@
 
 import { SquarePen } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/chat/Composer";
 import { TurnView, type ChatTurn } from "@/components/chat/TurnView";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -29,6 +30,16 @@ function dropParam(name: string) {
   const url = new URL(window.location.href);
   url.searchParams.delete(name);
   window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+}
+
+/** Reports ?q= and ?track= on mount and on every change (the palette can push a new q while
+ * /ask is open). It sits in its own Suspense boundary so the rest of the chat stays static HTML. */
+function UrlParams({ onChange }: { onChange: (q: string | null, track: string | null) => void }) {
+  const params = useSearchParams();
+  const q = params.get("q");
+  const track = params.get("track");
+  useEffect(() => onChange(q, track), [q, track, onChange]);
+  return null;
 }
 
 /** The chat at /ask. Answers stream in; a cold start or a network failure shows a friendly
@@ -180,19 +191,18 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     dropParam("track");
   }
 
-  // Shareable links: /ask?q=...&track=... sets the scope and asks once (even in dev StrictMode).
-  const askedFromUrl = useRef(false);
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const scope = params.get("track");
-    const known = scope && scope in trackTitles ? scope : null;
-    setTrack(known);
-    const q = params.get("q");
-    if (q && !askedFromUrl.current) {
-      askedFromUrl.current = true;
-      submit(q, known);
-    }
-  }, [trackTitles, submit]);
+  // Shareable links: /ask?q=...&track=... sets the scope and asks each new q once (a second run
+  // with the same q, from dev StrictMode or a track change, does not ask again).
+  const askedQ = useRef<string | null>(null);
+  const applyUrl = useCallback(
+    (q: string | null, scope: string | null) => {
+      const known = scope && scope in trackTitles ? scope : null;
+      setTrack(known);
+      if (q && q !== askedQ.current) submit(q, known);
+      askedQ.current = q;
+    },
+    [trackTitles, submit],
+  );
 
   // Which providers this server allows. Without an answer, the chat uses the server default.
   useEffect(() => {
@@ -207,17 +217,26 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     };
   }, []);
 
-  // Leaving the page stops the stream and any pending retry.
-  useEffect(
-    () => () => {
-      cancelRetry();
-      abortRef.current?.abort();
-    },
-    [cancelRetry],
-  );
+  // Leaving the page stops the stream and any pending retry. Dev StrictMode runs this cleanup and
+  // the effect again in one go, so the abort waits a microtask and only a real unmount cancels.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      queueMicrotask(() => {
+        if (mounted.current) return;
+        cancelRetry();
+        abortRef.current?.abort();
+      });
+    };
+  }, [cancelRetry]);
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-3xl flex-col px-4 pt-8">
+      <Suspense fallback={null}>
+        <UrlParams onChange={applyUrl} />
+      </Suspense>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="eyebrow text-faint">Ask cairnly</p>
         <div className="flex items-center gap-2">

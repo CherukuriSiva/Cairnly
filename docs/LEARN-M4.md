@@ -254,7 +254,12 @@ when it shuts down.
   model, the first answer can take up to a minute…". The first token clears it.
 - **Limits.** A 429 says "Please wait 42 seconds and try again", using the `Retry-After` header.
   The API lists that header in CORS `expose_headers`; without it, a browser on another origin
-  would hide it from our code. 503 and 403 show the server's own message.
+  would hide it from our code. A 403 shows the server's own message.
+- **Waking and network failures.** A 503 (the model is still starting) or a network failure
+  shows a friendly "cairnly is waking up" card and asks again once by itself after 3 seconds;
+  if that fails too, the card asks the reader to try again in a minute. If no response headers
+  arrive within 30 seconds, the turn says "cairnly didn't answer in time." Every card has a
+  Retry button that asks again in place of the failed turn.
 - **Safety.** A withdrawn answer shows the safety message. A guard refusal says "Blocked by the
   safety check" instead of "Not in the lessons", so the reader knows to rephrase.
 - **Providers.** The provider select appears only when `GET /config` lists more than one.

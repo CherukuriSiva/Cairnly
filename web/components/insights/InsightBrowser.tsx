@@ -1,7 +1,8 @@
 "use client";
 
 import { Search, SearchX } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,19 +19,29 @@ function Meta({ insight, labels }: { insight: InsightCard; labels: Record<string
   );
 }
 
-/** /insights: category chips (preset from ?category=), a search over titles and summaries,
- * the newest match as a large card and the rest in a grid. */
-export function InsightBrowser({ insights, labels }: { insights: InsightCard[]; labels: Record<string, string> }) {
-  const [category, setCategory] = useState("");
+type BrowserProps = { insights: InsightCard[]; labels: Record<string, string> };
+
+/** /insights: category chips (driven by ?category=), a search over titles and summaries, the
+ * newest match as a large card and the rest in a grid. The static HTML shows every category;
+ * the browser then follows the address bar, so /insights?category= links work on /insights too. */
+export function InsightBrowser(props: BrowserProps) {
+  return (
+    <Suspense fallback={<Browser {...props} category="" />}>
+      <BrowserFromUrl {...props} />
+    </Suspense>
+  );
+}
+
+function BrowserFromUrl(props: BrowserProps) {
+  const wanted = useSearchParams().get("category");
+  return <Browser {...props} category={wanted && wanted in props.labels ? wanted : ""} />;
+}
+
+function Browser({ insights, labels, category }: BrowserProps & { category: string }) {
   const [query, setQuery] = useState("");
 
-  useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get("category");
-    if (wanted && wanted in labels) setCategory(wanted);
-  }, [labels]);
-
+  // Next.js syncs replaceState into useSearchParams, which re-renders with the new category.
   function choose(next: string) {
-    setCategory(next);
     const url = new URL(window.location.href);
     if (next) url.searchParams.set("category", next);
     else url.searchParams.delete("category");

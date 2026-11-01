@@ -36,9 +36,12 @@ same file to check the `track` scope.
 
 ## 3. Pages and anchors (`web/`, `pages.py`, `web/lib/anchors.ts`)
 
-Every page is generated at build time (`next build` prerenders 175 pages; only the News page
-reads `content/news/linkedin.yaml` from disk, at each hourly refresh): `/syllabus`, `/<track>`, `/<track>/<lesson>`, `/roadmap/<slug>` and
-`/insights/<slug>`. Lesson pages have a sidebar on desktop and a "Lessons" drawer on phones.
+Every page is generated at build time (`next build` prerenders them all): `/syllabus`,
+`/<track>`, `/<track>/<lesson>`, `/roadmap/<slug>` and `/insights/<slug>`. Two pages are
+rebuilt at most once an hour (`revalidate = 3600`): the landing page `/` and `/news`. Each
+refresh, and the root layout around it (the header and footer), reads `content/` from disk
+again, so the server image copies the whole `content/` folder, not only
+`content/news/linkedin.yaml`. Lesson pages have a sidebar on desktop and a "Lessons" drawer on phones.
 
 For a citation to open the right section, the chunk must know the `id` of its heading on the
 page. Two languages compute it, so the rule is written down once and tested twice:
@@ -133,7 +136,8 @@ hallucinations lesson, or exact versus semantic caches next to semantic caching.
 
 ## 9. News page (`web/lib/news/`, `web/app/news/page.tsx`)
 
-`/news` shows fresh AI-engineering reading. It is the one page that is not fully static.
+`/news` shows fresh AI-engineering reading. Like the landing page, it is rebuilt hourly
+instead of only once at build time.
 
 - **Sources.** Hacker News (only titles that look like AI), arXiv, Hugging Face daily papers,
   and the blogs of AI labs and practitioners. They are listed as data in `sources.ts`.
