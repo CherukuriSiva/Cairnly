@@ -88,7 +88,7 @@ At 0.64 it is 8%, so the suggestion was not adopted and 0.70 was kept. The owner
 - 64 more real questions are answered, "What is a jailbreak?" among them.
 - 4 of 150 off-topic questions now reach the model.
 
-The answer prompt (`answer-learner-v1`) tells the model to use only the sources and to say so
+The answer prompt (`answer-learner-v1`, and `answer-learner-v2` after it) tells the model to use only the sources and to say so
 plainly when they do not cover the question, so an accepted off-topic question should get that
 answer rather than outside knowledge; this cycle did not measure it. The overlap stays a known
 gap.

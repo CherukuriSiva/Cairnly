@@ -16,6 +16,6 @@ lessons:
   title: AI engineering lessons
   path: content
   min_score: 0.66
-  prompt: answer-learner-v1
+  prompt: answer-learner-v2   # v1 also ended answers with "Read next:"; the chat's full-lesson link replaced it
   rerank: true
   questions: evals/questions

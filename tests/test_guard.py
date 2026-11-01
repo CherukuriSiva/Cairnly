@@ -182,7 +182,7 @@ def test_check_all_returns_the_first_block():
     assert not check_all(["What is RAG?", "And how do I test it?"]).blocked
 
 
-PROMPT = load_prompt("answer-learner-v1")
+PROMPT = load_prompt("answer-learner-v2")
 
 
 def test_leak_is_detected_even_when_pieces_split_words():
