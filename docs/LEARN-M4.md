@@ -69,10 +69,15 @@ collector. The API's `AnswerStream` response therefore closes the generator itse
 response ends, however it ends, and then releases the slot. `release()` is safe to call twice.
 The close is not instant, though. A generator cannot be closed while it is in the middle of a
 step, so the API waits for the running step to end. While words are streaming, that is the next
-word. While the model is still silent, it can be a follow-up's rewrite or the first-token limit
-(90 seconds each) or the query embedding timeout (120 seconds per read). The slot stays held
-until then, and that is the right count: the model request is still open, so the GPU is still
-busy.
+word. Before anything has been sent, a follow-up's rewrite (up to 90 seconds) and the query
+embedding (120 seconds per read) are one step, so the wait can be about 210 seconds, and longer
+if the embedding server sends bytes slowly, because its limit is per read. Waiting for the
+first token is a separate step of up to 90 seconds. The slot stays held until then, and that is
+the right count: the model request is still open, so the GPU is still busy.
+There is one gap the other way. When a time limit fires, the answer ends and the slot is freed
+at once, but the reader thread that pulls pieces from the model stops only when the next piece
+arrives or the HTTP read timeout (90 seconds) fires. For up to 90 seconds the model request
+stays open with no slot counting it.
 Tests cover every path, one of them against a real Uvicorn server with the garbage collector
 switched off.
 

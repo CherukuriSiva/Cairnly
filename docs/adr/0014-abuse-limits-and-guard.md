@@ -23,11 +23,16 @@ other reader, or make the model follow its own instructions instead of ours.
   generator on a disconnect, so without this the model stream and the slot were held until
   garbage collection. A test against a real Uvicorn server checks it. The close is not
   instant: a generator cannot be closed in the middle of a step, so it waits for the running
-  step to end. While the answer streams, that is the next piece; while the model is still
-  silent, it can be a follow-up's rewrite limit or the first-token limit (90 s each) or the
-  query embedding timeout (120 s per read). The slot stays held until then, which is correct,
-  since the model request is still open. No extra cancel mechanism: the time limits already
-  bound every step.
+  step to end. While the answer streams, that is the next piece. Before the first event, a
+  follow-up's rewrite (up to 90 s) and the query embedding (120 s per read) run as one step,
+  so the close can wait about 210 s, or longer if the embedding server sends bytes slowly
+  (its limit is per read). Waiting for the first token is a separate step of up to 90 s. The
+  slot stays held until then, which is correct, since the model request is still open. No
+  extra cancel mechanism: the time limits already bound every step.
+- One gap in that count: after a time limit (ModelTooSlow) the answer ends and the slot is
+  freed at once, but the reader thread in `llm.time_limited` stops only at the model's next
+  piece or at the HTTP read timeout (90 s). For up to 90 s the model request stays open with no
+  slot counting it, so a burst of timeouts can briefly put more than 4 requests on the GPU.
 - The model must send its first token within 90 s (a cold GPU) and finish within 60 s after
   that, on the wall clock: a reader thread fills a queue and the answer waits on it only for the
   time left. A follow-up's rewrite must finish within 90 s. Timeouts end in a friendly in-band

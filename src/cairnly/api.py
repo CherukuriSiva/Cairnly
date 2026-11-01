@@ -14,10 +14,17 @@ never closes it, so the abandoned answer would hold its model stream, its databa
 and its answer slot until garbage collection found it. AnswerStream therefore closes the
 generator itself when the response ends, however it ends (finished, client gone, error), and
 then frees the slot. A generator cannot be closed in the middle of a step, so the cleanup waits
-for the step that is running to end: the next model piece while the answer streams, or at worst
-that step's own time limit (a follow-up's rewrite or the first token 90 s, the query
-embedding 120 s per read). Until then the model request is still open, so its slot stays held,
-which is the right count.
+for the step that is running to end. While the answer streams, that is the next model piece.
+Before the first event, a follow-up's rewrite (up to 90 s) and the query embedding (120 s per
+read) are ONE step, so the cleanup can wait about 210 s, longer if the embedding server sends
+bytes slowly, because its 120 s limit is per read. Waiting for the first token is its own step
+(up to 90 s). Until the step ends the model request is still open, so its slot stays held, which
+is the right count.
+
+One case frees the slot while a model request is still open: after ModelTooSlow, the answer
+ends and the slot is freed at once, but the reader thread in llm.time_limited stops only at the
+model's next piece or at the HTTP read timeout (90 s). For up to that long the request to the
+model stays open with no slot counting it.
 """
 
 import json
