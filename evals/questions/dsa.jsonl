@@ -1,0 +1,69 @@
+{"id": "w-arrays-and-frequency-maps-1", "question": "What is a frequency map?", "gold": ["lessons/dsa/arrays-and-frequency-maps.mdx"], "section": "The pattern"}
+{"id": "w-arrays-and-frequency-maps-2", "question": "How do I check whether two strings are anagrams?", "gold": ["lessons/dsa/arrays-and-frequency-maps.mdx"], "section": "When to use it"}
+{"id": "w-arrays-and-frequency-maps-3", "question": "I need two numbers in an array that add up to a target, faster than checking every pair. How?", "gold": ["lessons/dsa/arrays-and-frequency-maps.mdx", "lessons/dsa/hashing-and-sets.mdx"], "section": "Two Sum (the classic)"}
+{"id": "w-binary-search-1", "question": "What is binary search on answer?", "gold": ["lessons/dsa/binary-search.mdx"], "section": "Binary search on answer: Koko Eating Bananas"}
+{"id": "w-binary-search-2", "question": "Why write mid as lo + (hi - lo) // 2 instead of (lo + hi) // 2?", "gold": ["lessons/dsa/binary-search.mdx"], "section": "The bug-free template"}
+{"id": "w-binary-search-3", "question": "I need the smallest ship capacity that delivers all packages within D days. Which technique fits?", "gold": ["lessons/dsa/binary-search.mdx"], "section": "When to reach for binary search"}
+{"id": "w-binary-search-4", "question": "How can binary search still work on a rotated sorted array?", "gold": ["lessons/dsa/binary-search.mdx"], "section": "Search in rotated sorted array"}
+{"id": "w-design-lru-cache-1", "question": "How does an LRU cache work?", "gold": ["lessons/dsa/design-lru-cache.mdx"], "section": "The constraints that force the design"}
+{"id": "w-design-lru-cache-2", "question": "Why use dummy head and tail nodes in the LRU linked list?", "gold": ["lessons/dsa/design-lru-cache.mdx"], "section": "Why sentinel nodes matter"}
+{"id": "w-design-lru-cache-3", "question": "My LRU cache breaks on eviction because I can't tell which key to delete from the dict. What did I miss?", "gold": ["lessons/dsa/design-lru-cache.mdx"], "section": "Common mistakes"}
+{"id": "w-design-lru-cache-4", "question": "Is there a quick way to build an LRU cache in Python?", "gold": ["lessons/dsa/design-lru-cache.mdx"], "section": "Python shortcut: OrderedDict"}
+{"id": "w-design-rate-limiter-1", "question": "What is a token bucket?", "gold": ["lessons/dsa/design-rate-limiter.mdx"], "section": "Algorithm 4: Token Bucket"}
+{"id": "w-design-rate-limiter-2", "question": "Why does a fixed window rate limiter let bursts through at the window edge?", "gold": ["lessons/dsa/design-rate-limiter.mdx"], "section": "Algorithm 1: Fixed Window Counter"}
+{"id": "w-design-rate-limiter-3", "question": "We bill customers per API call, so the request limit has to be exact. Which rate limiting algorithm should we use?", "gold": ["lessons/dsa/design-rate-limiter.mdx"], "section": "When each is used in practice"}
+{"id": "w-design-rate-limiter-4", "question": "Sliding window log vs sliding window counter: what's the trade-off?", "gold": ["lessons/dsa/design-rate-limiter.mdx"], "section": "Comparison table"}
+{"id": "w-dp-without-fear-1", "question": "Memoization vs tabulation?", "gold": ["lessons/dsa/dp-without-fear.mdx"], "section": "The mental model: top-down vs. bottom-up"}
+{"id": "w-dp-without-fear-2", "question": "How do I approach a dynamic programming problem step by step?", "gold": ["lessons/dsa/dp-without-fear.mdx"], "section": "The DP recipe"}
+{"id": "w-dp-without-fear-3", "question": "My coin change DP returns 0 for every amount. What's likely wrong?", "gold": ["lessons/dsa/dp-without-fear.mdx"], "section": "Common mistakes"}
+{"id": "w-dp-without-fear-4", "question": "How do I solve house robber with dynamic programming?", "gold": ["lessons/dsa/dp-without-fear.mdx"], "section": "Walkthrough: House Robber (LC 198)"}
+{"id": "w-dsa-on-resume-1", "question": "How do I show DSA on my resume?", "gold": ["lessons/dsa/dsa-on-resume.mdx"], "section": "Resume framing"}
+{"id": "w-dsa-on-resume-2", "question": "Why organize my LeetCode solutions by pattern instead of by problem number?", "gold": ["lessons/dsa/dsa-on-resume.mdx"], "section": "The solutions repo structure"}
+{"id": "w-dsa-on-resume-3", "question": "An interviewer asks about a hard technical problem I solved, and all I have is LeetCode practice. How should I answer?", "gold": ["lessons/dsa/dsa-on-resume.mdx"], "section": "In behavioral interviews"}
+{"id": "w-dsa-on-resume-4", "question": "What should I write at the top of each solution file in my repo?", "gold": ["lessons/dsa/dsa-on-resume.mdx"], "section": "What makes a solution file stand out"}
+{"id": "w-graphs-basics-1", "question": "BFS or DFS for shortest path?", "gold": ["lessons/dsa/graphs-basics.mdx"], "section": "BFS vs. DFS for graphs"}
+{"id": "w-graphs-basics-2", "question": "How does Kahn's algorithm tell me there's a cycle in course prerequisites?", "gold": ["lessons/dsa/graphs-basics.mdx"], "section": "Walkthrough: Course Schedule (LC 207) - Topological Sort"}
+{"id": "w-graphs-basics-3", "question": "My recursive DFS on a 500 by 500 grid crashes with a recursion depth error. What can I do?", "gold": ["lessons/dsa/graphs-basics.mdx"], "section": "Common mistakes"}
+{"id": "w-graphs-basics-4", "question": "How do I count islands in a grid of 1s and 0s?", "gold": ["lessons/dsa/graphs-basics.mdx"], "section": "Walkthrough: Number of Islands (LC 200)"}
+{"id": "w-hashing-and-sets-1", "question": "Hash map or hash set?", "gold": ["lessons/dsa/hashing-and-sets.mdx"], "section": "Hash map vs. hash set"}
+{"id": "w-hashing-and-sets-2", "question": "How do I group a list of words into anagram groups?", "gold": ["lessons/dsa/hashing-and-sets.mdx"], "section": "Group Anagrams"}
+{"id": "w-hashing-and-sets-3", "question": "I need the longest run of consecutive integers in an unsorted list without sorting it. How do I do that in linear time?", "gold": ["lessons/dsa/hashing-and-sets.mdx"], "section": "Longest Consecutive Sequence"}
+{"id": "w-hashing-and-sets-4", "question": "Which problem signals tell me to reach for a hash set or hash map?", "gold": ["lessons/dsa/hashing-and-sets.mdx"], "section": "When to use hashing"}
+{"id": "w-heap-priority-queue-1", "question": "Does Python have a max-heap?", "gold": ["lessons/dsa/heap-priority-queue.mdx"], "section": "Python's heapq"}
+{"id": "w-heap-priority-queue-2", "question": "How do I keep track of the median of a stream of numbers?", "gold": ["lessons/dsa/heap-priority-queue.mdx"], "section": "Walkthrough: Find Median from Data Stream (LC 295)"}
+{"id": "w-heap-priority-queue-3", "question": "Merging K sorted lists with heapq crashes with a comparison error on my node objects. Why?", "gold": ["lessons/dsa/heap-priority-queue.mdx"], "section": "Common mistakes"}
+{"id": "w-heap-priority-queue-4", "question": "Why is a heap of size K better than sorting for top-K problems?", "gold": ["lessons/dsa/heap-priority-queue.mdx"], "section": "Pattern: Top K Elements"}
+{"id": "w-intervals-1", "question": "How do I merge overlapping intervals?", "gold": ["lessons/dsa/intervals.mdx"], "section": "Merge Intervals (LC 56)"}
+{"id": "w-intervals-2", "question": "Why sort by end time when removing the fewest intervals to avoid overlaps?", "gold": ["lessons/dsa/intervals.mdx"], "section": "Non-Overlapping Intervals (LC 435)"}
+{"id": "w-intervals-3", "question": "I'm building a calendar app and need to know how many conference rooms a day of bookings requires. How?", "gold": ["lessons/dsa/intervals.mdx"], "section": "Meeting Rooms II (LC 253): Minimum rooms needed"}
+{"id": "w-intervals-4", "question": "Do [1,2] and [2,3] count as overlapping intervals?", "gold": ["lessons/dsa/intervals.mdx"], "section": "Common mistakes"}
+{"id": "w-pattern-recognition-1", "question": "What do input size constraints tell me?", "gold": ["lessons/dsa/pattern-recognition.mdx"], "section": "The decision framework"}
+{"id": "w-pattern-recognition-2", "question": "How should I spend the first minute after reading a coding problem?", "gold": ["lessons/dsa/pattern-recognition.mdx"], "section": "The 60-second process"}
+{"id": "w-pattern-recognition-3", "question": "I'm in an interview and can't see which pattern fits the problem. What should I try?", "gold": ["lessons/dsa/pattern-recognition.mdx"], "section": "The \"I'm stuck\" recovery plan"}
+{"id": "w-pattern-recognition-4", "question": "Dynamic programming vs greedy: how do I tell which one a problem needs?", "gold": ["lessons/dsa/pattern-recognition.mdx"], "section": "Common mistakes"}
+{"id": "w-recursion-backtracking-1", "question": "What is backtracking?", "gold": ["lessons/dsa/recursion-backtracking.mdx"], "section": "The backtracking template"}
+{"id": "w-recursion-backtracking-2", "question": "How do I generate every subset of a list?", "gold": ["lessons/dsa/recursion-backtracking.mdx"], "section": "Subsets (power set)"}
+{"id": "w-recursion-backtracking-3", "question": "My combination sum backtracking gets very slow on bigger inputs. How can I speed it up?", "gold": ["lessons/dsa/recursion-backtracking.mdx"], "section": "The power of pruning"}
+{"id": "w-sliding-window-1", "question": "What is a sliding window?", "gold": ["lessons/dsa/sliding-window.mdx"], "section": "The core idea"}
+{"id": "w-sliding-window-2", "question": "How do I find the longest substring with no repeated characters?", "gold": ["lessons/dsa/sliding-window.mdx"], "section": "Variable-size window template"}
+{"id": "w-sliding-window-3", "question": "I need the shortest part of a string that contains every letter of another string. Which approach works?", "gold": ["lessons/dsa/sliding-window.mdx"], "section": "Variable window: Minimum Window Substring"}
+{"id": "w-stack-monotonic-1", "question": "What is a monotonic stack?", "gold": ["lessons/dsa/stack-monotonic.mdx"], "section": "The monotonic stack pattern"}
+{"id": "w-stack-monotonic-2", "question": "How do I check if brackets in a string are balanced?", "gold": ["lessons/dsa/stack-monotonic.mdx"], "section": "Stack basics: Valid Parentheses (LC 20)"}
+{"id": "w-stack-monotonic-3", "question": "For each day's stock price I need the number of days until a higher price. What's an efficient approach?", "gold": ["lessons/dsa/stack-monotonic.mdx"], "section": "Walkthrough: Daily Temperatures (LC 739)"}
+{"id": "w-stack-monotonic-4", "question": "Should I push values or indices onto a monotonic stack?", "gold": ["lessons/dsa/stack-monotonic.mdx"], "section": "Common mistakes"}
+{"id": "w-talking-through-code-1", "question": "What do coding interviewers actually score?", "gold": ["lessons/dsa/talking-through-code.mdx"], "section": "The interviewer's scorecard"}
+{"id": "w-talking-through-code-2", "question": "How do I think aloud during a coding interview without rambling?", "gold": ["lessons/dsa/talking-through-code.mdx"], "section": "The 5-step interview framework"}
+{"id": "w-talking-through-code-3", "question": "Halfway through my solution I spot an off-by-one bug while the interviewer watches. How should I handle it?", "gold": ["lessons/dsa/talking-through-code.mdx"], "section": "When you find a bug"}
+{"id": "w-talking-through-code-4", "question": "What should I say out loud when I get stuck in a coding round?", "gold": ["lessons/dsa/talking-through-code.mdx"], "section": "When you're stuck"}
+{"id": "w-trees-dfs-bfs-1", "question": "Inorder vs preorder vs postorder?", "gold": ["lessons/dsa/trees-dfs-bfs.mdx"], "section": "DFS traversals"}
+{"id": "w-trees-dfs-bfs-2", "question": "How do I validate a binary search tree?", "gold": ["lessons/dsa/trees-dfs-bfs.mdx"], "section": "Walkthrough: Validate BST (LC 98)"}
+{"id": "w-trees-dfs-bfs-3", "question": "My BST check only compares each node with its two children and accepts a tree that is wrong. Why?", "gold": ["lessons/dsa/trees-dfs-bfs.mdx"], "section": "Common mistakes"}
+{"id": "w-trees-dfs-bfs-4", "question": "How do I print a binary tree level by level?", "gold": ["lessons/dsa/trees-dfs-bfs.mdx"], "section": "BFS (level-order traversal)"}
+{"id": "w-tries-autocomplete-1", "question": "What is a trie?", "gold": ["lessons/dsa/tries-autocomplete.mdx"], "section": "What is a trie?"}
+{"id": "w-tries-autocomplete-2", "question": "How do I build autocomplete suggestions with a trie?", "gold": ["lessons/dsa/tries-autocomplete.mdx"], "section": "Building autocomplete"}
+{"id": "w-tries-autocomplete-3", "question": "My trie says 'app' is a word even though I only inserted 'apple'. What's wrong?", "gold": ["lessons/dsa/tries-autocomplete.mdx"], "section": "Common mistakes"}
+{"id": "w-tries-autocomplete-4", "question": "Why does a trie help when searching for many words on a letter grid?", "gold": ["lessons/dsa/tries-autocomplete.mdx"], "section": "Walkthrough: Word Search II (LC 212)"}
+{"id": "w-two-pointers-1", "question": "What is Floyd's cycle detection?", "gold": ["lessons/dsa/two-pointers.mdx"], "section": "Pattern 3: Fast and slow pointers"}
+{"id": "w-two-pointers-2", "question": "How does 3Sum avoid returning duplicate triplets?", "gold": ["lessons/dsa/two-pointers.mdx"], "section": "Pattern 2: The 3Sum technique"}
+{"id": "w-two-pointers-3", "question": "I need to check whether a string is a palindrome without extra memory. What approach works?", "gold": ["lessons/dsa/two-pointers.mdx"], "section": "When to reach for two pointers"}
+{"id": "w-two-pointers-4", "question": "Why do converging pointers never skip a valid pair in a sorted array?", "gold": ["lessons/dsa/two-pointers.mdx"], "section": "Pattern 1: Converging pointers (sorted array)"}
