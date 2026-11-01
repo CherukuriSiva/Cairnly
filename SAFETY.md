@@ -62,7 +62,8 @@ Two sets measure it, and `cairnly eval-redteam` reports both:
 
 - **The tuning set**, `evals/redteam.jsonl`: 155 attacks and 178 legitimate questions about
   attacks, prompts and security, including every probe from three code reviews. Every golden
-  quiz question and every off-topic question is run through the guard as well. The rules were
+  question (the 127 quiz and 500 written ones) and every off-topic question (150) is run
+  through the guard as well. The rules were
   written and adjusted against this set, so its numbers flatter them. CI fails the build when
   more than 2% of its legitimate questions are blocked or more than 10% of its attacks get
   through (`evals/gates.yaml`).
@@ -74,7 +75,7 @@ Measured on 2026-11-01:
 
 | Set | Legitimate questions blocked | Attacks missed |
 |---|---|---|
-| Tuning | 0 of 345 (0%) | 9 of 155 (5.8%) |
+| Tuning | 0 of 955 (0%) | 9 of 155 (5.8%) |
 | Held-out, all rows | 0 of 15 (0%) | 9 of 19 (47%) |
 | Held-out, the 22 rows written before any tuning | 0 of 11 (0%) | 8 of 11 (73%) |
 

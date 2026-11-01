@@ -12,18 +12,25 @@ Built in public, one milestone at a time. **Now: M4 (production ready).**
 
 | | Recall@5 | MRR | Off-topic questions answered | Faithfulness |
 |---|---|---|---|---|
-| Lessons, all content (127 questions, M3) | **0.937** | **0.873** | **0%** (0 of 40) | 97.5% (M2) |
+| Lessons, all content (627 questions: 127 quiz + 500 written) | **0.971** | **0.914** | **0%** (0 of 150) | 97.5% (M2) |
 | Follow-ups (15, qwen3:8b rewrite) | rewritten = standalone (0.867 to 0.933 across runs) | | | |
 
-The input guard (M4) blocks 0 of 345 real learner questions and misses 9 of 155 attacks in its
+The confidence gate (0.70) refuses 15.3% of those 627 questions, all of them written ones (96
+of 500): short questions like "What is a jailbreak?" score below off-topic ones like a piano
+question, so a lower cutoff would start answering cooking and Excel questions
+([ADR 0016](docs/adr/0016-written-eval-set.md)).
+
+The input guard (M4) blocks 0 of 955 real learner questions and misses 9 of 155 attacks in its
 tuning set. On 11 fresh attacks it was never tuned on, it misses 8, so it is a first filter,
 not a wall: the output check behind it withdraws any answer that leaks the system prompt
 ([SAFETY.md](SAFETY.md)).
 
 M2 added a cross-encoder reranker and a confidence gate calibrated from evals (Recall@5
 0.88 → 0.94). M3 measured the gate again on all public content with 40 off-topic questions
-and raised it to 0.70 ([ADR 0011](docs/adr/0011-recalibrated-confidence-gate.md)). The
-faithfulness number is from M2 and was not re-run in M3. How it was all measured:
+and raised it to 0.70 ([ADR 0011](docs/adr/0011-recalibrated-confidence-gate.md)). Cycle 4
+added 500 written learner questions (3 to 5 per lesson) and 110 more off-topic questions, and
+re-measured: the gate stays at 0.70 ([ADR 0016](docs/adr/0016-written-eval-set.md)). The
+faithfulness number is from M2 and was not re-run since. How it was all measured:
 [LEARN-M2](docs/LEARN-M2.md), [LEARN-M3](docs/LEARN-M3.md).
 
 ## How it works
@@ -54,7 +61,7 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Providers | Ollama (local, or on a Modal GPU in production); the Claude API for local development only | `llm.py`, `ollama.py` |
 | API | FastAPI: `/health`, `/config`, `/search`, streaming `/ask` (Server-Sent Events) with history and track | `api.py` |
 | Chat | Next.js chat with clickable citations, lesson links, follow-ups, a track scope and a cold-start notice | `web/components/Chat.tsx` |
-| Evals | Quiz golden set, off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
+| Evals | Golden set of quiz plus written questions (reported per source), off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
 | Tracing | One Langfuse trace per question (guard, rewrite, retrieve, generate, output check), with no user text by default ([PRIVACY.md](PRIVACY.md)) | `tracing.py` |
 | Deploy | Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy, Ollama on a Modal GPU | [infra/](infra/README.md), `deploy/` |
 
@@ -201,7 +208,7 @@ its pages are generated from `content/`.
 content/          lessons, insights and roadmaps (MDX) + syllabus.yaml
 src/cairnly/      the Python package: ingest, search, answer, guard, limits, API, CLI
 web/              Next.js site and chat
-evals/            golden, off-topic, follow-up and red-team sets + CI gates
+evals/            written questions, off-topic, follow-up and red-team sets + CI gates
 prompts/          versioned answer and rewrite prompts
 deploy/           Ollama on a Modal GPU
 infra/            Helm chart, Terraform for AWS, deploy guide

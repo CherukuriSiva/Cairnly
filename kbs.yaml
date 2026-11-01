@@ -4,7 +4,8 @@
 #   path       what `cairnly ingest --kb <name>` reads (a folder of .md/.mdx, or a .jsonl file)
 #   min_score  confidence gate: refuse when the best cosine similarity is below this.
 #              It is measured, not guessed: `cairnly eval` reports false refusals vs.
-#              false accepts (off-topic questions, evals/off-topic.jsonl); see docs/LEARN-M3.md
+#              false accepts (off-topic questions, evals/off-topic.jsonl); see
+#              docs/adr/0016-written-eval-set.md
 #   prompt     prompt version from prompts/ (versioned so evals can compare them)
 #   notice     shown with every answer in the UI
 #   rerank     re-order candidates with a cross-encoder (measured lift; see src/cairnly/rerank.py)
