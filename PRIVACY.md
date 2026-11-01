@@ -22,10 +22,10 @@ The chat stores nothing else in your browser.
 |---|---|---|
 | Your IP address and request counts, for rate limits | the API's memory only, never written to disk | until the process restarts; addresses from past days are dropped once more than 10,000 are held |
 | Access logs: client address, path, status code, time | the API's Uvicorn logs in CloudWatch | 14 days (the log group retention) |
+| Traces (see below) | the operator's Langfuse project | the retention set in that project |
 
 Behind the load balancer, the client address in the API's access logs is usually the load
 balancer's own address. Load balancer access logs are not turned on.
-| Traces (see below) | the operator's Langfuse project | the retention set in that project |
 
 Questions and answers are not stored in the database. The database holds only the lessons.
 
