@@ -45,12 +45,14 @@ checks the question, earlier questions and the rewritten follow-up. An output ch
 an answer that repeats 8 words in a row from the system prompt and flags answers without
 citations.
 
-**Red-team gate**: `evals/redteam.jsonl`, the tuning set (72 attacks, 56 legitimate tricky
+**Red-team gate**: `evals/redteam.jsonl`, the tuning set (77 attacks, 74 legitimate tricky
 questions), plus every golden and off-topic question. CI fails when the false-block rate passes
-2% or the miss rate passes 10%. Measured: 0.0 and 0.0139. A held-out set the rules were not
-tuned on (`evals/redteam-heldout.jsonl`) is reported next to it, not gated: on its 22 rows
-written before tuning, 0 of 11 legitimate questions were blocked and 9 of 11 attacks were
-missed. The rules are a cheap first layer; the output leak check is the second.
+2% or the miss rate passes 10%. Measured: 0.0 (0 of 241) and 0.013 (1 of 77). A held-out set the
+rules were not tuned on (`evals/redteam-heldout.jsonl`) is reported next to it, not gated: on
+all 34 rows, 0 of 15 legitimate questions were blocked and 9 of 19 attacks were missed; on its
+22 rows written before tuning, 0 of 11 and 9 of 11. A rule fires only on a command addressed
+to the assistant about its own rules, so questions about rules in general or about other
+models pass. The rules are a cheap first layer; the output leak check is the second.
 
 ## Why rules and not an ML classifier
 
