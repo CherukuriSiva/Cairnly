@@ -17,6 +17,9 @@ __pycache__/
 web/node_modules/
 web/.next/
 
+# Vercel CLI project link (created by `vercel link`)
+.vercel/
+
 # Local datasets, never committed
 data/
 

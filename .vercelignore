@@ -1,0 +1,13 @@
+# What a Vercel CLI deploy from the repo root uploads: an allowlist, so .env, PDFs, data/,
+# drafts/ and session records can never leave this machine. The site builds from web/ and
+# reads ../content at build time (and content/news at runtime), so only those two go up.
+/*
+!/web
+!/content
+
+# Built or installed by Vercel itself.
+/web/node_modules
+/web/.next
+
+# Local settings files, at any depth.
+.env*

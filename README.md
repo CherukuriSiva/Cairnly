@@ -64,7 +64,7 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Chat | Next.js chat with clickable citations, lesson links, a link to the full lesson under each answer, follow-ups, a track scope and a cold-start notice | `web/components/Chat.tsx` |
 | Evals | Golden set of quiz plus written questions (reported per source), off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
 | Tracing | One Langfuse trace per question (guard, rewrite, retrieve, generate, output check), with no user text by default ([PRIVACY.md](PRIVACY.md)) | `tracing.py` |
-| Deploy | Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy, Ollama on a Modal GPU | [infra/](infra/README.md), `deploy/` |
+| Deploy | Vercel + Modal (API and Ollama GPU) + Neon on free plans, Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy | [infra/](infra/README.md), `deploy/` |
 
 How and why each piece works, in plain English: [LEARN-M1](docs/LEARN-M1.md),
 [LEARN-M2](docs/LEARN-M2.md), [LEARN-M3](docs/LEARN-M3.md), [LEARN-M4](docs/LEARN-M4.md).
@@ -196,10 +196,15 @@ Helm validation, both image builds, and the web tests and build.
 
 ## Deploy
 
-See [infra/README.md](infra/README.md): Docker Compose, Kubernetes (`scripts/kind-up.sh`), and
-AWS (ECS Fargate + RDS + ALB) deployed by a GitHub Actions workflow with no stored AWS keys.
-In production the models run on a Modal T4 GPU that switches off when idle
-([deploy/modal_ollama.py](deploy/modal_ollama.py)).
+The default production route runs on free and hobby plans
+([ADR 0017](docs/adr/0017-free-tier-production.md)): the site on Vercel, the API on Modal
+([deploy/modal_api.py](deploy/modal_api.py), one container that switches off when idle), the
+models on a Modal T4 GPU ([deploy/modal_ollama.py](deploy/modal_ollama.py)) and Postgres +
+pgvector on Neon. Every secret lives in one Modal secret, `cairnly-api`.
+
+See [infra/README.md](infra/README.md) for the steps, and for the other routes: Docker Compose,
+Kubernetes (`scripts/kind-up.sh`), and AWS (ECS Fargate + RDS + ALB) deployed by a GitHub
+Actions workflow with no stored AWS keys.
 The web image is built from the repository root (`docker build -f web/Dockerfile .`) because
 its pages are generated from `content/`.
 
@@ -211,7 +216,7 @@ src/cairnly/      the Python package: ingest, search, answer, guard, limits, API
 web/              Next.js site and chat
 evals/            written questions, off-topic, follow-up and red-team sets + CI gates
 prompts/          versioned answer and rewrite prompts
-deploy/           Ollama on a Modal GPU
+deploy/           Modal apps: the API with its jobs, Ollama on a GPU
 infra/            Helm chart, Terraform for AWS, deploy guide
 tests/            pytest suite (fake models, optional real database)
 docs/             LEARN-M1..M4 write-ups and ADRs

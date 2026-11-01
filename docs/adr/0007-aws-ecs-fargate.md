@@ -2,7 +2,8 @@
 
 Status: accepted (M2), not yet applied. Amended by
 [ADR 0013](0013-models-on-a-modal-gpu.md): the CPU Ollama task and the Claude API are gone;
-the models run on a Modal GPU.
+the models run on a Modal GPU. Superseded as the default deploy by
+[ADR 0017](0017-free-tier-production.md); kept as the documented alternative.
 
 ## Context
 

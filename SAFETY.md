@@ -128,7 +128,8 @@ lessons do not cover, which is where most off-task requests end up.
 
 ## Limits
 
-To keep the free deploy free and fair (numbers are the defaults, per API process):
+To keep the free deploy free and fair (numbers are the defaults, per API process; the default
+deploy runs one API container, so they hold for the whole site):
 
 - 10 questions or searches per minute and 200 per day from one IP address
 - 2,000 answers per day for the whole site
