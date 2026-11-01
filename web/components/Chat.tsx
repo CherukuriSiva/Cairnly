@@ -250,7 +250,11 @@ function TurnView({ turn }: { turn: Turn }) {
           <Cited text={turn.answer} onCite={setActive} />
         ) : (
           <span className="text-[var(--muted)]">
-            {turn.waking ? "Waking up the model, the first answer can take up to a minute…" : "Searching…"}
+            {turn.status !== "streaming"
+              ? "No answer." // e.g. a rate limit or an error before the first token
+              : turn.waking
+                ? "Waking up the model, the first answer can take up to a minute…"
+                : "Searching…"}
           </span>
         )}
         {turn.status === "streaming" && turn.answer && <span className="animate-pulse">▍</span>}

@@ -88,7 +88,11 @@ def cmd_eval_redteam(args: argparse.Namespace) -> None:
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
 
-    uvicorn.run("cairnly.api:app", host=args.host, port=args.port, reload=args.reload)
+    # proxy_headers=False: uvicorn would otherwise trust X-Forwarded-For from 127.0.0.1 on its
+    # own and rewrite the client address, so a local caller could dodge the rate limits.
+    # TRUST_PROXY (limits.client_ip) is the one place that decides whether to trust the header.
+    uvicorn.run("cairnly.api:app", host=args.host, port=args.port, reload=args.reload,
+                proxy_headers=False)
 
 
 def main(argv: list[str] | None = None) -> None:
