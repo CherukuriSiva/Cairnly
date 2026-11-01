@@ -61,15 +61,27 @@ daily cost is still bounded.
 
 **Concurrency.** At most 4 answers are written at the same time; the 5th request gets **503**
 right away. Queueing would only make everyone wait longer. The tricky part is giving the slot
-back. A stream can end normally, fail halfway, or stop because the reader closed the tab. The
-API releases the slot in the stream's `finally` block and also in a background task that runs
-after the response, in case the stream never started. `release()` is safe to call twice. Tests
-check all four paths.
+back. A stream can end normally, fail halfway, never start, or stop because the reader closed
+the tab. The surprise is the last one: Starlette reads a plain (sync) generator in a worker
+thread and, when the client goes away, simply stops reading. It never closes the generator, so
+its `finally` block, the model stream and the database connection wait for Python's garbage
+collector. The API's `AnswerStream` response therefore closes the generator itself when the
+response ends, however it ends, and then releases the slot. `release()` is safe to call twice.
+Tests cover every path, one of them against a real Uvicorn server with the garbage collector
+switched off.
 
 **Time.** The model must send its first token within 90 seconds, which covers a cold start,
-and then finish within 60 seconds. Both end with a friendly message in the stream. Any other
-error shows "Something went wrong while writing the answer.": an exception message can contain
-internal URLs, and those should never reach a browser.
+and then finish within 60 seconds. A network read timeout cannot enforce that alone: it
+restarts with every piece, so a model sending one word every 80 seconds would never time out.
+So the limits are on the wall clock: a reader thread puts pieces in a queue, and the answer
+waits on the queue only for the time left (`time_limited` in `llm.py`). A follow-up's rewrite
+gets the same 90 seconds in total. Both limits end with a friendly message in the stream. Any
+other error shows "Something went wrong while writing the answer.": an exception message can
+contain internal URLs, and those should never reach a browser.
+
+Adding up every step at its limit (rewrite 90 s, query embedding 120 s, first token 90 s,
+answer 60 s), the worst case is about 6 minutes. That only happens when everything is slow at
+once; a warm GPU answers in a few seconds.
 
 The counters live in the API's memory. With several API tasks, each has its own counters, so
 the real caps are a few times higher. ADR 0014 explains why that is acceptable here.

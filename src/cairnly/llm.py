@@ -7,9 +7,19 @@ traces can show cost per answer.
 
 Claude is local only: `get_llm("anthropic")` raises ProviderDisabled unless ALLOW_ANTHROPIC is
 set, and config.py refuses that setting on a production server.
+
+Time limits (`time_limited`): a read timeout alone cannot bound an answer, because it restarts
+with every piece, so a model that sends one word every 80 seconds never times out. The limits
+are therefore wall-clock: a helper thread reads the stream into a queue, and the caller waits
+on the queue only for the time left. When time runs out the caller gets ModelTooSlow at once;
+the helper thread stops reading at its next piece, or at the HTTP read timeout if the model
+has gone silent, and closes the stream so the model stops generating.
 """
 
 import json
+import queue
+import threading
+import time
 from collections.abc import Iterator
 from typing import Protocol
 
@@ -24,6 +34,57 @@ DISABLED_MESSAGE = "The Claude API is turned off on this server."
 
 class ProviderDisabled(Exception):
     """The requested provider exists but this server does not allow it."""
+
+
+class ModelTooSlow(Exception):
+    """The model missed a time limit; `started` says whether any text had arrived."""
+
+    def __init__(self, started: bool):
+        super().__init__("answer timeout" if started else "first token timeout")
+        self.started = started
+
+
+_PIECE, _END, _ERROR = "piece", "end", "error"
+
+
+def time_limited(stream: Iterator[str], first_s: float, rest_s: float | None = None
+                 ) -> Iterator[str]:
+    """The pieces of `stream`, or ModelTooSlow when the first piece takes longer than `first_s`
+    or the rest takes longer than `rest_s` after it. Without `rest_s` the whole stream must
+    finish within `first_s`. Closing this generator stops the stream too."""
+    pieces: queue.Queue = queue.Queue()
+    stop = threading.Event()
+
+    def pump() -> None:
+        try:
+            for piece in stream:
+                pieces.put((_PIECE, piece))
+                if stop.is_set():
+                    break
+            pieces.put((_END, None))
+        except Exception as exc:  # handed to the caller, which raises it
+            pieces.put((_ERROR, exc))
+        finally:
+            getattr(stream, "close", lambda: None)()  # stop the model generating
+
+    threading.Thread(target=pump, name="llm-stream", daemon=True).start()
+    deadline, started = time.monotonic() + first_s, False
+    try:
+        while True:
+            try:
+                kind, value = pieces.get(timeout=max(0.0, deadline - time.monotonic()))
+            except queue.Empty:
+                raise ModelTooSlow(started) from None
+            if kind == _END:
+                return
+            if kind == _ERROR:
+                raise value
+            if not started and rest_s is not None:
+                deadline = time.monotonic() + rest_s
+            started = True
+            yield value
+    finally:
+        stop.set()
 
 
 class LLM(Protocol):

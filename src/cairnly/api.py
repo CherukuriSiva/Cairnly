@@ -8,18 +8,26 @@ The API is public, so every request that can reach the model is limited before t
 starts (limits.py): a 403 for a provider this server does not allow, a 429 with Retry-After
 over a rate limit, and a 503 when all answer slots are busy. Once the stream has started,
 errors are reported in-band with a generic message, so internal details never reach the client.
+
+A client that goes away mid-answer: Starlette reads a sync generator in a worker thread and
+never closes it, so the abandoned answer would hold its model stream, its database connection
+and its answer slot until garbage collection found it. AnswerStream therefore closes the
+generator itself when the response ends, however it ends (finished, client gone, error), and
+then frees the slot.
 """
 
 import json
+import time
 from collections.abc import Iterator
 from contextlib import asynccontextmanager, closing
 
+import anyio
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
-from starlette.background import BackgroundTask
+from starlette.types import Receive, Scope, Send
 
 from cairnly import tracing
 from cairnly.answer import answer
@@ -36,6 +44,7 @@ BUSY = "Too many answers are being written right now. Please try again in a few 
 BUSY_RETRY_S = 5
 RATE_LIMITED = "Too many requests. Please wait and try again."
 STREAM_ERROR = "Something went wrong while writing the answer."
+CLOSE_RETRY_S = 0.05  # how often to retry closing a generator that is mid-step in a worker
 
 # Read at import, so a misconfigured production server (Claude allowed) fails at boot.
 settings = get_settings()
@@ -152,14 +161,45 @@ def ask(req: AskRequest, request: Request) -> StreamingResponse:
         raise HTTPException(status_code=503, detail=BUSY,
                             headers={"Retry-After": str(BUSY_RETRY_S)})
     try:
-        # The slot is released by the stream's `finally` and, in case the stream never
-        # starts, by the background task; release() is idempotent.
-        return StreamingResponse(_sse(req, slot), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache"},
-                                 background=BackgroundTask(slot.release))
+        return AnswerStream(_sse(req, slot), slot)
     except BaseException:
         slot.release()
         raise
+
+
+class AnswerStream(StreamingResponse):
+    """The /ask event stream. When the response ends, however it ends, the generator is closed
+    (so the model stream and the database connection are let go at once) and the answer slot
+    is freed, even when the generator never started."""
+
+    def __init__(self, events: Iterator[str], slot: Slot):
+        super().__init__(events, media_type="text/event-stream",
+                         headers={"Cache-Control": "no-cache"})
+        self.events, self.slot = events, slot
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            # Shielded: a cancelled request must still clean up. In a worker thread, because
+            # closing runs the generator's cleanup, which does blocking I/O.
+            with anyio.CancelScope(shield=True):
+                await anyio.to_thread.run_sync(finish_stream, self.events, self.slot)
+
+
+def finish_stream(events: Iterator[str], slot: Slot) -> None:
+    """Close the event generator, then free its slot. A generator still running a step in
+    another worker thread cannot be closed yet (ValueError), so retry until that step yields;
+    every step is bounded by the time limits in answer.py."""
+    try:
+        while True:
+            try:
+                getattr(events, "close", lambda: None)()
+                return
+            except ValueError:  # "generator already executing"
+                time.sleep(CLOSE_RETRY_S)
+    finally:
+        slot.release()
 
 
 def _rate_limit(request: Request, *, answer: bool) -> None:

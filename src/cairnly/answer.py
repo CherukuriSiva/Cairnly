@@ -24,8 +24,12 @@ Confidence gate: when even the best match is weakly similar, the corpus probably
 the question. Refusing then is better than letting the model answer from its own memory with
 citations that do not support it.
 
-Time limits: the model must send its first token within FIRST_TOKEN_TIMEOUT_S (the Ollama read
-timeout, long enough for a cold GPU) and finish within ANSWER_TIMEOUT_S after that.
+Time limits (wall clock, llm.time_limited): the model must send its first token within
+FIRST_TOKEN_TIMEOUT_S (long enough for a cold GPU) and finish within ANSWER_TIMEOUT_S after
+that. A follow-up's rewrite must finish within FIRST_TOKEN_TIMEOUT_S. With the defaults the
+worst case before the stream ends is about 6 minutes, each step at its limit: rewrite 90 s,
+query embedding 120 s (embed.py's HTTP timeout, which is per read, not wall clock), first token
+90 s, answer 60 s. A warm GPU answers in seconds; the long limits only matter on a cold start.
 
 Tracing (tracing.py): one trace per question with guard, rewrite, retrieve, generate and
 output_check steps. Without TRACE_CONTENT the trace holds sizes, hashes and citations only,
@@ -33,7 +37,6 @@ never the question, the query or the answer.
 """
 
 import hashlib
-import time
 from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, datetime
 
@@ -43,7 +46,7 @@ from cairnly import tracing
 from cairnly.config import Settings, get_settings
 from cairnly.guard import GUARD_REFUSAL, LeakDetector, Verdict, check_all, is_cited
 from cairnly.kb import KnowledgeBase, load_prompt
-from cairnly.llm import LLM
+from cairnly.llm import LLM, ModelTooSlow, time_limited
 from cairnly.rewrite import rewrite_question
 from cairnly.search import Hit, SearchResult
 
@@ -99,8 +102,7 @@ class _Run:
 
 def answer(question: str, retrieve: Callable[[str], SearchResult], llm: LLM,
            kb: KnowledgeBase, history: Sequence[dict] = (), *, session_id: str | None = None,
-           track: str | None = None, settings: Settings | None = None,
-           clock: Callable[[], float] = time.monotonic) -> Iterator[dict]:
+           track: str | None = None, settings: Settings | None = None) -> Iterator[dict]:
     s = settings or get_settings()
     trace = tracing.start_trace(
         "ask", metadata={"prompt_version": kb.prompt},
@@ -111,11 +113,11 @@ def answer(question: str, retrieve: Callable[[str], SearchResult], llm: LLM,
         session_id=session_id, version=kb.prompt)
     run = _Run(trace, s.trace_content)
     try:
-        yield from _steps(run, question, retrieve, llm, kb, history, s, clock)
+        yield from _steps(run, question, retrieve, llm, kb, history, s)
     except GeneratorExit:  # the client went away mid-answer
         run.fail("WARNING", "client disconnected")
         raise
-    except httpx.TimeoutException as exc:
+    except (httpx.TimeoutException, ModelTooSlow) as exc:
         run.fail("ERROR", f"{type(exc).__name__}: "
                  + ("answer timeout" if run.first_token else "first token timeout"))
         yield {"type": "error", "message": TOO_SLOW if run.first_token else NO_RESPONSE}
@@ -125,15 +127,14 @@ def answer(question: str, retrieve: Callable[[str], SearchResult], llm: LLM,
 
 
 def _steps(run: _Run, question: str, retrieve: Callable[[str], SearchResult], llm: LLM,
-           kb: KnowledgeBase, history: Sequence[dict], s: Settings,
-           clock: Callable[[], float]) -> Iterator[dict]:
+           kb: KnowledgeBase, history: Sequence[dict], s: Settings) -> Iterator[dict]:
     verdict = _guard(run, [question, *(turn["question"] for turn in history)], "user input")
     query = question
     if not verdict.blocked and history:
         run.start("rewrite", generation=True, model=llm.name,
                   input=run.text({"history_turns": len(history),
                                   "question_chars": len(question)}, question=question))
-        query = rewrite_question(question, history, llm)
+        query = rewrite_question(question, history, llm, time_limit_s=s.first_token_timeout_s)
         run.finish(output=run.text({"rewritten": query != question, "query_chars": len(query)},
                                    query=query),
                    usage_details=getattr(llm, "usage", None))
@@ -156,13 +157,8 @@ def _steps(run: _Run, question: str, retrieve: Callable[[str], SearchResult], ll
     if confident:
         system, prompt = load_prompt(kb.prompt), build_prompt(query, hits)
         pieces: list[str] = []
-        stopped = yield from _generate(run, llm, system, prompt, kb, s, clock, pieces)
-        if stopped == "timeout":
-            run.fail("ERROR", "answer timeout")
-            yield {"type": "error", "message": TOO_SLOW}
-            return
+        leaked = yield from _generate(run, llm, system, prompt, kb, s, pieces)
         text = "".join(pieces)
-        leaked = stopped == "leak"
         uncited = not leaked and not is_cited(text)
         run.start("output_check")
         run.finish(output={"leak": leaked, "cited": not uncited})
@@ -199,39 +195,34 @@ def _guard_refusal(run: _Run, llm: LLM, kb: KnowledgeBase, query: str,
 
 
 def _generate(run: _Run, llm: LLM, system: str, prompt: str, kb: KnowledgeBase, s: Settings,
-              clock: Callable[[], float], pieces: list[str]) -> Iterator[dict]:
-    """Stream the answer into `pieces`; return "leak", "timeout" or None (finished)."""
+              pieces: list[str]) -> Iterator[dict]:
+    """Stream the answer into `pieces`; return True when it leaked the prompt and was stopped.
+    A missed time limit raises ModelTooSlow, which answer() turns into a friendly error."""
     step = run.start("generate", generation=True, model=llm.name,
                      input=run.text({"prompt_chars": len(prompt)}, prompt=prompt),
                      metadata={"prompt_version": kb.prompt})
-    detector, deadline, stopped = LeakDetector(system), None, None
-    stream = llm.stream(system, prompt)
+    detector, leaked = LeakDetector(system), False
+    stream = time_limited(llm.stream(system, prompt), s.first_token_timeout_s, s.answer_timeout_s)
     try:
         for piece in stream:
-            if deadline is None:
+            if not run.first_token:
                 run.first_token = True
                 step.update(completion_start_time=datetime.now(UTC))  # time to first token
-                deadline = clock() + s.answer_timeout_s
             pieces.append(piece)
             if detector.feed(piece):
-                stopped = "leak"
+                leaked = True
                 break
             yield {"type": "token", "text": piece}
-            if clock() > deadline:
-                stopped = "timeout"
-                break
         else:
-            stopped = "leak" if detector.finish() else None
+            leaked = detector.finish()
     finally:
-        getattr(stream, "close", lambda: None)()  # stop reading from the model
-    if stopped == "timeout":
-        return stopped  # _steps marks the open generate span as an error
+        stream.close()  # stop reading from the model
     text = "".join(pieces)
-    level = {"level": "WARNING", "status_message": "prompt leak"} if stopped == "leak" else {}
+    level = {"level": "WARNING", "status_message": "prompt leak"} if leaked else {}
     run.finish(output=run.text({"answer_chars": len(text), "cited": is_cited(text)},
                                answer=text),
                usage_details=getattr(llm, "usage", None), **level)
-    return stopped
+    return leaked
 
 
 def _close(run: _Run, *, refused: bool, guard: str | None, uncited: bool, answer: str,

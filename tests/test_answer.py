@@ -1,7 +1,12 @@
+import dataclasses
+import threading
+import time
+
 import httpx
 import pytest
 
 from cairnly.answer import NO_RESPONSE, REFUSAL, RETRACTED, TOO_SLOW, answer, build_prompt
+from cairnly.config import get_settings
 from cairnly.guard import GUARD_REFUSAL
 from cairnly.kb import KnowledgeBase, load_prompt
 from cairnly.search import Hit, SearchResult
@@ -186,14 +191,78 @@ def test_an_answer_without_citations_is_flagged_not_withdrawn():
     assert _events(0.3, FakeLLM())[-1]["uncited"] is False  # a refusal needs no citation
 
 
-def test_an_answer_past_its_deadline_is_stopped_with_an_error():
-    times = iter([0.0, 61.0])
-    llm = FakeLLM()
+class StallingLLM(FakeLLM):
+    """Sends `before` pieces, then goes silent until released (a stalled network read), then
+    finishes. Records when its stream was closed."""
+
+    def __init__(self, before: int):
+        super().__init__()
+        self.before, self.release, self.closed = before, threading.Event(), threading.Event()
+
+    def stream(self, system, prompt):
+        try:
+            for n in range(self.before):
+                yield f"piece {n} [1] "
+            self.release.wait(10)
+            yield "late piece"
+        finally:
+            self.closed.set()
+
+
+def _limited(first_s: float, answer_s: float):
+    return dataclasses.replace(get_settings(), first_token_timeout_s=first_s,
+                               answer_timeout_s=answer_s)
+
+
+def test_a_stalled_answer_is_stopped_on_the_wall_clock():
+    llm = StallingLLM(before=1)
+    started = time.monotonic()
     events = list(answer("What is RAG?", lambda q: SearchResult([HIT], 0.9), llm, KB,
-                         clock=lambda: next(times)))
+                         settings=_limited(5, 0.3)))
+    elapsed = time.monotonic() - started
 
     assert _types(events) == ["sources", "token", "error"]
     assert events[-1]["message"] == TOO_SLOW
+    assert elapsed < 2  # not "when the next piece arrives", which is never here
+    llm.release.set()  # the stalled read returns: the reader thread stops and closes the stream
+    assert llm.closed.wait(2)
+
+
+def test_a_silent_model_hits_the_first_token_limit_on_the_wall_clock():
+    llm = StallingLLM(before=0)
+    started = time.monotonic()
+    events = list(answer("What is RAG?", lambda q: SearchResult([HIT], 0.9), llm, KB,
+                         settings=_limited(0.3, 5)))
+
+    assert events[-1] == {"type": "error", "message": NO_RESPONSE}
+    assert time.monotonic() - started < 2
+    llm.release.set()
+    assert llm.closed.wait(2)
+
+
+def test_a_slow_follow_up_rewrite_falls_back_within_the_first_token_limit():
+    class SlowRewrite(StallingLLM):
+        def stream(self, system, prompt):
+            if prompt.startswith("Conversation:"):
+                yield from super().stream(system, prompt)
+            else:
+                yield "RAG retrieves first [1]."
+
+    llm, searched = SlowRewrite(before=0), []
+
+    def retrieve(q):
+        searched.append(q)
+        return SearchResult([HIT], 0.9)
+
+    history = [{"question": "What is RAG?", "answer": "Retrieval then generation [1]."}]
+    started = time.monotonic()
+    events = list(answer("How do I test it?", retrieve, llm, KB, history=history,
+                         settings=_limited(0.3, 5)))
+
+    assert time.monotonic() - started < 2
+    assert searched == ["How do I test it?"]  # the original question, not a rewrite
+    assert events[-1]["type"] == "done" and events[-1]["refused"] is False
+    llm.release.set()
 
 
 def test_no_first_token_in_time_gives_a_friendly_error():

@@ -1,9 +1,12 @@
+import dataclasses
 import json
+import threading
 
 import pytest
 
 from cairnly import tracing
 from cairnly.answer import TOO_SLOW, answer
+from cairnly.config import get_settings
 from cairnly.kb import KnowledgeBase
 from cairnly.search import Hit, SearchResult
 
@@ -190,13 +193,21 @@ def test_trace_content_switch_adds_the_texts(fake, monkeypatch, fresh_settings):
 
 
 def test_an_answer_timeout_marks_the_span_and_trace_as_errors(fake):
-    times = iter([0.0, 61.0])
-    events = list(answer(QUESTION, lambda q: SearchResult([HIT], 0.9), FakeLLM(), KB,
-                         clock=lambda: next(times)))
+    release = threading.Event()
+
+    class Stalling(FakeLLM):
+        def stream(self, system, prompt):
+            yield "RAG [1]"
+            release.wait(10)
+
+    settings = dataclasses.replace(get_settings(), answer_timeout_s=0.2)
+    events = list(answer(QUESTION, lambda q: SearchResult([HIT], 0.9), Stalling(), KB,
+                         settings=settings))
+    release.set()
 
     assert events[-1] == {"type": "error", "message": TOO_SLOW}
-    assert ("generate", "ERROR", "answer timeout") in fake.levels
-    assert ("ask", "ERROR", "answer timeout") in fake.levels
+    assert ("generate", "ERROR", "ModelTooSlow: answer timeout") in fake.levels
+    assert ("ask", "ERROR", "ModelTooSlow: answer timeout") in fake.levels
 
 
 def test_a_client_disconnect_is_a_warning(fake):

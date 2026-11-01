@@ -1,5 +1,6 @@
 import json
 
+import anyio
 import pytest
 from fastapi.testclient import TestClient
 
@@ -251,17 +252,29 @@ def test_a_stream_closed_early_frees_its_slot(client):
     assert _free_slots() == 4
 
 
-def test_a_stream_that_never_starts_frees_its_slot_in_the_background(client):
-    import asyncio
-
-    from starlette.requests import Request
+@pytest.mark.parametrize("spec_version", ["2.3", "2.4"])
+def test_a_stream_that_never_starts_is_closed_and_frees_its_slot(client, spec_version):
+    """The client is gone before the first byte: with ASGI 2.4 Starlette raises
+    ClientDisconnect and skips any background task, so the cleanup must not depend on one."""
+    from starlette.requests import ClientDisconnect, Request
 
     request = Request({"type": "http", "method": "POST", "headers": [],
                        "client": ("198.51.100.1", 5000)})
     resp = api.ask(api.AskRequest(**ASK), request)
     assert _free_slots() == 3
-    asyncio.run(resp.background())
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        raise OSError("client gone")
+
+    scope = {"type": "http", "asgi": {"spec_version": spec_version}}
+    with pytest.raises((ClientDisconnect, OSError)):
+        anyio.run(resp, scope, receive, send)
     assert _free_slots() == 4
+    with pytest.raises(StopIteration):
+        next(resp.events)  # closed, not just abandoned
 
 
 def test_session_id_must_match_the_pattern(client):

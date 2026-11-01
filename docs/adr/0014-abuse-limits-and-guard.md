@@ -17,12 +17,17 @@ other reader, or make the model follow its own instructions instead of ours.
   429 with Retry-After. `/config`, `/kbs`, `/health` and `/livez` are not limited.
 - Fixed windows per UTC minute and UTC day: simple to explain, test and report ("try again in
   42 seconds"). A refused request is not counted.
-- At most 4 answers are written at once; the 5th gets 503 with Retry-After: 5. The slot is
-  released when the stream ends, fails or the client goes away, and also by a background task
-  in case the stream never starts.
+- At most 4 answers are written at once; the 5th gets 503 with Retry-After: 5. When the
+  response ends, however it ends (finished, failed, client gone, never started), the API closes
+  the answer generator itself and then releases the slot. Starlette does not close a sync
+  generator on a disconnect, so without this the model stream and the slot were held until
+  garbage collection. A test against a real Uvicorn server checks it.
 - The model must send its first token within 90 s (a cold GPU) and finish within 60 s after
-  that. Both end in a friendly in-band error; other errors show a generic message, so internal
-  URLs never reach the browser.
+  that, on the wall clock: a reader thread fills a queue and the answer waits on it only for the
+  time left. A follow-up's rewrite must finish within 90 s. Timeouts end in a friendly in-band
+  error; other errors show a generic message, so internal URLs never reach the browser. The
+  worst case before an answer stream ends is about 6 minutes (rewrite 90 s, query embedding
+  120 s per read, first token 90 s, answer 60 s); it only happens when every step is slow.
 - **Client IP.** With `TRUST_PROXY=1` (set in production) the client is the LAST entry of
   `X-Forwarded-For`, the one our single proxy appended. Entries to its left come from the
   client and can be forged, so they are never used. Without `TRUST_PROXY` the header is

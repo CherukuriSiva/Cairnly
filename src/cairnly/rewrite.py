@@ -3,14 +3,15 @@
 "How do I evaluate it?" finds nothing useful on its own: "it" lives in the conversation. A
 small LLM call turns the follow-up plus the recent turns into one standalone question
 ("How do I evaluate a RAG pipeline?"), and search runs on that. Any failure (an exception, an
-empty, multi-line or overlong reply) falls back to the original question, so rewriting can
-make retrieval better but never stops an answer.
+empty, multi-line or overlong reply, or a reply slower than the time limit) falls back to the
+original question, so rewriting can make retrieval better but never stops an answer.
 """
 
 from collections.abc import Sequence
 
+from cairnly.config import get_settings
 from cairnly.kb import load_prompt
-from cairnly.llm import LLM
+from cairnly.llm import LLM, time_limited
 
 MAX_TURNS = 6  # earlier turns a client may send (the API rejects more)
 MAX_ANSWER_CHARS = 600  # each earlier answer is cut to this before it reaches the prompt
@@ -27,13 +28,17 @@ def format_history(history: Sequence[dict], question: str) -> str:
     return "\n".join(lines)
 
 
-def rewrite_question(question: str, history: Sequence[dict], llm: LLM) -> str:
+def rewrite_question(question: str, history: Sequence[dict], llm: LLM,
+                     time_limit_s: float | None = None) -> str:
     """A standalone version of `question`, or `question` itself when there is no history or the
-    rewrite fails."""
+    rewrite fails. The whole rewrite must finish within `time_limit_s` (default: the first-token
+    limit, FIRST_TOKEN_TIMEOUT_S)."""
     if not history:
         return question
+    limit = time_limit_s if time_limit_s is not None else get_settings().first_token_timeout_s
     try:
-        reply = "".join(llm.stream(load_prompt(PROMPT_VERSION), format_history(history, question)))
+        stream = llm.stream(load_prompt(PROMPT_VERSION), format_history(history, question))
+        reply = "".join(time_limited(stream, limit))
     except Exception:  # a failed rewrite must never cost an answer
         return question
     lines = [line.strip() for line in reply.strip().splitlines() if line.strip()]

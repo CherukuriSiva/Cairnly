@@ -79,7 +79,9 @@ To keep the free deploy free and fair (numbers are the defaults, per API process
 - 2,000 answers per day for the whole site
 - at most 4 answers being written at the same time
 - the model must start answering within 90 seconds (a cold GPU) and finish within 60 seconds
-  after that
+  after that, measured on the wall clock; a follow-up's rewrite step must finish within 90
+  seconds. With every step at its limit (rewrite, query embedding, first token, answer) the
+  worst case is about 6 minutes; a warm GPU answers in seconds
 
 Over a limit, the API answers 429 (with a Retry-After header) or 503, and the chat says how
 long to wait.
