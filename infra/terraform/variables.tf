@@ -19,6 +19,13 @@ variable "image_tag" {
 variable "ollama_url" {
   description = "The Modal Ollama URL printed by `modal deploy` (deploy/modal_ollama.py)."
   type        = string
+
+  validation {
+    # An empty or plain-http URL would deploy an API that cannot reach the model (or sends
+    # the Modal proxy token in the clear).
+    condition     = can(regex("^https://[^\\s]+$", var.ollama_url))
+    error_message = "ollama_url must be the https:// URL printed by `modal deploy`."
+  }
 }
 
 variable "langfuse_host" {
