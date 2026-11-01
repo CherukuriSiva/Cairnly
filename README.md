@@ -15,6 +15,11 @@ Built in public, one milestone at a time. **Now: M4 (production ready).**
 | Lessons, all content (127 questions, M3) | **0.937** | **0.873** | **0%** (0 of 40) | 97.5% (M2) |
 | Follow-ups (15, qwen3:8b rewrite) | rewritten = standalone (0.867 to 0.933 across runs) | | | |
 
+The input guard (M4) blocks 0 of 345 real learner questions and misses 9 of 155 attacks in its
+tuning set. On 11 fresh attacks it was never tuned on, it misses 8, so it is a first filter,
+not a wall: the output check behind it withdraws any answer that leaks the system prompt
+([SAFETY.md](SAFETY.md)).
+
 M2 added a cross-encoder reranker and a confidence gate calibrated from evals (Recall@5
 0.88 → 0.94). M3 measured the gate again on all public content with 40 off-topic questions
 and raised it to 0.70 ([ADR 0011](docs/adr/0011-recalibrated-confidence-gate.md)). The
@@ -58,23 +63,76 @@ How and why each piece works, in plain English: [LEARN-M1](docs/LEARN-M1.md),
 Design decisions: [docs/adr/](docs/adr/). Safety and privacy: [SAFETY.md](SAFETY.md),
 [PRIVACY.md](PRIVACY.md).
 
-## Quick start
+## Installation
 
-Needs [uv](https://docs.astral.sh/uv/), Docker, Node 20+, and [Ollama](https://ollama.com):
+### What you need
+
+| Tool | Version | Used for |
+|---|---|---|
+| [uv](https://docs.astral.sh/uv/) | any recent | Python 3.12 and the API's dependencies (uv installs Python for you) |
+| [Docker](https://docs.docker.com/get-docker/) | with Compose v2 | Postgres + pgvector, and optionally Langfuse |
+| [Node.js](https://nodejs.org) | 20 or newer | the site and the chat |
+| [Ollama](https://ollama.com) | any recent | local embeddings and answers |
+
+About 8 GB of free RAM runs qwen3:8b; a GPU or Apple silicon makes answers much faster. No
+API key is needed.
+
+### Set up
 
 ```bash
-ollama pull nomic-embed-text && ollama pull qwen3:8b
+git clone <this repo> cairnly && cd cairnly
 
-cp .env.example .env               # defaults work for the local setup
-docker compose up -d db            # Postgres + pgvector on port 5434
-uv sync --extra rerank             # without --extra rerank, search skips reranking
-uv run cairnly migrate             # create tables (safe to re-run; upgrades old databases)
-uv run cairnly ingest --kb lessons # chunk + embed + store everything in content/
-uv run cairnly ask "What is RAG and when does it beat pure prompting?"
+# 1. Models (about 5.5 GB in all)
+ollama pull nomic-embed-text
+ollama pull qwen3:8b
 
-uv run cairnly serve               # API on http://localhost:8010
-cd web && npm install && npm run dev   # site and chat on http://localhost:3010
+# 2. Settings: the defaults in .env.example work for this local setup
+cp .env.example .env
+
+# 3. Database: Postgres 17 + pgvector on port 5434
+docker compose up -d db
+
+# 4. API dependencies (drop --extra rerank to skip the cross-encoder reranker)
+uv sync --extra rerank
+
+# 5. Tables, then index every lesson (a few minutes on first run; later runs embed only changed files)
+uv run cairnly migrate
+uv run cairnly ingest --kb lessons
+
+# 6. Site dependencies
+cd web && npm install && cd ..
 ```
+
+### Run
+
+In two terminals:
+
+```bash
+uv run cairnly serve                 # API on http://localhost:8010
+cd web && npm run dev                # site and chat on http://localhost:3010
+```
+
+### Check that it works
+
+```bash
+curl -s localhost:8010/health        # {"status":"ok", ...}
+curl -s localhost:8010/config        # {"providers":["ollama"],"default_provider":"ollama"}
+uv run cairnly ask "What is RAG and when does it beat pure prompting?"
+```
+
+Then open http://localhost:3010 and click a starter question. The answer streams in with
+`[n]` citations that open the lesson section they came from.
+
+### Common problems
+
+| Symptom | Fix |
+|---|---|
+| `connection refused` on port 5434 | Start the database: `docker compose up -d db` |
+| Every question says "not in the lessons" | The index is empty: run `uv run cairnly ingest --kb lessons` |
+| `model "qwen3:8b" not found` | `ollama pull qwen3:8b` (and `nomic-embed-text`), and make sure Ollama is running |
+| The chat shows "Waking up the model…" for a long time | The first answer loads qwen3:8b into memory; later answers are faster |
+| The chat cannot reach the API | Start `uv run cairnly serve`; for another address set `NEXT_PUBLIC_API_URL` and add the site to `CORS_ORIGINS` |
+| `429 Too Many Requests` | The local rate limits from `.env` apply to you too; raise `RATE_LIMIT_PER_MINUTE` for testing |
 
 `http://localhost:3010/?q=your+question&track=ai-engineering` opens the chat with a question
 already asked and the search limited to one track. Every lesson page has an "Ask cairnly
@@ -136,6 +194,20 @@ In production the models run on a Modal T4 GPU that switches off when idle
 ([deploy/modal_ollama.py](deploy/modal_ollama.py)).
 The web image is built from the repository root (`docker build -f web/Dockerfile .`) because
 its pages are generated from `content/`.
+
+## Project layout
+
+```
+content/          lessons, insights and roadmaps (MDX) + syllabus.yaml
+src/cairnly/      the Python package: ingest, search, answer, guard, limits, API, CLI
+web/              Next.js site and chat
+evals/            golden, off-topic, follow-up and red-team sets + CI gates
+prompts/          versioned answer and rewrite prompts
+deploy/           Ollama on a Modal GPU
+infra/            Helm chart, Terraform for AWS, deploy guide
+tests/            pytest suite (fake models, optional real database)
+docs/             LEARN-M1..M4 write-ups and ADRs
+```
 
 ## Roadmap
 
