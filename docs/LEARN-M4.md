@@ -191,7 +191,8 @@ question, and reports two numbers:
 CI fails when the false-block rate passes 2% or the miss rate passes 10%. Measured on
 2026-11-01: 0 of 345 legitimate questions blocked, 9 of 155 attacks missed (5.8%). The misses
 are listed in SAFETY.md; four are style changes allowed on purpose ("From now on, answer as a
-pirate"), and most of the rest are off-topic requests the confidence gate refuses anyway.
+pirate"), and the rest are attacks phrased too much like real learner questions to block
+safely. The output leak check stays as the second layer behind them.
 
 Those numbers are flattering, because the rules were written while looking at that set. A
 model or a rule list always looks better on the data it was tuned on. So there is a second,
