@@ -1,13 +1,16 @@
 # Load balancer: one public entry point. API paths go to the api service, everything else to
-# the web UI, so the browser talks to a single origin (no CORS). The idle timeout is raised
-# because answers stream for several seconds.
+# the web UI, so the browser talks to a single origin (no CORS). The idle timeout covers the
+# longest silent gap of a cold answer: the Modal GPU waking up can keep /ask silent for up to
+# about 6 minutes in the worst case (rewrite 90 s + embedding 120 s + first token 90 s + answer
+# 60 s, see src/cairnly/answer.py), and the load balancer must not cut the stream before the
+# API's own time limits do.
 
 resource "aws_lb" "main" {
   name                       = var.project
   load_balancer_type         = "application"
   subnets                    = aws_subnet.public[*].id
   security_groups            = [aws_security_group.alb.id]
-  idle_timeout               = 120
+  idle_timeout               = 400
   drop_invalid_header_fields = true
   enable_deletion_protection = var.deletion_protection
 }

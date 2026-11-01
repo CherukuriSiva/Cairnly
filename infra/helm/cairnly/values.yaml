@@ -59,3 +59,9 @@ ingress:
   enabled: false
   className: ""
   host: cairnly.local
+  # /ask streams Server-Sent Events and can stay silent for minutes while the Modal GPU wakes
+  # up (see infra/terraform/alb.tf). For ingress-nginx: no buffering, and long read timeouts.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "400"
