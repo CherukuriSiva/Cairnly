@@ -4,7 +4,7 @@ import { Menu, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { openPalette } from "@/components/site/PaletteHost";
+import { openPalette, preloadPalette } from "@/components/site/PaletteHost";
 import { Drawer } from "@/components/ui/Drawer";
 import { Logo } from "@/components/ui/Logo";
 import { activeHref, NAV_LINKS } from "@/lib/nav";
@@ -55,6 +55,9 @@ export function Header({ trackIds }: { trackIds: string[] }) {
           <button
             type="button"
             onClick={openPalette}
+            onPointerEnter={preloadPalette}
+            onFocus={preloadPalette}
+            aria-haspopup="dialog"
             className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 py-1.5 pl-3 pr-2 text-sm text-muted hover:border-border-strong hover:text-text"
           >
             <Search size={15} aria-hidden="true" />
@@ -70,7 +73,9 @@ export function Header({ trackIds }: { trackIds: string[] }) {
           <button
             type="button"
             onClick={openPalette}
+            onPointerDown={preloadPalette}
             aria-label="Search"
+            aria-haspopup="dialog"
             className="rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-text"
           >
             <Search size={20} aria-hidden="true" />

@@ -10,7 +10,8 @@ export function GET() {
   const lessons = flatLessons().flatMap((entry) => {
     const lesson = getLesson(entry.track, entry.slug);
     if (!lesson) return [];
-    return [{ track: entry.track, slug: entry.slug, title: lesson.title, trackTitle: getTrack(entry.track)?.title ?? entry.track }];
+    const trackTitle = getTrack(entry.track)?.title ?? entry.track;
+    return [{ track: entry.track, slug: entry.slug, title: lesson.title, trackTitle, module: entry.module }];
   });
   return Response.json(
     buildSearchIndex({ lessons, roadmaps: getRoadmaps(), insights: getInsights(), categoryLabels: CATEGORY_LABELS }),

@@ -23,6 +23,7 @@ export interface Insight {
   slug: string;
   title: string;
   summary: string;
+  tags: string[];
   /** YYYY-MM-DD, or "" when the front matter has none. */
   publishedAt: string;
   readingMinutes: number;
@@ -33,6 +34,7 @@ export interface Roadmap {
   slug: string;
   title: string;
   summary: string;
+  tags: string[];
   /** Who it is for (lib/roadmaps.ts maps it to a persona). */
   audience: string;
   timeHorizon: string;
@@ -70,6 +72,7 @@ function read(kind: string): { data: Record<string, unknown>; body: string; rel:
 }
 
 const text = (value: unknown): string => (value == null ? "" : String(value));
+const list = (value: unknown): string[] => (Array.isArray(value) ? value.map(text) : []);
 
 let lessons: Lesson[] | undefined;
 let insights: Insight[] | undefined;
@@ -93,6 +96,7 @@ export function getInsights(): Insight[] {
     slug: text(data.slug),
     title: text(data.title),
     summary: text(data.summary),
+    tags: list(data.tags),
     // YAML reads an unquoted date as a Date.
     publishedAt: data.publishedAt instanceof Date ? data.publishedAt.toISOString().slice(0, 10) : text(data.publishedAt),
     readingMinutes: readingMinutes(body),
@@ -106,6 +110,7 @@ export function getRoadmaps(): Roadmap[] {
     slug: text(data.slug),
     title: text(data.title),
     summary: text(data.summary),
+    tags: list(data.tags),
     audience: text(data.audience),
     timeHorizon: text(data.timeHorizon),
     body,
