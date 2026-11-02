@@ -163,14 +163,17 @@ h3 {
   -webkit-mask-image: linear-gradient(to bottom, black, transparent 40vh);
 }
 
-/* Reduced motion: no transitions or animations anywhere. */
+/* Reduced motion: no transitions or animations anywhere. Animations keep a tiny duration so
+   animationend still fires (dialog exits wait for it); transitions get none at all, because a
+   0.01ms transition on every property makes scripts that measure the DOM (mermaid's labels)
+   read values mid-transition. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
 }
