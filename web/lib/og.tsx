@@ -1,15 +1,38 @@
-// Open Graph images (1200×630): dark background with the teal glow, the cairn mark and
-// the wordmark, a mono eyebrow and the page title. Uses ImageResponse's built-in font, so the
-// build never fetches a font.
+// Open Graph images (1200×630): dark background with the teal glow, the wordmark with a pebble
+// dotting its "i", a mono eyebrow and the page title. Uses ImageResponse's built-in font
+// (Geist), so the build never fetches a font.
 
 import { ImageResponse } from "next/og";
-import { STONES } from "@/components/ui/Logo";
+import { DOT_PEBBLE } from "@/components/ui/Logo";
 import { SITE_NAME } from "@/lib/site";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_CONTENT_TYPE = "image/png";
 
-const STONE_COLOURS = ["#a8a29e", "#d6d3d1", "#2dd4bf"];
+const TEAL = "#2dd4bf";
+const WORDMARK_SIZE = 56;
+
+/** "Cairnly" with a dotless ı under a teal pebble (components/ui/Logo.tsx PebbleWordmark). */
+function Wordmark() {
+  const [head, tail] = SITE_NAME.split("i");
+  return (
+    <div style={{ display: "flex", fontSize: WORDMARK_SIZE, lineHeight: 1, letterSpacing: -1.5 }}>
+      <span>{head}</span>
+      <span style={{ display: "flex", position: "relative" }}>
+        {"\u0131"}
+        <svg
+          width={WORDMARK_SIZE * 0.26}
+          height={WORDMARK_SIZE * 0.2}
+          viewBox="0 0 9 7"
+          style={{ position: "absolute", top: WORDMARK_SIZE * 0.02, left: -WORDMARK_SIZE * 0.035 }}
+        >
+          <path d={DOT_PEBBLE} fill={TEAL} />
+        </svg>
+      </span>
+      <span>{tail}</span>
+    </div>
+  );
+}
 
 export function ogImage({ eyebrow, title }: { eyebrow: string; title: string }): ImageResponse {
   return new ImageResponse(
@@ -27,16 +50,9 @@ export function ogImage({ eyebrow, title }: { eyebrow: string; title: string }):
           color: "#f5f5f4",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <svg width="64" height="64" viewBox="0 0 32 32">
-            {STONES.map((stone, i) => (
-              <rect key={i} {...stone} fill={STONE_COLOURS[i]} />
-            ))}
-          </svg>
-          <span style={{ fontSize: 44, letterSpacing: -1 }}>{SITE_NAME}</span>
-        </div>
+        <Wordmark />
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <span style={{ fontSize: 24, letterSpacing: 4, textTransform: "uppercase", color: "#2dd4bf" }}>{eyebrow}</span>
+          <span style={{ fontSize: 24, letterSpacing: 4, textTransform: "uppercase", color: TEAL }}>{eyebrow}</span>
           <span
             style={{
               fontSize: 68,

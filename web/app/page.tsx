@@ -6,6 +6,7 @@ import { NewsCard } from "@/components/NewsCard";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { PERSONA_ICONS, trackIcon } from "@/components/ui/icons";
+import { PebbleWordmark } from "@/components/ui/Logo";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CATEGORY_LABELS, getInsights, getRoadmaps } from "@/lib/content";
 import { getNews, latestAcross } from "@/lib/news/fetch";
@@ -39,7 +40,8 @@ function Hero() {
   return (
     <section className={`${SECTION} pb-16 pt-16 sm:pt-24`}>
       <div className="mx-auto max-w-3xl text-center">
-        <p className="eyebrow text-accent">AI engineering, one stone at a time</p>
+        <PebbleWordmark className="text-[2rem] text-text sm:text-[2.5rem]" />
+        <p className="eyebrow mt-6 text-accent">AI engineering, one stone at a time</p>
         <h1 className="text-hero mt-4">Find your way into AI engineering</h1>
         <p className="mx-auto mt-5 max-w-[48ch] text-lg text-muted">Lessons, roadmaps and an assistant that cites them.</p>
         <div className="mt-8">

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { STONES } from "@/components/ui/Logo";
+import { PEBBLES } from "@/components/ui/Logo";
 import { pageTitle, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -8,9 +8,16 @@ export const metadata: Metadata = {
   description: "This page isn't on any trail we know.",
 };
 
-/** A toppled cairn: the three stones scattered beside a dotted trail. */
+// Where each pebble of the mark lands, bottom to top: its centre in the 32×32 mark, then the
+// spot, tilt and scale it gets in the scene.
+const SCATTER = [
+  { centre: [16, 25.2], at: [114, 90], rotate: 0, scale: 3 },
+  { centre: [15.9, 17], at: [190, 86], rotate: -16, scale: 2.8 },
+  { centre: [16.6, 9.4], at: [48, 82], rotate: 22, scale: 2.8 },
+] as const;
+
+/** A toppled cairn: the three pebbles of the mark scattered beside a dotted trail. */
 function ToppledCairn() {
-  const [bottom, middle, top] = STONES;
   return (
     <svg viewBox="0 0 240 120" width="240" height="120" aria-hidden="true" focusable="false" className="text-text">
       <path
@@ -21,15 +28,18 @@ function ToppledCairn() {
         strokeDasharray="2 8"
         strokeLinecap="round"
       />
-      <g transform="translate(84 74) scale(2.4)">
-        <rect {...bottom} x={0} y={0} fill="currentColor" fillOpacity="0.55" />
-      </g>
-      <g transform="translate(150 78) rotate(-18) scale(2.2)">
-        <rect {...middle} x={0} y={0} fill="currentColor" fillOpacity="0.8" />
-      </g>
-      <g transform="translate(36 70) rotate(24) scale(2.2)">
-        <rect {...top} x={0} y={0} fill="var(--accent)" />
-      </g>
+      {PEBBLES.map((pebble, i) => {
+        const { centre, at, rotate, scale } = SCATTER[i];
+        return (
+          <path
+            key={i}
+            d={pebble.d}
+            transform={`translate(${at[0]} ${at[1]}) rotate(${rotate}) scale(${scale}) translate(${-centre[0]} ${-centre[1]})`}
+            fill={i === PEBBLES.length - 1 ? "var(--accent)" : "currentColor"}
+            fillOpacity={pebble.opacity}
+          />
+        );
+      })}
     </svg>
   );
 }
