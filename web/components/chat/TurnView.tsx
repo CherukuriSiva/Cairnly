@@ -1,11 +1,12 @@
 "use client";
 
 import { BookOpen, Check, Copy, FileText, RotateCcw, Route, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Answer } from "@/components/chat/Answer";
 import { CairnMark } from "@/components/ui/Logo";
 import { TIMEOUT_MESSAGE, type AskErrorKind, type Source, type StreamedTurn } from "@/lib/ask";
 import { fullPageLink } from "@/lib/fullPage";
+import { groupSources, sectionLabel, type SourceGroup } from "@/lib/sources";
 import { SITE_NAME } from "@/lib/site";
 
 export interface ChatTurn extends StreamedTurn {
@@ -15,7 +16,11 @@ export interface ChatTurn extends StreamedTurn {
   /** 1 for the first try; Retry and the automatic retry count up. */
   attempt: number;
   sources: Source[];
-  searched?: string; // the rewritten query, shown when it differs from the question
+  searched?: string; // the rewritten query, shown in debug mode when it differs from the question
+  /** Model and best match ("ollama/qwen3:8b · best match 0.86"), shown in debug mode only. */
+  debug?: string;
+  /** The answer cites none of its sources. */
+  uncited?: boolean;
   notice?: string;
   errorKind?: AskErrorKind;
   /** The one automatic retry is scheduled. */
@@ -64,16 +69,40 @@ function ErrorCard({ turn, busy, onRetry }: { turn: ChatTurn; busy: boolean; onR
   );
 }
 
-/** Three dots while the answer has not started; the waking note after a few seconds. */
+/** Whole seconds since the component mounted, ticking once a second. */
+function useElapsedSeconds(): number {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return seconds;
+}
+
+/** Three dots while the answer has not started; after a few seconds, "Waking up… 12s" counting
+ * from when the question was sent. The ticking count is hidden from screen readers, which hear
+ * the waking note once. */
 function Typing({ waking }: { waking?: boolean }) {
+  const seconds = useElapsedSeconds();
   return (
-    <div className="flex items-center gap-3 text-sm text-muted" role="status">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted" role="status">
       <span className="flex gap-1" aria-hidden="true">
         {[0, 150, 300].map((delay) => (
           <span key={delay} className="h-1.5 w-1.5 rounded-full bg-faint motion-safe:animate-bounce" style={{ animationDelay: `${delay}ms` }} />
         ))}
       </span>
-      <span>{waking ? "Waking up the model, the first answer can take up to a minute…" : <span className="sr-only">Searching the lessons…</span>}</span>
+      {waking ? (
+        <>
+          <span aria-hidden="true">
+            Waking up… <span className="font-mono tabular-nums">{seconds}s</span>
+            <span className="text-faint"> · the first answer can take up to a minute</span>
+          </span>
+          <span className="sr-only">Waking up the model, the first answer can take up to a minute.</span>
+        </>
+      ) : (
+        <span className="sr-only">Searching the lessons…</span>
+      )}
     </div>
   );
 }
@@ -97,44 +126,90 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function SourceCard({ source, active }: { source: Source; active: boolean }) {
-  const Icon = sourceIcon(source.path);
+/** One cited section: its [n] and heading, linking to the section when it has a page. */
+function SectionChip({ source, active }: { source: Source; active: boolean }) {
+  const label = sectionLabel(source.trail);
   const body = (
     <>
-      <span className="mt-0.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded bg-surface-3 px-1 font-mono text-[11px] text-accent">
-        {source.n}
-      </span>
-      <span className="min-w-0">
-        <span className="flex items-center gap-1.5 font-medium text-text">
-          <Icon size={13} aria-hidden="true" className="shrink-0 text-faint" />
-          <span className="truncate">{source.title}</span>
-        </span>
-        {source.trail && <span className="mt-0.5 block truncate text-xs text-muted">{source.trail}</span>}
-      </span>
+      <span className="font-mono text-[11px] text-accent">{source.n}</span>
+      <span className="min-w-0 truncate">{label}</span>
     </>
   );
-  const frame = `flex items-start gap-2.5 rounded-xl border bg-surface-1 px-3 py-2 text-sm ${
-    active ? "border-accent" : "border-border"
+  const chip = `inline-flex max-w-full items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs ${
+    active ? "border-accent text-text" : "border-border text-muted"
   }`;
   return (
-    <li>
+    <li className="max-w-full">
       {source.url ? (
-        <a href={source.url} target="_blank" rel="noopener noreferrer" className={`${frame} hover:border-accent`}>
+        <a
+          href={source.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={source.trail || undefined}
+          aria-label={`Source ${source.n}: ${label} (opens in a new tab)`}
+          className={`${chip} hover:border-accent hover:text-text`}
+        >
           {body}
-          <span className="sr-only">(opens in a new tab)</span>
         </a>
       ) : (
-        <div className={frame}>{body}</div>
+        <span title={source.trail || undefined} className={chip}>
+          {body}
+        </span>
       )}
     </li>
   );
 }
 
-/** One question and its answer: the reader's bubble, then the answer block with its sources,
- * the full-page link, Copy and the meta line, or the error card. */
-export function TurnView({ turn, busy, onRetry }: { turn: ChatTurn; busy: boolean; onRetry: () => void }) {
+/** One cited document: its title (linking to the page) and a chip for every cited section, so a
+ * page cited five times is one card, not five. */
+function SourceCard({ group, active }: { group: SourceGroup; active: number | null }) {
+  const Icon = sourceIcon(group.path);
+  const lit = group.sections.some((s) => s.n === active);
+  return (
+    <li className={`min-w-0 rounded-xl border bg-surface-1 px-3 py-2.5 text-sm ${lit ? "border-accent" : "border-border"}`}>
+      <span className="flex items-center gap-1.5 font-medium text-text">
+        <Icon size={13} aria-hidden="true" className="shrink-0 text-faint" />
+        {group.href ? (
+          <a href={group.href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate hover:text-accent">
+            {group.title}
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        ) : (
+          <span className="min-w-0 truncate">{group.title}</span>
+        )}
+      </span>
+      <ul aria-label={`Cited sections of ${group.title}`} className="mt-2 flex flex-wrap gap-1.5">
+        {group.sections.map((s) => (
+          <SectionChip key={s.n} source={s} active={active === s.n} />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+/** One question and its answer: the reader's bubble, then the answer block with its sources
+ * (one card per document), the full-page link, Copy and the notes line, or the error card.
+ * `debug` adds the model, best match and rewritten query (?debug=1 or development). */
+export function TurnView({
+  turn,
+  busy,
+  debug,
+  onRetry,
+}: {
+  turn: ChatTurn;
+  busy: boolean;
+  debug: boolean;
+  onRetry: () => void;
+}) {
   const [active, setActive] = useState<number | null>(null);
   const link = fullPageLink(turn);
+  const groups = groupSources(turn.sources);
+  const notes = [
+    turn.status === "refused" && (turn.guard ? "Blocked by the safety check" : "Not in the lessons"),
+    turn.uncited && "No citations, check the sources",
+    debug && turn.searched && `Searched: ${turn.searched}`,
+    debug && turn.debug,
+  ].filter(Boolean);
   const streaming = turn.status === "streaming";
   const finished = turn.status === "done" || turn.status === "refused";
   return (
@@ -159,12 +234,12 @@ export function TurnView({ turn, busy, onRetry }: { turn: ChatTurn; busy: boolea
           {streaming && turn.answer && <span aria-hidden="true" className="motion-safe:animate-pulse text-accent">▍</span>}
           {turn.status === "error" && <ErrorCard turn={turn} busy={busy} onRetry={onRetry} />}
 
-          {turn.sources.length > 0 && (
-            <ol aria-label="Sources" className="mt-4 grid gap-2 sm:grid-cols-2">
-              {turn.sources.map((s) => (
-                <SourceCard key={s.n} source={s} active={active === s.n} />
+          {groups.length > 0 && (
+            <ul aria-label="Sources" className="mt-4 grid gap-2 sm:grid-cols-2">
+              {groups.map((group) => (
+                <SourceCard key={group.path} group={group} active={active} />
               ))}
-            </ol>
+            </ul>
           )}
           {finished && (
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -183,13 +258,7 @@ export function TurnView({ turn, busy, onRetry }: { turn: ChatTurn; busy: boolea
             </div>
           )}
           {turn.notice && <p className="mt-2 text-xs italic text-muted">{turn.notice}</p>}
-          {turn.meta && turn.status !== "error" && (
-            <p className="mt-2 text-xs text-faint">
-              {turn.status === "refused" && (turn.guard ? "Blocked by the safety check · " : "Not in the lessons · ")}
-              {turn.searched && `Searched: ${turn.searched} · `}
-              {turn.meta}
-            </p>
-          )}
+          {finished && notes.length > 0 && <p className="mt-2 text-xs text-faint">{notes.join(" · ")}</p>}
         </div>
       </div>
     </article>

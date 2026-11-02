@@ -58,7 +58,7 @@ export interface PastTurn {
 
 /** A turn as the chat shows it while the answer streams in. */
 export interface StreamedTurn extends PastTurn {
-  meta?: string; // the line under the answer: model and match, or the error message
+  meta?: string; // the error message of a failed turn
   waking?: boolean;
 }
 
@@ -149,6 +149,20 @@ export async function fetchConfig(): Promise<AppConfig | null> {
   } catch {
     return null;
   }
+}
+
+let warmed = false;
+
+/**
+ * Wake the API ahead of the first question: a fire-and-forget GET /health when the home page or
+ * the chat opens, at most once per page load. It starts the API container and its database
+ * connection (not the GPU model, which wakes on the first question). Never throws, never waits;
+ * `no-cors` keeps a refused origin from logging a console error.
+ */
+export function warmUp(): void {
+  if (warmed) return;
+  warmed = true;
+  fetch(`${API_URL}/health`, { mode: "no-cors", cache: "no-store" }).catch(() => {});
 }
 
 const SESSION_KEY = "cairnly.session";

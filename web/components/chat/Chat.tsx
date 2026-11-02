@@ -17,6 +17,7 @@ import {
   getSessionId,
   PROVIDER_LABELS,
   shouldAutoRetry,
+  warmUp,
   type AskEvent,
   type Provider,
 } from "@/lib/ask";
@@ -98,9 +99,8 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
             ...t,
             status: e.refused ? "refused" : "done",
             waking: false,
-            meta:
-              `${e.model} · best match ${e.top_similarity.toFixed(2)}` +
-              (e.uncited ? " · no citations, check the sources" : ""),
+            debug: `${e.model} · best match ${e.top_similarity.toFixed(2)}`,
+            uncited: e.uncited || undefined,
             searched: e.query && e.query !== t.question ? e.query : undefined,
             notice: e.notice || undefined,
             guard: e.guard || undefined,
@@ -205,8 +205,16 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     [trackTitles, submit],
   );
 
-  // Which providers this server allows. Without an answer, the chat uses the server default.
+  // Model, best match and rewritten query under each answer: in development or with ?debug=1.
+  const [debug, setDebug] = useState(false);
   useEffect(() => {
+    setDebug(process.env.NODE_ENV === "development" || new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
+
+  // Wake the API for the first question, and ask which providers this server allows. Without
+  // an answer, the chat uses the server default.
+  useEffect(() => {
+    warmUp();
     let live = true;
     fetchConfig().then((config) => {
       if (!live || !config) return;
@@ -294,7 +302,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
           </div>
         )}
         {turns.map((turn) => (
-          <TurnView key={turn.id} turn={turn} busy={busy} onRetry={() => retry(turn.id)} />
+          <TurnView key={turn.id} turn={turn} busy={busy} debug={debug} onRetry={() => retry(turn.id)} />
         ))}
       </section>
 

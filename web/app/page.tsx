@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { AskForwarder } from "@/components/landing/AskForwarder";
 import { HeroAsk } from "@/components/landing/HeroAsk";
+import { WarmUp } from "@/components/landing/WarmUp";
 import { NewsCard } from "@/components/NewsCard";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -95,6 +96,7 @@ export default async function Home() {
   return (
     <main className="pb-8">
       <AskForwarder />
+      <WarmUp />
       <Hero />
       <Stats
         items={[

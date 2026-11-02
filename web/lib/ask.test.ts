@@ -13,6 +13,7 @@ import {
   parseFrames,
   shouldAutoRetry,
   TIMEOUT_MESSAGE,
+  warmUp,
   type PastTurn,
 } from "@/lib/ask";
 
@@ -237,5 +238,21 @@ describe("closeTurn", () => {
       const t = { question: "q", answer: "a", status, meta: "model · best match 0.80" };
       expect(closeTurn(t)).toBe(t);
     }
+  });
+});
+
+describe("warmUp", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("sends one GET /health per page load and swallows failures", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    warmUp();
+    warmUp();
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toMatch(/\/health$/);
+    expect(init).toMatchObject({ mode: "no-cors", cache: "no-store" });
   });
 });
