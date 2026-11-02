@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { CATEGORY_LABELS, getRoadmaps } from "@/lib/content";
+import { SITE_NAME } from "@/lib/site";
 import { getTracks } from "@/lib/syllabus";
 
 const REPO_URL = "https://github.com/CherukuriSiva/cairnly";
@@ -33,11 +34,11 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-/** The site footer: tagline, links to every track, roadmap, insight category and News, the
- * source credits and the GitHub repository. */
+/** The site footer: tagline, links to every track, roadmap and insight category, a More column
+ * (News, the chat, the GitHub repository) and the source credits. */
 export function Footer() {
   return (
-    <footer className="mt-24 border-t border-border bg-surface-1/60">
+    <footer className="mt-16 border-t border-border bg-surface-1/60">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-4">
@@ -66,20 +67,23 @@ export function Footer() {
               </FooterLink>
             ))}
           </Column>
-          <Column title="News">
+          <Column title="More">
             <FooterLink href="/news">News</FooterLink>
+            <FooterLink href="/ask">Ask {SITE_NAME}</FooterLink>
+            <li>
+              <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-muted hover:text-text">
+                <GitHubIcon />
+                GitHub
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </li>
           </Column>
         </div>
-        <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 text-xs text-faint sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-10 border-t border-border pt-6 text-xs text-faint">
           <p className="max-w-[70ch]">
-            Links on the News page open the original source. Thank you to arXiv for use of its open access
+            Links on the News page open their source; Hacker News stories open the discussion. Thank you to arXiv for use of its open access
             interoperability.
           </p>
-          <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-2 text-muted hover:text-text">
-            <GitHubIcon />
-            GitHub
-            <span className="sr-only">(opens in a new tab)</span>
-          </a>
         </div>
       </div>
     </footer>

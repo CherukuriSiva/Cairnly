@@ -34,16 +34,21 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 /** Build a NewsItem, or null when the title or link is unusable. */
-function makeItem(origin: Origin, raw: { title: unknown; url: unknown; date: unknown; summary: unknown }): NewsItem | null {
+function makeItem(
+  origin: Origin,
+  raw: { title: unknown; url: unknown; date: unknown; summary: unknown; storyUrl?: unknown },
+): NewsItem | null {
   const title = cleanText(textOf(raw.title));
   const url = safeUrl(raw.url);
   if (!title || !url) return null;
+  const storyUrl = safeUrl(raw.storyUrl);
   return {
     id: `${origin.name}:${url}`,
     source: origin.name,
     group: origin.group,
     title,
     url,
+    ...(storyUrl && storyUrl !== url ? { storyUrl } : {}),
     date: toIsoDate(raw.date),
     summary: truncate(cleanText(textOf(raw.summary))),
   };
@@ -101,7 +106,9 @@ function parseJson(text: string): unknown {
   }
 }
 
-/** Hacker News Algolia search: `{ hits: [...] }`. */
+/** Hacker News Algolia search: `{ hits: [...] }`. The title links to the HN discussion, not
+ * straight to the story (which can be any file anywhere); the story link rides along as
+ * `storyUrl` for a small secondary link. Without an id, the story link is all there is. */
 export function parseHn(text: string, origin: Origin): NewsItem[] {
   const hits = toArray(record(parseJson(text)).hits as unknown[]);
   return compact(
@@ -109,9 +116,11 @@ export function parseHn(text: string, origin: Origin): NewsItem[] {
       const hit = record(raw);
       const id = textOf(hit.objectID);
       const points = typeof hit.points === "number" ? `${hit.points} points on Hacker News` : "";
+      const discussion = id ? `https://news.ycombinator.com/item?id=${encodeURIComponent(id)}` : null;
       return makeItem(origin, {
         title: hit.title,
-        url: safeUrl(hit.url) ?? (id ? `https://news.ycombinator.com/item?id=${encodeURIComponent(id)}` : null),
+        url: discussion ?? hit.url,
+        storyUrl: discussion ? hit.url : undefined,
         date: hit.created_at,
         summary: points,
       });

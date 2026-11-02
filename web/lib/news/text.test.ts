@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanText, safeUrl, toIsoDate, truncate } from "./text";
+import { cleanText, domainOf, safeUrl, toIsoDate, truncate } from "./text";
 
 describe("cleanText", () => {
   it("strips tags and decodes entities", () => {
@@ -71,5 +71,16 @@ describe("toIsoDate", () => {
     expect(toIsoDate("not a date")).toBe("");
     expect(toIsoDate(undefined)).toBe("");
     expect(toIsoDate({})).toBe("");
+  });
+});
+
+describe("domainOf", () => {
+  it("gives the host without www", () => {
+    expect(domainOf("https://www.example.com/a?b=1")).toBe("example.com");
+    expect(domainOf("https://huggingface.co/some/repo")).toBe("huggingface.co");
+  });
+
+  it("gives an empty string for a bad URL", () => {
+    expect(domainOf("not a url")).toBe("");
   });
 });

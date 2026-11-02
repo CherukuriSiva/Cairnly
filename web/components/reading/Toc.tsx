@@ -27,14 +27,14 @@ function TocList({ items, active }: { items: OutlineItem[]; active: string | nul
   );
 }
 
-/** "On this page": a sticky list at xl that marks the section being read, and a collapsible
- * list at the top of the content below xl. */
+/** "On this page": a sticky list from lg that marks the section being read, and a collapsible
+ * list at the top of the content below lg. */
 export function Toc({ items, placement }: { items: OutlineItem[]; placement: "aside" | "inline" }) {
   const active = useScrollSpy(placement === "aside" ? items.map((i) => i.id) : []);
   if (items.length === 0) return null;
   if (placement === "inline") {
     return (
-      <details className="group mb-8 rounded-2xl border border-border bg-surface-1 px-4 xl:hidden">
+      <details className="group mb-8 rounded-2xl border border-border bg-surface-1 px-4 lg:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between py-3 [&::-webkit-details-marker]:hidden">
           <span className="eyebrow text-faint">On this page</span>
           <ChevronDown size={16} aria-hidden="true" className="text-faint transition-transform group-open:rotate-180" />

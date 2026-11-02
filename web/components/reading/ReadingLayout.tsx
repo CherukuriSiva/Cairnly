@@ -5,8 +5,9 @@ import type { OutlineItem } from "@/lib/outline";
 /**
  * The shared layout of lesson, roadmap and insight pages: an optional left navigation (lg and
  * up, with `mobileNav` shown in its place below lg), the content column (68ch), "On this page"
- * on the right from xl (collapsible above the content below xl), and the reading progress bar.
- * `aside` adds a sticky block above the outline at lg (the roadmap's Start card).
+ * as a sticky right rail from lg (collapsible above the content below lg), and the reading
+ * progress bar. At lg the side columns are narrower so the content keeps its room.
+ * `aside` adds a sticky block above the outline (the roadmap's Start card).
  */
 export function ReadingLayout({
   header,
@@ -26,10 +27,10 @@ export function ReadingLayout({
   aside?: React.ReactNode;
 }) {
   const grid = leftNav
-    ? "lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_14rem]"
+    ? "lg:grid-cols-[15rem_minmax(0,1fr)_12rem] xl:grid-cols-[18rem_minmax(0,1fr)_14rem]"
     : aside
       ? "lg:grid-cols-[minmax(0,1fr)_16rem]"
-      : "xl:grid-cols-[minmax(0,1fr)_14rem]";
+      : "lg:grid-cols-[minmax(0,1fr)_14rem]";
   return (
     <div className={`mx-auto grid max-w-7xl ${grid}`}>
       <ReadingProgress />
@@ -38,7 +39,7 @@ export function ReadingLayout({
           {leftNav}
         </aside>
       )}
-      <main className="min-w-0 px-4 py-10 sm:px-8">
+      <main className="min-w-0 px-4 py-10 sm:px-8 lg:px-6 xl:px-8">
         <div className="mx-auto max-w-[68ch]">
           {mobileNav}
           {header}
@@ -50,12 +51,10 @@ export function ReadingLayout({
         </div>
       </main>
       {(outline.length > 0 || aside) && (
-        <div className={`py-10 pr-4 ${aside ? "hidden lg:block" : "hidden xl:block"}`}>
+        <div className="hidden py-10 pr-4 lg:block">
           <div className="sticky top-20 space-y-8">
             {aside}
-            <div className={aside ? "hidden xl:block" : ""}>
-              <Toc items={outline} placement="aside" />
-            </div>
+            <Toc items={outline} placement="aside" />
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getInsights, readingMinutes } from "@/lib/content";
-import { latestByDate, lessonStats, mixLabel } from "@/lib/stats";
+import { formatMinutes, latestByDate, lessonStats, mixLabel } from "@/lib/stats";
 
 describe("lessonStats", () => {
   it("counts lessons, sums minutes to hours and counts the difficulty mix", () => {
@@ -38,5 +38,15 @@ describe("readingMinutes", () => {
       expect(insight.readingMinutes).toBeGreaterThanOrEqual(1);
       expect(insight.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
+  });
+});
+
+describe("formatMinutes", () => {
+  it("keeps minutes under an hour and switches to hours from 60", () => {
+    expect(formatMinutes(0)).toBe("0 min");
+    expect(formatMinutes(45)).toBe("45 min");
+    expect(formatMinutes(60)).toBe("1h");
+    expect(formatMinutes(195)).toBe("3h 15m");
+    expect(formatMinutes(120)).toBe("2h");
   });
 });

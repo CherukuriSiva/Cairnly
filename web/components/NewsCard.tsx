@@ -1,12 +1,15 @@
 import { ArrowUpRight } from "lucide-react";
 import { RelativeTime } from "@/components/news/RelativeTime";
 import { SOURCE_COLORS } from "@/lib/news/sources";
+import { domainOf } from "@/lib/news/text";
 
 interface NewsCardProps {
   source: string;
   date: string;
   title: string;
   url: string;
+  /** The story's own link when `url` is a discussion page (Hacker News): shown as its domain. */
+  storyUrl?: string;
   /** Extra muted line under the title, e.g. the author of a LinkedIn post. */
   byline?: string;
   summary?: string;
@@ -15,10 +18,11 @@ interface NewsCardProps {
 }
 
 /** One link to an outside source, opening in a new tab: a coloured source dot, the relative
- * date, the title with an ↗ icon and an optional summary. All text is rendered as React text,
- * never as HTML. */
-export function NewsCard({ source, date, title, url, byline, summary, variant = "card" }: NewsCardProps) {
+ * date, the title with an ↗ icon, the story's domain as a small second link when the title opens
+ * a discussion, and an optional summary. All text is rendered as React text, never as HTML. */
+export function NewsCard({ source, date, title, url, storyUrl, byline, summary, variant = "card" }: NewsCardProps) {
   const compact = variant === "compact";
+  const storyDomain = storyUrl ? domainOf(storyUrl) : "";
   return (
     <li className={compact ? "py-4" : "rounded-2xl border border-border bg-surface-1 p-4 hover:border-border-strong sm:p-5"}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-faint">
@@ -43,6 +47,18 @@ export function NewsCard({ source, date, title, url, byline, summary, variant = 
         <ArrowUpRight size={15} aria-hidden="true" className="mt-0.5 shrink-0 text-faint group-hover:text-accent" />
         <span className="sr-only">(opens in a new tab)</span>
       </a>
+      {storyUrl && storyDomain ? (
+        <a
+          href={storyUrl}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="mt-1 inline-flex max-w-full items-center gap-1 font-mono text-xs text-muted hover:text-text"
+        >
+          <span className="truncate">{storyDomain}</span>
+          <ArrowUpRight size={12} aria-hidden="true" className="shrink-0" />
+          <span className="sr-only">(story link, opens in a new tab)</span>
+        </a>
+      ) : null}
       {byline ? <p className="mt-0.5 break-words text-xs text-muted">{byline}</p> : null}
       {summary ? (
         <p className={`mt-1.5 break-words text-sm text-muted ${compact ? "line-clamp-2" : "line-clamp-3"}`}>{summary}</p>

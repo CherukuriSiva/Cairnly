@@ -10,6 +10,7 @@ import { Callout, type CalloutVariant } from "@/components/ui/Callout";
 import { tint } from "@/components/ui/tokens";
 import { getLesson, sectionTitles } from "@/lib/content";
 import { stageLessons } from "@/lib/roadmapLessons";
+import { formatMinutes } from "@/lib/stats";
 
 type Children = { children?: React.ReactNode };
 type Anchored = Children & { anchorId?: string };
@@ -87,7 +88,7 @@ const QUADRANTS = [
 
 type Quadrant = (typeof QUADRANTS)[number]["key"];
 
-/** The 2×2 skill board: now (accent), soon (info), later (neutral), ignore (muted, struck). */
+/** The 2×2 skill board: now (accent), soon (info), later (neutral), ignore (muted). */
 export function SkillPriorityMatrix({
   anchorId,
   ...lists
@@ -112,12 +113,7 @@ export function SkillPriorityMatrix({
               </h3>
               <ul className={`mt-3 list-disc space-y-1.5 pl-5 text-sm marker:text-faint ${ignore ? "text-muted" : "text-text"}`}>
                 {(lists[key] ?? []).map((item) => (
-                  <li
-                    key={item}
-                    className={ignore ? "line-through decoration-[color-mix(in_srgb,currentColor_40%,transparent)]" : undefined}
-                  >
-                    {item}
-                  </li>
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
@@ -141,7 +137,7 @@ function LessonChip({ lessonKey }: { lessonKey: string }) {
       >
         <DifficultyDot difficulty={lesson.difficulty} />
         <span className="min-w-0 truncate">{lesson.title}</span>
-        <span className="shrink-0 font-mono text-xs text-faint">{lesson.estimatedMinutes} min</span>
+        <span className="shrink-0 font-mono text-xs text-faint">{formatMinutes(lesson.estimatedMinutes)}</span>
       </Link>
     </li>
   );
@@ -150,10 +146,11 @@ function LessonChip({ lessonKey }: { lessonKey: string }) {
 type PhaseProps = Anchored & { title: string; duration?: string };
 
 /** One stage on the roadmap trail: a stone on the rail that fills as the reader reaches it,
- * the duration, the title (keeping its anchor), the stage's notes and its lessons. */
+ * the duration, the title (keeping its anchor), the stage's notes and its lessons. The first
+ * stage stands clear of the intro text, so the trail starts at a stone. */
 function TrailStage({ anchorId, title, duration, children, lessons }: PhaseProps & { lessons: string[] }) {
   return (
-    <section className="trail-stage relative pb-12 pl-10 last:pb-4">
+    <section className="trail-stage relative pb-12 pl-10 last:pb-4 [:not(.trail-stage)+&]:mt-12">
       <span aria-hidden="true" className="trail-rail absolute bottom-0 left-[9px] top-6 w-0.5 bg-border" />
       <StoneMarker />
       {duration && <p className="eyebrow text-accent">{duration}</p>}

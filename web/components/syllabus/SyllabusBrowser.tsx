@@ -8,6 +8,7 @@ import { useProgress } from "@/components/progress/useProgress";
 import { useScrollSpy } from "@/components/reading/useScrollSpy";
 import { ModuleList } from "@/components/syllabus/ModuleList";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { trackIcon } from "@/components/ui/icons";
 import { difficultyTone, tint } from "@/components/ui/tokens";
 import { doneCount, lessonKey } from "@/lib/progress";
 import { filterModules, numberLessons } from "@/lib/syllabusFilter";
@@ -17,8 +18,9 @@ const DIFFICULTIES = ["easy", "medium", "hard"] as const;
 
 const keysOf = (track: TrackSummary) => track.modules.flatMap((m) => m.lessons.map((l) => lessonKey(l.track, l.slug)));
 
-/** The whole syllabus: track cards, a sticky track bar, search and difficulty filters, and
- * each track's modules with progress from this browser. */
+/** The whole syllabus: compact track cards (icon, title, count, progress; the same icons as the
+ * home page), a sticky track bar, search and difficulty filters, and each track's modules with
+ * progress from this browser. */
 export function SyllabusBrowser({ tracks }: { tracks: TrackSummary[] }) {
   const progress = useProgress();
   const [query, setQuery] = useState("");
@@ -35,18 +37,22 @@ export function SyllabusBrowser({ tracks }: { tracks: TrackSummary[] }) {
 
   return (
     <div>
-      <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <ul className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
         {tracks.map((track) => {
           const keys = keysOf(track);
+          const Icon = trackIcon(track.id);
           return (
             <li key={track.id}>
               <a
                 href={`#${track.id}`}
-                className="flex h-full flex-col rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:border-[color-mix(in_srgb,var(--accent)_40%,transparent)]"
+                className="flex h-full flex-col rounded-xl border border-border bg-surface-1 px-3 py-3 transition-colors hover:border-[color-mix(in_srgb,var(--accent)_40%,transparent)]"
               >
-                <span className="font-semibold text-text">{track.title}</span>
-                <span className="mt-1 flex-1 font-mono text-xs text-faint">{keys.length} lessons</span>
-                <ProgressMeter done={doneCount(progress, keys)} total={keys.length} className="mt-3" />
+                <span className="flex items-start gap-2">
+                  <Icon size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-accent" />
+                  <span className="min-w-0 text-sm font-semibold leading-snug text-text">{track.title}</span>
+                </span>
+                <span className="mt-1 flex-1 pl-6 font-mono text-xs text-faint">{keys.length} lessons</span>
+                <ProgressMeter done={doneCount(progress, keys)} total={keys.length} className="mt-2.5" />
               </a>
             </li>
           );

@@ -70,7 +70,7 @@ export function NewsBrowser({
           ) : (
             <ul className="mt-4 grid gap-3 md:grid-cols-2">
               {news[group].map((item) => (
-                <NewsCard key={item.url} source={item.source} date={item.date} title={item.title} url={item.url} summary={item.summary} />
+                <NewsCard key={item.url} source={item.source} date={item.date} title={item.title} url={item.url} storyUrl={item.storyUrl} summary={item.summary} />
               ))}
             </ul>
           )}

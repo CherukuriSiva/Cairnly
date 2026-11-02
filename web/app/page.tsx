@@ -21,6 +21,7 @@ import { SITE_NAME } from "@/lib/site";
 export const revalidate = 3600;
 
 const SECTION = "mx-auto max-w-6xl px-4 sm:px-6";
+const MOBILE_STARTERS = 3;
 
 /** A 6px bar split into easy / medium / hard segments by count. */
 function MixBar({ mix }: { mix: DifficultyMix }) {
@@ -48,9 +49,10 @@ function Hero() {
         <div className="mt-8">
           <HeroAsk />
         </div>
+        {/* Three chips on phones (six stack too tall), all six from sm. */}
         <ul className="mt-5 flex flex-wrap justify-center gap-2" aria-label="Sample questions">
-          {STARTERS.map((q) => (
-            <li key={q}>
+          {STARTERS.map((q, i) => (
+            <li key={q} className={i >= MOBILE_STARTERS ? "hidden sm:block" : undefined}>
               <Link
                 href={askHref(q)}
                 className="inline-block rounded-full border border-border bg-surface-1 px-3 py-1.5 text-left text-sm text-muted hover:border-border-strong hover:text-text"
@@ -94,7 +96,7 @@ export default async function Home() {
   });
 
   return (
-    <main className="pb-8">
+    <main>
       <AskForwarder />
       <WarmUp />
       <Hero />
@@ -186,7 +188,7 @@ export default async function Home() {
           </div>
           <ul className="mt-8 grid gap-4 sm:grid-cols-2">
             {news.map((item) => (
-              <NewsCard key={item.url} source={item.source} date={item.date} title={item.title} url={item.url} />
+              <NewsCard key={item.url} source={item.source} date={item.date} title={item.title} url={item.url} storyUrl={item.storyUrl} />
             ))}
           </ul>
         </section>

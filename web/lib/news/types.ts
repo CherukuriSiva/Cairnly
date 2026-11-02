@@ -8,8 +8,10 @@ export interface NewsItem {
   source: string;
   group: NewsGroup;
   title: string;
-  /** Always an http(s) URL. */
+  /** Always an http(s) URL. For Hacker News, the discussion page. */
   url: string;
+  /** The story's own link, when `url` is a discussion page about it (Hacker News). */
+  storyUrl?: string;
   /** ISO date string, or "" when the source gave none or an unreadable one. */
   date: string;
   /** Plain text, at most 200 characters. May be empty. */

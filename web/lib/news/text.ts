@@ -61,6 +61,15 @@ export function safeUrl(url: unknown): string | null {
   }
 }
 
+/** The host of an http(s) URL without "www." ("github.com"), or "" when it has none. */
+export function domainOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 /** A date the feed gave, as an ISO string, or "" when it cannot be read. */
 export function toIsoDate(value: unknown): string {
   if (typeof value !== "string" && typeof value !== "number") return "";

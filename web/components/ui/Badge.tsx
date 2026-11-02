@@ -1,5 +1,6 @@
 import { Clock } from "lucide-react";
 import { difficultyTone, tint, type Tone } from "@/components/ui/tokens";
+import { formatMinutes } from "@/lib/stats";
 
 const BASE =
   "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 font-mono text-xs leading-5";
@@ -45,12 +46,12 @@ export function DifficultyBadge({ difficulty }: { difficulty: string }) {
   );
 }
 
-/** "⏱ 25 min". */
+/** "⏱ 25 min" ("⏱ 1h 10m" from an hour). */
 export function DurationBadge({ minutes }: { minutes: number }) {
   return (
     <Badge>
       <Clock size={12} aria-hidden="true" />
-      {minutes} min
+      {formatMinutes(minutes)}
     </Badge>
   );
 }

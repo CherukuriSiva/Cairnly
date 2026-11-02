@@ -88,21 +88,24 @@ describe("parseFeed", () => {
 });
 
 describe("parseHn", () => {
-  it("builds items, using the HN page when the story has no url", () => {
+  it("links titles to the HN discussion and keeps a safe story link aside", () => {
     const json = JSON.stringify({
       hits: [
         { objectID: "1", title: "With url", url: "https://example.com/story", created_at: "2026-10-31T09:00:00.000Z", points: 120 },
         { objectID: "2", title: "Ask HN: no url", url: null, created_at: "2026-10-31T08:00:00.000Z", points: 45 },
         { objectID: "3", title: "Bad scheme", url: "javascript:alert(1)", created_at: "2026-10-31T07:00:00.000Z" },
         { objectID: "4", url: "https://example.com/untitled" },
+        { title: "No id", url: "https://example.com/no-id" },
       ],
     });
     const items = parseHn(json, origin);
     expect(items.map((i) => i.url)).toEqual([
-      "https://example.com/story",
+      "https://news.ycombinator.com/item?id=1",
       "https://news.ycombinator.com/item?id=2",
       "https://news.ycombinator.com/item?id=3",
+      "https://example.com/no-id",
     ]);
+    expect(items.map((i) => i.storyUrl)).toEqual(["https://example.com/story", undefined, undefined, undefined]);
     expect(items[0].summary).toBe("120 points on Hacker News");
     expect(items[2].summary).toBe("");
   });

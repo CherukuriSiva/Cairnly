@@ -6,6 +6,7 @@ import { LessonRow } from "@/components/syllabus/LessonRow";
 import type { LessonSummary } from "@/lib/syllabus";
 import { slugify } from "@/lib/anchors";
 import { isDone, lessonKey } from "@/lib/progress";
+import { formatMinutes } from "@/lib/stats";
 
 export interface NumberedModule {
   title: string;
@@ -35,7 +36,7 @@ export function ModuleList({ modules, anchors = false }: { modules: NumberedModu
                 <ChevronDown size={16} aria-hidden="true" className="shrink-0 text-faint transition-transform group-[:not([open])]:-rotate-90" />
                 <span className="min-w-0 flex-1 font-semibold text-text">{module.title}</span>
                 <span className="shrink-0 font-mono text-xs text-faint">
-                  {module.lessons.length} {module.lessons.length === 1 ? "lesson" : "lessons"} · {minutes} min
+                  {module.lessons.length} {module.lessons.length === 1 ? "lesson" : "lessons"} · {formatMinutes(minutes)}
                 </span>
               </summary>
               <ul className="divide-y divide-border border-t border-border">

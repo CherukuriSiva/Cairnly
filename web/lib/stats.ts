@@ -25,6 +25,14 @@ export function lessonStats(lessons: { difficulty: string; estimatedMinutes: num
   return { lessons: lessons.length, minutes, hours: Math.round((minutes / 60) * 10) / 10, mix };
 }
 
+/** A duration for people: "45 min" under an hour, then hours and minutes ("3h 15m", "2h"). */
+export function formatMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
 /** "12 easy, 30 medium, 10 hard" for screen readers. */
 export function mixLabel(mix: DifficultyMix): string {
   return `${mix.easy} easy, ${mix.medium} medium, ${mix.hard} hard`;
