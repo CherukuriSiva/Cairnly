@@ -10,7 +10,7 @@ import { PERSONA_ICONS } from "@/components/ui/icons";
 import { getLesson, getRoadmap, getRoadmaps, sectionTitles } from "@/lib/content";
 import { renderMdx } from "@/lib/mdx";
 import { pageOutline, roadmapStages } from "@/lib/outline";
-import { stageLessons } from "@/lib/roadmapLessons";
+import { firstStone } from "@/lib/roadmapLessons";
 import { horizonLabel, personaOf } from "@/lib/roadmaps";
 import { pageTitle } from "@/lib/site";
 
@@ -56,7 +56,7 @@ export default async function RoadmapPage({ params }: Params) {
   const stages = roadmapStages(roadmap.body, titles);
   const persona = personaOf(roadmap.audience);
   const PersonaIcon = persona ? PERSONA_ICONS[persona.icon] : null;
-  const firstKey = stages.map((s) => stageLessons(slug, s.title)).find((l) => l.length > 0)?.[0];
+  const firstKey = firstStone(slug, stages.map((s) => s.title));
   const [firstTrack, firstSlug] = firstKey?.split("/") ?? [];
   const first = firstKey ? getLesson(firstTrack, firstSlug) : undefined;
   const startHref = first ? `/${firstTrack}/${firstSlug}` : null;

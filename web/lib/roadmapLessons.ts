@@ -1,16 +1,14 @@
 // "Lessons for this stage" on each roadmap: roadmap slug → RoadmapPhase title → lessons as
-// "<track>/<slug>", in reading order. Chosen by hand from each stage's bullets and the lesson
-// titles (relevant lessons only, 1 to 5 per stage). lib/roadmapLessons.test.ts checks that every
-// stage has an entry and every entry is a real lesson.
+// "<track>/<slug>", in reading order. Curated by hand: a lesson is listed only when it teaches
+// one of the stage's bullets at a level that fits the stage (no keyword matching). A stage
+// with no lesson that fits gets [] and shows none. The first lesson of the first stage is the
+// roadmap's "First stone". lib/roadmapLessons.test.ts checks that every stage has an entry and
+// every entry is a real lesson.
 
 export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
   "ai-engineer-technical-path": {
-    "Python + Git + HTTP": [
-      "ai-systems/designing-ai-api-contracts",
-      "full-stack/server-actions-vs-api-routes",
-      "career/github-profile-checklist",
-      "full-stack/deploying-to-vercel",
-    ],
+    // Python data structures (lists, dicts, sets); no lesson covers Git, HTTP or env setup.
+    "Python + Git + HTTP": ["dsa/arrays-and-frequency-maps", "dsa/hashing-and-sets"],
     "ML + LLM Foundations": [
       "ml-foundations/ml-workflow-train-test-split",
       "ai-engineering/ai-app-mental-model",
@@ -19,6 +17,7 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
       "ai-engineering/embeddings-explained",
     ],
     "RAG End-to-End": [
+      "ai-engineering/build-a-rag-pipeline",
       "ai-engineering/chunking-strategies",
       "ai-engineering/vector-databases-beyond-faiss",
       "ai-engineering/hybrid-search-bm25-vector",
@@ -28,6 +27,7 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
     "Agents + Tools + Memory": [
       "ai-engineering/what-is-an-agent",
       "ai-engineering/the-react-loop",
+      "ai-engineering/designing-a-tool-registry",
       "ai-engineering/mcp-tool-use",
       "ai-engineering/agent-memory",
       "ai-engineering/safety-guardrails",
@@ -36,54 +36,54 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
       "ai-systems/fastapi-architecture-for-ai",
       "ai-systems/streaming-responses-sse",
       "ai-engineering/observability",
-      "ai-systems/semantic-caching",
+      "ai-engineering/cost-and-latency",
+      "ai-engineering/capstone-ship-rag",
       "career/three-project-portfolio",
     ],
   },
   "ai-era-beginner-readiness": {
-    "Months 1–2: Programming Fundamentals": [
-      "dsa/arrays-and-frequency-maps",
-      "dsa/hashing-and-sets",
-      "dsa/recursion-backtracking",
-    ],
+    // First programming steps; this roadmap puts data structures and algorithms "later".
+    "Months 1–2: Programming Fundamentals": [],
     "Months 3–4: Web + AI Literacy": [
       "full-stack/nextjs-app-router",
-      "ai-engineering/ai-app-mental-model",
+      "ai-engineering/prompt-engineering-patterns",
       "ai-engineering/tokenization-and-context-windows",
       "ai-engineering/embeddings-explained",
       "ai-engineering/what-is-rag",
     ],
     "Months 5–6: First Real Project": [
-      "full-stack/capstone-content-site",
-      "full-stack/deploying-to-vercel",
+      "full-stack/server-actions-vs-api-routes",
       "ai-engineering/build-a-rag-pipeline",
-      "career/three-project-portfolio",
+      "full-stack/deploying-to-vercel",
     ],
   },
   "cs-student-ai-era-roadmap": {
     "Year 1: Foundations That Don't Expire": [
-      "dsa/pattern-recognition",
       "dsa/arrays-and-frequency-maps",
+      "dsa/hashing-and-sets",
       "dsa/two-pointers",
+      "dsa/sliding-window",
       "career/github-profile-checklist",
     ],
     "Year 2: AI + Full-Stack": [
       "ai-engineering/what-is-rag",
+      "ai-engineering/embeddings-explained",
       "ai-engineering/build-a-rag-pipeline",
       "ai-engineering/prompt-engineering-patterns",
-      "full-stack/capstone-content-site",
-      "dsa/sliding-window",
+      "full-stack/nextjs-app-router",
+      "full-stack/deploying-to-vercel",
     ],
     "Year 3: Specialize + Ship": [
       "ai-engineering/capstone-ship-rag",
+      "full-stack/capstone-content-site",
       "career/three-project-portfolio",
       "career/ai-era-resume",
       "career/linkedin-for-engineers",
     ],
     "Final Semester: Placement Mode": [
+      "dsa/talking-through-code",
       "career/behavioral-interviews",
       "career/tell-me-about-yourself",
-      "dsa/talking-through-code",
       "career/cold-email-templates",
     ],
   },
@@ -93,57 +93,59 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
       "dsa/sliding-window",
       "dsa/two-pointers",
       "dsa/binary-search",
+      "dsa/trees-dfs-bfs",
       "dsa/dp-without-fear",
     ],
     "Months 3–4: Project + System Design": [
       "career/three-project-portfolio",
+      "dsa/design-lru-cache",
       "dsa/design-rate-limiter",
-      "ai-engineering/system-design-enterprise-rag",
+      "ai-engineering/what-is-rag",
       "ai-engineering/explain-rag-in-interview",
     ],
     "Month 5: Interview Mode": [
+      "dsa/talking-through-code",
       "career/behavioral-interviews",
       "career/tell-me-about-yourself",
-      "dsa/talking-through-code",
       "career/ai-era-resume",
+      "career/linkedin-for-engineers",
       "career/cold-email-templates",
     ],
-    "Month 6: Active Applications": [
-      "career/job-search-routine",
-      "dsa/pattern-recognition",
-      "career/salary-negotiation",
-    ],
+    "Month 6: Active Applications": ["career/job-search-routine", "dsa/pattern-recognition"],
   },
   "fullstack-dev-to-ai-engineer": {
     "Month 1: LLM API Fluency": [
       "ai-engineering/ai-app-mental-model",
       "ai-engineering/prompt-engineering-patterns",
       "ai-engineering/tokenization-and-context-windows",
-      "ai-systems/streaming-responses-sse",
     ],
     "Month 2–3: RAG End-to-End": [
       "ai-engineering/what-is-rag",
       "ai-engineering/embeddings-explained",
+      "ai-engineering/build-a-rag-pipeline",
       "ai-engineering/vector-databases-beyond-faiss",
       "ai-engineering/confidence-gates",
       "ai-engineering/evaluating-an-ai-app",
     ],
     "Month 4: Agents + FastAPI": [
       "ai-engineering/what-is-an-agent",
+      "ai-engineering/the-react-loop",
       "ai-engineering/building-retrieval-tools-for-agents",
       "ai-systems/fastapi-architecture-for-ai",
       "ai-systems/streaming-responses-sse",
     ],
     "Month 5–6: Ship + Showcase": [
       "ai-engineering/capstone-ship-rag",
-      "career/resume-bullets-ai-projects",
       "career/three-project-portfolio",
+      "career/resume-bullets-ai-projects",
+      "career/job-search-routine",
     ],
   },
   "limited-time-professional": {
     "Month 1: Understand + Build Basic": [
       "ai-engineering/what-is-rag",
       "ai-engineering/what-is-an-agent",
+      "ai-engineering/tokenization-and-context-windows",
       "ai-engineering/build-a-rag-pipeline",
     ],
     "Month 2: Improve + Evaluate": [
@@ -154,9 +156,9 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
       "full-stack/deploying-to-vercel",
     ],
     "Month 3: Ship + Document": [
+      "career/three-project-portfolio",
       "career/github-profile-checklist",
       "career/linkedin-for-engineers",
-      "career/three-project-portfolio",
     ],
   },
   "non-ai-engineer-to-ai-career": {
@@ -164,6 +166,8 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
       "ml-foundations/ml-workflow-train-test-split",
       "ai-engineering/ai-app-mental-model",
       "ai-engineering/prompt-engineering-patterns",
+      "ai-engineering/what-is-rag",
+      "ai-engineering/embeddings-explained",
       "ai-engineering/build-a-rag-pipeline",
     ],
     "Months 4–6: Applied AI": [
@@ -177,17 +181,20 @@ export const ROADMAP_LESSONS: Record<string, Record<string, string[]>> = {
       "career/three-project-portfolio",
       "ai-engineering/explain-rag-in-interview",
       "ai-engineering/explain-an-agent-architecture",
-      "ai-engineering/resume-bullets-ai",
+      "ai-engineering/defend-eval-metrics",
+      "career/resume-bullets-ai-projects",
     ],
-    "Month 9: Job Search": [
-      "career/job-search-routine",
-      "career/cold-email-templates",
-      "career/salary-negotiation",
-    ],
+    "Month 9: Job Search": ["career/job-search-routine", "career/tell-me-about-yourself"],
   },
 };
 
 /** The lessons mapped to one roadmap stage ([] when none). */
 export function stageLessons(roadmap: string, stageTitle: string): string[] {
   return ROADMAP_LESSONS[roadmap]?.[stageTitle] ?? [];
+}
+
+/** The roadmap's "First stone": the first lesson of its first stage, or undefined when that
+ * stage has none. */
+export function firstStone(roadmap: string, stageTitles: string[]): string | undefined {
+  return stageTitles.length > 0 ? stageLessons(roadmap, stageTitles[0])[0] : undefined;
 }
