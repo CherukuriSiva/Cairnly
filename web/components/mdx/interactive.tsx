@@ -141,6 +141,10 @@ export function Diagram({ children }: { children?: React.ReactNode }) {
       <div className="relative">
         <div
           ref={targetRef}
+          // A wide diagram scrolls sideways, so keyboard users need to be able to focus it.
+          tabIndex={0}
+          role="region"
+          aria-label="Diagram"
           style={{ maxHeight: DIAGRAM_MAX_HEIGHT }}
           className="overflow-x-auto overflow-y-hidden rounded-2xl border border-border bg-surface-1 p-4 [&>svg]:mx-auto [&>svg]:block [&>svg]:max-w-none"
         />

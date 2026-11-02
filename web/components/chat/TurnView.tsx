@@ -170,7 +170,7 @@ function SourceCard({ group, active }: { group: SourceGroup; active: number | nu
       <span className="flex items-center gap-1.5 font-medium text-text">
         <Icon size={13} aria-hidden="true" className="shrink-0 text-faint" />
         {group.href ? (
-          <a href={group.href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate hover:text-accent">
+          <a href={group.href} target="_blank" rel="noopener noreferrer" className="relative min-w-0 truncate hover:text-accent">
             {group.title}
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
