@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { askHref, STARTERS } from "@/lib/starters";
+import { SITE_NAME } from "@/lib/site";
 
 const ROTATE_MS = 4000;
 
@@ -26,7 +27,7 @@ export function HeroAsk() {
   return (
     <form
       role="search"
-      aria-label="Ask cairnly"
+      aria-label={`Ask ${SITE_NAME}`}
       onSubmit={(e) => {
         e.preventDefault();
         router.push(value.trim() ? askHref(value.trim()) : "/ask");

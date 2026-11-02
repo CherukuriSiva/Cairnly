@@ -1,4 +1,4 @@
-# cairnly
+# Cairnly
 
 A free, public site for learning AI engineering, made for new graduates, with a chat that
 answers from the lessons. 126 lessons in six tracks, 7 roadmaps and 29 insights, all
@@ -143,7 +143,7 @@ Then open http://localhost:3010/ask and click a starter question. The answer str
 | `429 Too Many Requests` | The local rate limits from `.env` apply to you too; raise `RATE_LIMIT_PER_MINUTE` for testing |
 
 `http://localhost:3010/ask?q=your+question&track=ai-engineering` opens the chat with a question
-already asked and the search limited to one track. Every lesson page has an "Ask cairnly
+already asked and the search limited to one track. Every lesson page has an "Ask Cairnly
 about this lesson" button that does this for you.
 
 The Claude API is for local development only. To try it, set `ALLOW_ANTHROPIC=true` in `.env`

@@ -21,6 +21,7 @@ import {
   type Provider,
 } from "@/lib/ask";
 import { askHref, STARTERS } from "@/lib/starters";
+import { SITE_NAME } from "@/lib/site";
 
 const WAKING_MS = 5000; // no token yet after this: the model is probably starting up
 const STOPPED = "Stopped.";
@@ -238,7 +239,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
         <UrlParams onChange={applyUrl} />
       </Suspense>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="eyebrow text-faint">Ask cairnly</p>
+        <p className="eyebrow text-faint">Ask {SITE_NAME}</p>
         <div className="flex items-center gap-2">
           {chooseProvider && (
             <select

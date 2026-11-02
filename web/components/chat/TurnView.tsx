@@ -4,8 +4,9 @@ import { BookOpen, Check, Copy, FileText, RotateCcw, Route, type LucideIcon } fr
 import { useState } from "react";
 import { Answer } from "@/components/chat/Answer";
 import { CairnMark } from "@/components/ui/Logo";
-import type { AskErrorKind, Source, StreamedTurn } from "@/lib/ask";
+import { TIMEOUT_MESSAGE, type AskErrorKind, type Source, type StreamedTurn } from "@/lib/ask";
 import { fullPageLink } from "@/lib/fullPage";
+import { SITE_NAME } from "@/lib/site";
 
 export interface ChatTurn extends StreamedTurn {
   id: number;
@@ -33,13 +34,13 @@ function ErrorCard({ turn, busy, onRetry }: { turn: ChatTurn; busy: boolean; onR
   let text: string | undefined;
   if (turn.errorKind === "waking" || turn.errorKind === "network") {
     if (turn.attempt > 1) {
-      title = "cairnly still isn't answering. Please try again in a minute.";
+      title = `${SITE_NAME} still isn't answering. Please try again in a minute.`;
     } else {
-      title = "cairnly is waking up";
+      title = `${SITE_NAME} is waking up`;
       text = "This can take a few seconds.";
     }
   } else if (turn.errorKind === "timeout") {
-    title = "cairnly didn't answer in time.";
+    title = TIMEOUT_MESSAGE;
   } else {
     title = turn.meta || "Something went wrong.";
   }

@@ -8,6 +8,7 @@ import { openPalette } from "@/components/site/PaletteHost";
 import { Drawer } from "@/components/ui/Drawer";
 import { Logo } from "@/components/ui/Logo";
 import { activeHref, NAV_LINKS } from "@/lib/nav";
+import { SITE_NAME } from "@/lib/site";
 
 const ASK_BUTTON =
   "inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-strong";
@@ -116,7 +117,7 @@ export function Header({ trackIds }: { trackIds: string[] }) {
           </button>
           <Link href="/ask" className={`${ASK_BUTTON} justify-center py-2`}>
             <MessageCircle size={15} aria-hidden="true" />
-            Ask cairnly
+            Ask {SITE_NAME}
           </Link>
         </div>
       </Drawer>

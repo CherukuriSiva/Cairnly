@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { STONES } from "@/components/ui/Logo";
+import { pageTitle, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Lost on the trail · cairnly",
+  title: pageTitle("Lost on the trail"),
   description: "This page isn't on any trail we know.",
 };
 
@@ -45,7 +46,7 @@ export default function NotFound() {
           Back to Learn
         </Link>
         <Link href="/ask" className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-strong">
-          Ask cairnly
+          Ask {SITE_NAME}
         </Link>
       </div>
     </main>

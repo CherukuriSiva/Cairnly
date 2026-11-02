@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { SyllabusBrowser } from "@/components/syllabus/SyllabusBrowser";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { getTracks, trackSummary } from "@/lib/syllabus";
+import { pageTitle, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Syllabus · cairnly",
-  description: "Six tracks and every cairnly lesson in reading order, from ML foundations to AI systems, DSA, full-stack and career.",
+  title: pageTitle("Syllabus"),
+  description: `Six tracks and every ${SITE_NAME} lesson in reading order, from ML foundations to AI systems, DSA, full-stack and career.`,
 };
 
 export default function SyllabusPage() {
@@ -14,7 +15,7 @@ export default function SyllabusPage() {
       <SectionHeader
         eyebrow="Learn"
         title="Syllabus"
-        description="Six tracks for new graduates who want to become AI engineers. Start with ML Foundations if machine learning is new to you, or jump to the track you need. Every lesson is open to read, and Ask cairnly answers questions with links back to them."
+        description={`Six tracks for new graduates who want to become AI engineers. Start with ML Foundations if machine learning is new to you, or jump to the track you need. Every lesson is open to read, and Ask ${SITE_NAME} answers questions with links back to them.`}
         className="mb-10"
       />
       <SyllabusBrowser tracks={getTracks().map(trackSummary)} />

@@ -3,9 +3,10 @@ import { NewsBrowser } from "@/components/news/NewsBrowser";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { getNews } from "@/lib/news/fetch";
 import { loadLinkedInPicks } from "@/lib/news/linkedin";
+import { pageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "News · cairnly",
+  title: pageTitle("News"),
   description: "Fresh AI engineering reading from open sources, refreshed every hour.",
 };
 

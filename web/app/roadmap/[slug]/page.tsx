@@ -12,6 +12,7 @@ import { renderMdx } from "@/lib/mdx";
 import { pageOutline, roadmapStages } from "@/lib/outline";
 import { stageLessons } from "@/lib/roadmapLessons";
 import { horizonLabel, personaOf } from "@/lib/roadmaps";
+import { pageTitle } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamicParams = false;
@@ -25,7 +26,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const roadmap = getRoadmap(slug);
-  return { title: `${roadmap?.title ?? "Roadmap"} · cairnly`, description: roadmap?.summary };
+  return { title: pageTitle(roadmap?.title ?? "Roadmap"), description: roadmap?.summary };
 }
 
 /** "Start this roadmap" as the sticky card in the right column (lg and up); below lg the page

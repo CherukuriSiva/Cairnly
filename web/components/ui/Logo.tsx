@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SITE_NAME } from "@/lib/site";
 
 /** The three stones of the cairn mark, bottom to top, in a 32×32 box. Shared by the logo,
  * the favicon (app/icon.svg), the chat avatar, the 404 page and the OG images. */
@@ -37,17 +38,17 @@ export function CairnMark({
   );
 }
 
-/** Mark + "cairnly" wordmark, linking home. */
+/** Mark + wordmark, linking home. */
 export function Logo({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/"
-      aria-label="cairnly home"
+      aria-label={`${SITE_NAME} home`}
       className={`inline-flex shrink-0 items-center gap-2 rounded-md text-text ${className}`}
     >
       <CairnMark size={28} />
       <span className="font-display text-[22px] leading-none tracking-tight" aria-hidden="true">
-        cairnly
+        {SITE_NAME}
       </span>
     </Link>
   );

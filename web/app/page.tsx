@@ -13,6 +13,7 @@ import { PERSONAS } from "@/lib/roadmaps";
 import { askHref, STARTERS } from "@/lib/starters";
 import { latestByDate, lessonStats, mixLabel, type DifficultyMix } from "@/lib/stats";
 import { getTracks, resolveTrack } from "@/lib/syllabus";
+import { SITE_NAME } from "@/lib/site";
 
 // Rebuilt at most once an hour, for the news strip; everything else is build-time content.
 export const revalidate = 3600;
@@ -63,7 +64,7 @@ function Hero() {
 
 function Stats({ items }: { items: { value: number; label: string }[] }) {
   return (
-    <section aria-label="cairnly in numbers" className={SECTION}>
+    <section aria-label={`${SITE_NAME} in numbers`} className={SECTION}>
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-4">
         {items.map((item) => (
           <div key={item.label} className="flex flex-col-reverse items-center gap-1 bg-surface-1 px-4 py-5">

@@ -9,6 +9,7 @@ import { CATEGORY_LABELS, getInsight, getInsights, sectionTitles } from "@/lib/c
 import { relatedInsights } from "@/lib/insights";
 import { renderMdx } from "@/lib/mdx";
 import { pageOutline } from "@/lib/outline";
+import { pageTitle } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamicParams = false;
@@ -22,7 +23,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const insight = getInsight(slug);
-  return { title: `${insight?.title ?? "Insight"} · cairnly`, description: insight?.summary };
+  return { title: pageTitle(insight?.title ?? "Insight"), description: insight?.summary };
 }
 
 export default async function InsightPage({ params }: Params) {

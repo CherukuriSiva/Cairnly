@@ -7,9 +7,10 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { getRoadmaps, sectionTitles, type Roadmap } from "@/lib/content";
 import { roadmapStages } from "@/lib/outline";
 import { AUDIENCE_GROUPS, CORE_AUDIENCE, horizonLabel, monthsOf, PERSONAS, personaOf } from "@/lib/roadmaps";
+import { pageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Roadmaps · cairnly",
+  title: pageTitle("Roadmaps"),
   description: "Step-by-step roadmaps into AI engineering for students, career switchers and working professionals.",
 };
 

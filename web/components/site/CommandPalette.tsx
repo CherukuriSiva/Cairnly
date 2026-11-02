@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import type { SearchItem, SearchKind } from "@/lib/searchIndex";
+import { SITE_NAME } from "@/lib/site";
 
 // Fetched once per page load, on the first open, then kept here.
 let cached: Promise<SearchItem[]> | null = null;
@@ -30,7 +31,7 @@ const GROUPS: { type: SearchKind; heading: string; icon: LucideIcon }[] = [
 const ITEM =
   "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-text data-[selected=true]:bg-surface-2";
 
-/** The ⌘K palette: search lessons, roadmaps and insights, or ask cairnly the typed question. */
+/** The ⌘K palette: search lessons, roadmaps and insights, or ask Cairnly the typed question. */
 export default function CommandPalette({
   open,
   onOpenChange,
@@ -65,8 +66,8 @@ export default function CommandPalette({
           aria-describedby={undefined}
           className="fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-surface-1 shadow-2xl"
         >
-          <Dialog.Title className="sr-only">Search cairnly</Dialog.Title>
-          <Command label="Search cairnly">
+          <Dialog.Title className="sr-only">Search {SITE_NAME}</Dialog.Title>
+          <Command label={`Search ${SITE_NAME}`}>
             <div className="flex items-center gap-2 border-b border-border px-4">
               <Search size={16} aria-hidden="true" className="shrink-0 text-faint" />
               <Command.Input
@@ -86,7 +87,7 @@ export default function CommandPalette({
                 >
                   <MessageCircle size={16} aria-hidden="true" className="shrink-0 text-accent" />
                   <span className="min-w-0 truncate">
-                    Ask cairnly: <span className="font-medium">{query.trim()}</span>
+                    Ask {SITE_NAME}: <span className="font-medium">{query.trim()}</span>
                   </span>
                 </Command.Item>
               )}
@@ -101,7 +102,7 @@ export default function CommandPalette({
               ) : (
                 <>
                   <Command.Empty>
-                    <EmptyState title="Nothing matches" text="Try a shorter search, or ask cairnly instead." />
+                    <EmptyState title="Nothing matches" text={`Try a shorter search, or ask ${SITE_NAME} instead.`} />
                   </Command.Empty>
                   {GROUPS.map(({ type, heading, icon: Icon }) => (
                     <Command.Group

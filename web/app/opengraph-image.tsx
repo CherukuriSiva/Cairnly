@@ -1,6 +1,7 @@
 import { OG_CONTENT_TYPE, OG_SIZE, ogImage } from "@/lib/og";
+import { SITE_NAME } from "@/lib/site";
 
-export const alt = "cairnly: Find your way into AI engineering";
+export const alt = `${SITE_NAME}: Find your way into AI engineering`;
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
 

@@ -2,6 +2,8 @@
 // each with a `data: {json}` line. We read the body incrementally and hand each event to a
 // callback, so the UI can render tokens as they arrive.
 
+import { SITE_NAME } from "@/lib/site";
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010";
 
 export const MAX_HISTORY_TURNS = 6; // the API rejects more
@@ -203,8 +205,8 @@ export function errorKind(status: number): AskErrorKind {
 
 export const ASK_TIMEOUT_MS = 30_000;
 export const AUTO_RETRY_DELAY_MS = 3_000;
-export const NETWORK_MESSAGE = "Could not reach cairnly.";
-export const TIMEOUT_MESSAGE = "cairnly didn't answer in time.";
+export const NETWORK_MESSAGE = `Could not reach ${SITE_NAME}.`;
+export const TIMEOUT_MESSAGE = `${SITE_NAME} didn't answer in time.`;
 
 /** One automatic retry, only for a cold start or a network failure, and only after the first
  * attempt (`attempt` counts the attempts made so far, starting at 1). */

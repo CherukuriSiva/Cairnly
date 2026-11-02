@@ -8,6 +8,7 @@ import { lessonKey } from "@/lib/progress";
 import { lessonStats } from "@/lib/stats";
 import { getTrack, getTracks, trackSummary } from "@/lib/syllabus";
 import { numberLessons } from "@/lib/syllabusFilter";
+import { pageTitle } from "@/lib/site";
 
 export const dynamicParams = false;
 
@@ -20,7 +21,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { track } = await params;
   const found = getTrack(track);
-  return { title: `${found?.title ?? "Track"} · cairnly`, description: found?.tagline };
+  return { title: pageTitle(found?.title ?? "Track"), description: found?.tagline };
 }
 
 export default async function TrackPage({ params }: Params) {

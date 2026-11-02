@@ -3,9 +3,10 @@ import { InsightBrowser } from "@/components/insights/InsightBrowser";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CATEGORY_LABELS, getInsights } from "@/lib/content";
 import type { InsightCard } from "@/lib/insights";
+import { pageTitle } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Insights · cairnly",
+  title: pageTitle("Insights"),
   description: "Short summaries of recurring AI engineering discussions, in our own words.",
 };
 

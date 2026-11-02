@@ -17,6 +17,7 @@ import { pageOutline } from "@/lib/outline";
 import { lessonKey } from "@/lib/progress";
 import { askHref } from "@/lib/starters";
 import { type Entry, findEntry, flatLessons, getTrack, neighbours, trackSummary } from "@/lib/syllabus";
+import { pageTitle, SITE_NAME } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamicParams = false;
@@ -30,10 +31,10 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { track, slug } = await params;
   const lesson = getLesson(track, slug);
-  if (!lesson) return { title: "Lesson · cairnly" };
+  if (!lesson) return { title: pageTitle("Lesson") };
   return {
-    title: `${lesson.title} · cairnly`,
-    description: `${lesson.title}: ${lesson.difficulty === "easy" ? "an" : "a"} ${lesson.difficulty}, ${lesson.estimatedMinutes}-minute lesson in ${getTrack(track)?.title ?? track} on cairnly.`,
+    title: pageTitle(lesson.title),
+    description: `${lesson.title}: ${lesson.difficulty === "easy" ? "an" : "a"} ${lesson.difficulty}, ${lesson.estimatedMinutes}-minute lesson in ${getTrack(track)?.title ?? track} on ${SITE_NAME}.`,
   };
 }
 
@@ -100,7 +101,7 @@ export default async function LessonPage({ params }: Params) {
         className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-strong"
       >
         <MessageCircle size={15} aria-hidden="true" />
-        Ask cairnly about this lesson
+        Ask {SITE_NAME} about this lesson
       </Link>
     </header>
   );

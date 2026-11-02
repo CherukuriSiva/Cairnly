@@ -1,9 +1,10 @@
 // Open Graph images (1200×630): dark background with the teal glow, the cairn mark and
-// "cairnly", a mono eyebrow and the page title. Uses ImageResponse's built-in font, so the
+// the wordmark, a mono eyebrow and the page title. Uses ImageResponse's built-in font, so the
 // build never fetches a font.
 
 import { ImageResponse } from "next/og";
 import { STONES } from "@/components/ui/Logo";
+import { SITE_NAME } from "@/lib/site";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_CONTENT_TYPE = "image/png";
@@ -32,7 +33,7 @@ export function ogImage({ eyebrow, title }: { eyebrow: string; title: string }):
               <rect key={i} {...stone} fill={STONE_COLOURS[i]} />
             ))}
           </svg>
-          <span style={{ fontSize: 44, letterSpacing: -1 }}>cairnly</span>
+          <span style={{ fontSize: 44, letterSpacing: -1 }}>{SITE_NAME}</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <span style={{ fontSize: 24, letterSpacing: 4, textTransform: "uppercase", color: "#2dd4bf" }}>{eyebrow}</span>

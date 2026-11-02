@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Footer } from "@/components/site/Footer";
 import { Header } from "@/components/site/Header";
 import { PaletteHost } from "@/components/site/PaletteHost";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { getTracks } from "@/lib/syllabus";
 import "./globals.css";
 
@@ -20,8 +21,11 @@ const display = Instrument_Serif({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://cairnly-blond.vercel.app"),
-  title: "cairnly",
-  description: "AI engineering lessons for new graduates, with a chat that cites them.",
+  title: SITE_NAME,
+  applicationName: SITE_NAME,
+  description: SITE_DESCRIPTION,
+  openGraph: { siteName: SITE_NAME, type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
