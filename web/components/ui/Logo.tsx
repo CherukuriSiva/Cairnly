@@ -47,7 +47,7 @@ export function Logo({ className = "" }: { className?: string }) {
       className={`inline-flex shrink-0 items-center gap-2 rounded-md text-text ${className}`}
     >
       <CairnMark size={28} />
-      <span className="font-display text-[22px] leading-none tracking-tight" aria-hidden="true">
+      <span className="text-[20px] font-semibold leading-none tracking-[-0.03em]" aria-hidden="true">
         {SITE_NAME}
       </span>
     </Link>

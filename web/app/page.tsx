@@ -40,7 +40,7 @@ function Hero() {
     <section className={`${SECTION} pb-16 pt-16 sm:pt-24`}>
       <div className="mx-auto max-w-3xl text-center">
         <p className="eyebrow text-accent">AI engineering, one stone at a time</p>
-        <h1 className="text-display mt-4">Find your way into AI engineering</h1>
+        <h1 className="text-hero mt-4">Find your way into AI engineering</h1>
         <p className="mx-auto mt-5 max-w-[48ch] text-lg text-muted">Lessons, roadmaps and an assistant that cites them.</p>
         <div className="mt-8">
           <HeroAsk />
@@ -69,7 +69,7 @@ function Stats({ items }: { items: { value: number; label: string }[] }) {
         {items.map((item) => (
           <div key={item.label} className="flex flex-col-reverse items-center gap-1 bg-surface-1 px-4 py-5">
             <dt className="eyebrow text-faint">{item.label}</dt>
-            <dd className="text-display-2 text-text">{item.value}</dd>
+            <dd className="text-display tabular-nums text-text">{item.value}</dd>
           </div>
         ))}
       </dl>

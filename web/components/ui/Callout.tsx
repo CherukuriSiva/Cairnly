@@ -38,12 +38,22 @@ export function Callout({
 }) {
   const { tone, icon: Icon } = VARIANTS[variant];
   const colour = tone ? `var(--${tone})` : "var(--muted)";
+  const quote = variant === "interview";
   return (
     <section
-      className={`callout callout-${variant} my-8 rounded-r-xl border-l-[3px] px-5 py-5 sm:px-6`}
+      className={`callout callout-${variant} relative my-8 rounded-r-xl border-l-[3px] px-5 py-5 sm:px-6`}
       style={{ borderLeftColor: tone ? colour : "var(--border-strong)", background: tone ? tint(tone) : "var(--surface-2)" }}
     >
-      <div className="mb-3 flex items-center gap-2">
+      {/* interview: a large quote mark in the corner, so the answer reads as spoken. */}
+      {quote && (
+        <Quote
+          size={40}
+          aria-hidden="true"
+          className="pointer-events-none absolute right-4 top-3 opacity-40"
+          style={{ color: colour, fill: colour }}
+        />
+      )}
+      <div className={`mb-3 flex items-center gap-2 ${quote ? "pr-10" : ""}`}>
         <Icon size={16} aria-hidden="true" style={{ color: colour }} className="shrink-0" />
         {label && (
           <span className="eyebrow rounded border border-border bg-surface-1 px-1.5 py-0.5 text-[10px] text-muted">
@@ -54,7 +64,7 @@ export function Callout({
           {title}
         </h2>
       </div>
-      <div className={`prose max-w-none ${variant === "interview" ? "callout-quote" : "prose-sm sm:prose-base"}`}>
+      <div className={`prose max-w-none ${quote ? "callout-quote" : "prose-sm sm:prose-base"}`}>
         {children}
       </div>
     </section>

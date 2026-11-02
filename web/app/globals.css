@@ -76,7 +76,6 @@
   --color-medium: var(--medium);
   --color-hard: var(--hard);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -98,20 +97,42 @@ body {
   outline-offset: 2px;
 }
 
-/* Type scale. */
-@utility text-display {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(2.25rem, 1.6rem + 3vw, 3.5rem);
-  line-height: 1.08;
-  letter-spacing: -0.01em;
+/* Type scale. Headings are Geist 600 like the body, tightened as they grow: h1 -0.03em,
+   h2 -0.025em, h3 -0.015em. */
+h1 {
+  letter-spacing: -0.03em;
 }
 
+h2 {
+  letter-spacing: -0.025em;
+}
+
+h3 {
+  letter-spacing: -0.015em;
+}
+
+/* The home hero: 34px on phones up to 56px. */
+@utility text-hero {
+  font-weight: 600;
+  font-size: clamp(2.125rem, 1.4rem + 3vw, 3.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+/* Page h1: 34px on phones up to 44px. */
+@utility text-display {
+  font-weight: 600;
+  font-size: clamp(2.125rem, 1.6rem + 1.5vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+/* Section h2: 26px on phones up to 30px. */
 @utility text-display-2 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 1.75rem;
-  line-height: 1.2;
+  font-weight: 600;
+  font-size: clamp(1.625rem, 1.4rem + 0.8vw, 1.875rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
 @utility eyebrow {
@@ -202,16 +223,17 @@ h3[id] {
 }
 
 .prose :where(h2):not(:where(.not-prose *)) {
-  font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: 600;
   font-size: 1.75rem;
-  line-height: 1.2;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
 .prose :where(h3):not(:where(.not-prose *)) {
   font-size: 1.125rem;
   line-height: 1.4;
   font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 /* Tables scroll inside their own box, with zebra rows and sticky header cells. */
@@ -355,12 +377,10 @@ code[data-theme] span {
   text-align: center;
 }
 
-/* interview: the answer reads as a spoken quote. */
+/* interview: the answer reads as a spoken quote, in the body face at 17px. */
 .callout-quote {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.125rem;
-  line-height: 1.6;
+  font-size: 1.0625rem;
+  line-height: 1.7;
 }
 
 /* Quiz (components/mdx/quiz.tsx): option lists lose their bullets; each option is a button. */
