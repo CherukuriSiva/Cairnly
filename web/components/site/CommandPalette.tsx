@@ -75,8 +75,7 @@ export default function CommandPalette({
   function search(next: string) {
     setQuery(next);
     setExpanded([]);
-    const first = next.trim() ? ASK_VALUE : "";
-    setSelected(first);
+    setSelected(next.trim() ? ASK_VALUE : "");
     if (listRef.current) listRef.current.scrollTop = 0;
   }
 

@@ -241,13 +241,16 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     };
   }, [cancelRetry]);
 
+  const Eyebrow = turns.length > 0 ? "h1" : "p";
+
   return (
     <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-3xl flex-col px-4 pt-8">
       <Suspense fallback={null}>
         <UrlParams onChange={applyUrl} />
       </Suspense>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="eyebrow text-faint">Ask {SITE_NAME}</p>
+        {/* The page heading once the empty state (and its h1) gives way to the conversation. */}
+        <Eyebrow className="eyebrow text-faint">Ask {SITE_NAME}</Eyebrow>
         <div className="flex items-center gap-2">
           {chooseProvider && (
             <select
