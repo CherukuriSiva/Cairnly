@@ -9,12 +9,12 @@ import socket
 import threading
 import time
 
-import numpy as np
 import pytest
 
 pytest.importorskip("pipecat")  # the voice extra
 
 import httpx  # noqa: E402
+import numpy as np  # noqa: E402
 import uvicorn  # noqa: E402
 from websockets.asyncio.client import connect  # noqa: E402
 from websockets.exceptions import InvalidStatus  # noqa: E402
