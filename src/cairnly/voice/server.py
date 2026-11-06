@@ -137,19 +137,29 @@ async def start_call(body: StartRequest, request: Request) -> dict:
     except VoiceUnavailable as exc:
         raise HTTPException(status_code=503, detail=UNAVAILABLE,
                             headers={"Retry-After": str(exc.retry_after)}) from exc
-    if not created and call.reply is not None:
-        return call.reply  # the same key again: the same call, never a second one
+    if not created:  # the same key again: the same call, never a second one
+        if call.reply is not None:
+            return call.reply
+        if call.pending is not None:  # its WebRTC answer is still being made: wait for it
+            reply = await asyncio.shield(call.pending)
+            if reply is None:
+                raise HTTPException(status_code=502, detail=UNAVAILABLE)
+            return reply
     reply = {"call_id": call.id, "token": call.token, "transport": call.transport,
              "max_seconds": call.max_seconds}
     if call.transport == "websocket":
         reply["socket_path"] = f"/voice/calls/{call.id}/socket?token={call.token}"
     else:
+        # Marked before the first await, so a retry that arrives meanwhile waits for this one.
+        call.pending = asyncio.get_running_loop().create_future()
         try:
             reply["answer"] = await _start_webrtc(call, body.offer)
         except Exception as exc:
+            call.pending.set_result(None)
             book.finish(call.id, "error")
             log.exception("WebRTC setup failed")
             raise HTTPException(status_code=502, detail=UNAVAILABLE) from exc
+        call.pending.set_result(reply)
     call.reply = reply
     return reply
 

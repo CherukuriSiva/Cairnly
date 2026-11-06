@@ -18,6 +18,7 @@ Everything here is plain Python with an injectable clock, so the rules are teste
   so the browser can read it after the call.
 """
 
+import asyncio
 import hmac
 import math
 import secrets
@@ -68,6 +69,9 @@ class Call:
     end_reason: str | None = None
     deadline: float | None = None
     reply: dict | None = None  # the start route's answer, replayed for a retry with the same key
+    # Set while a WebRTC start is still answering its offer: a retry with the same key waits
+    # for that answer instead of opening a second peer connection (None: the start failed).
+    pending: asyncio.Future | None = field(default=None, repr=False)
     hangup: Callable[[str], None] | None = field(default=None, repr=False)  # set by the session
 
     @property

@@ -129,6 +129,32 @@ def test_status_and_start_are_idempotent(voice):
     assert other.json()["detail"] == server.UNAVAILABLE
 
 
+def test_a_webrtc_retry_during_the_answer_waits_for_it(voice, monkeypatch):
+    """The same key twice while the first start is still answering its offer: one peer
+    connection, and both requests get the same answer."""
+    base, _ = voice
+    made: list[str] = []
+
+    async def slow_answer(call, offer):
+        made.append(call.id)
+        await asyncio.sleep(0.3)
+        return {"sdp": "v=0 answer", "type": "answer"}
+
+    monkeypatch.setattr(server, "_start_webrtc", slow_answer)
+    body = {"conversation_id": CONV, "key": "key-rtc-0001", "transport": "webrtc",
+            "offer": {"sdp": "v=0 an offer", "type": "offer"}}
+
+    async def both():
+        async with httpx.AsyncClient() as client:
+            return await asyncio.gather(*(client.post(f"http://{base}/voice/calls", json=body)
+                                          for _ in range(2)))
+
+    first, second = asyncio.run(both())
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json() and first.json()["answer"]["type"] == "answer"
+    assert len(made) == 1
+
+
 def test_bad_requests(voice):
     base, _ = voice
     assert start(base, conversation_id="not-a-uuid").status_code == 422
