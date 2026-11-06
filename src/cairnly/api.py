@@ -346,9 +346,9 @@ def _kb_or_404(name: str):
 
 def _sse(req: AskRequest, slot: Slot, history: list[dict] | None = None) -> Iterator[str]:
     """The event stream. `history` is the saved conversation's (None: the client's own)."""
-    if history is None:
-        history = [turn.model_dump() for turn in req.history]
     try:
+        if history is None:
+            history = [turn.model_dump() for turn in req.history]
         s, kb = get_settings(), get_kb(req.kb)
         with connect() as conn:
             events = answer(req.question,

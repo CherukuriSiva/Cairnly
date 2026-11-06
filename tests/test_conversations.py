@@ -258,6 +258,16 @@ def test_an_answer_that_errors_saves_nothing(client):
     assert client.get(f"/conversations/{cid}").json()["messages"] == []
 
 
+def test_a_client_that_leaves_mid_answer_saves_nothing(client):
+    cid = _new(client)
+    req = api.AskRequest(question="q", conversation_id=cid)
+    slot = api.slots.acquire()
+    stream = api._sse(req, slot, history=[])
+    next(stream), next(stream)  # sources and the first token, then the client goes away
+    stream.close()
+    assert client.get(f"/conversations/{cid}").json()["messages"] == []
+
+
 def test_a_voice_question_is_saved_on_the_voice_channel(client):
     cid = _new(client)
     client.post("/ask", json={"question": "q", "conversation_id": cid, "channel": "voice"})
