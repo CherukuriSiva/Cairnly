@@ -28,7 +28,7 @@ from cairnly.limits import DAY
 
 END_REASONS = ("farewell", "idle", "max_duration", "hung_up", "replaced", "error")
 MIN_CALL_S = 30  # less budget than this left: no new calls
-CONNECT_WINDOW_S = 30  # a call that never connects is given up after this long
+CONNECT_WINDOW_S = 10  # a call that never connects is given up after this long
 KEEP_ENDED_S = 3600  # an ended call's reason stays readable this long
 BUSY_RETRY_S = 30
 CLOSING_RETRY_S = 1

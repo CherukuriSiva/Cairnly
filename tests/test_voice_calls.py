@@ -99,7 +99,9 @@ def test_unconnected_call_is_given_up_and_end_reason_is_kept():
     clock = Clock()
     b = book(clock)
     call, _ = b.start(CONV_A, "key-0001", "1.1.1.1", "websocket")
-    clock.t += 31
+    clock.t += 9
+    assert b.status("2.2.2.2")["reason"] == "busy"
+    clock.t += 2  # a start that never connects holds the only place for 10 s, no longer
     assert b.get(call.id).public()["end_reason"] == "error"
     assert b.status("1.1.1.1")["available"] is True
     clock.t += 3601
