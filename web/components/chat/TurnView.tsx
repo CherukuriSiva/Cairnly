@@ -3,11 +3,12 @@
 import { BookOpen, Check, Copy, FileText, Mic, RotateCcw, Route, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Answer } from "@/components/chat/Answer";
+import { Feedback } from "@/components/chat/Feedback";
 import { useReveal } from "@/components/chat/useReveal";
 import { CairnMark } from "@/components/ui/Logo";
 import type { Source } from "@/lib/ask";
 import { failureTitle } from "@/lib/chat/reducer";
-import type { AssistantRow, ErrorRow, UserRow } from "@/lib/chat/types";
+import type { AssistantRow, ErrorRow, UserRow, Vote } from "@/lib/chat/types";
 import { fullPageLink } from "@/lib/fullPage";
 import { groupSources, sectionLabel, type SourceGroup } from "@/lib/sources";
 
@@ -156,10 +157,13 @@ function SourceCard({ group, active }: { group: SourceGroup; active: number | nu
   );
 }
 
+/** Sets or clears the vote on a saved answer; resolves to whether the API took it. */
+export type OnVote = (messageId: number, vote: Vote | null, reason?: string) => Promise<boolean>;
+
 /** One answer: its text (typed out while it streams in), sources (one card per document), the
- * full-page link, Copy and the notes line. `debug` adds the model, best match and rewritten
- * query (?debug=1 or development). */
-function AssistantMessage({ row, debug }: { row: AssistantRow; debug: boolean }) {
+ * full-page link, Copy, the vote buttons (saved answers, when the API has feedback) and the
+ * notes line. `debug` adds the model, best match and rewritten query (?debug=1 or development). */
+function AssistantMessage({ row, debug, onVote }: { row: AssistantRow; debug: boolean; onVote?: OnVote }) {
   const [active, setActive] = useState<number | null>(null);
   const { shown, revealing } = useReveal(row.text, row.live);
   const finished = !row.live && !row.cut && !revealing;
@@ -201,6 +205,9 @@ function AssistantMessage({ row, debug }: { row: AssistantRow; debug: boolean })
             </a>
           )}
           {row.text && <CopyButton text={row.text} />}
+          {onVote && row.messageId !== undefined && (
+            <Feedback vote={row.vote ?? null} onVote={(vote, reason) => onVote(row.messageId as number, vote, reason)} />
+          )}
         </div>
       )}
       {row.notice && <p className="mt-2 text-xs italic text-muted">{row.notice}</p>}
@@ -219,6 +226,7 @@ export function TurnView({
   busy,
   debug,
   onRetry,
+  onVote,
 }: {
   question: UserRow;
   replies: (AssistantRow | ErrorRow)[];
@@ -227,6 +235,7 @@ export function TurnView({
   busy: boolean;
   debug: boolean;
   onRetry: (key: string) => void;
+  onVote?: OnVote;
 }) {
   const typing = pending && !replies.some((r) => r.kind === "error" || r.text.trim());
   return (
@@ -250,7 +259,7 @@ export function TurnView({
           <div className="min-w-0 flex-1">
             {replies.map((row) =>
               row.kind === "assistant" ? (
-                <AssistantMessage key={row.key} row={row} debug={debug} />
+                <AssistantMessage key={row.key} row={row} debug={debug} onVote={onVote} />
               ) : (
                 <ErrorCard key={row.key} row={row} busy={busy} onRetry={() => onRetry(row.replyTo)} />
               ),

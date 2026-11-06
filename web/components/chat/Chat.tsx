@@ -79,6 +79,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const chooseProvider = providers.length > 1; // the select only appears when there is a choice
   const [track, setTrack] = useState<string | null>(null);
   const [demo, setDemo] = useState(false);
+  const [feedback, setFeedback] = useState(false); // vote buttons: only when the API has them
   const [starters, setStarters] = useState<Starter[]>(LIVE_STARTERS);
   const busy = state.status !== "idle";
   const transcript = useRef<HTMLElement>(null);
@@ -153,6 +154,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       }
       const features = featuresOf(config);
       chat.configure(config ? { features, conversations: features.conversations ? httpConversationApi() : null } : null);
+      setFeedback(chat.getFeatures().feedback);
       void chat.restore();
     });
     return () => {
@@ -251,6 +253,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
             busy={busy}
             debug={debug}
             onRetry={(key) => chat.retry(key)}
+            onVote={feedback ? (id, vote, reason) => chat.vote(id, vote, reason) : undefined}
           />
         ))}
       </section>
