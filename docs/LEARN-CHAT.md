@@ -45,9 +45,10 @@ while the new site talks to the old API. The rule: **feature-detect, never assum
 before. The same happens when `/config` fails, when creating a conversation fails (the database
 is down, or the new tables were not migrated yet: the API answers 503), and in the demo.
 
-Two details make the switch safe. A question waits up to 4 seconds for `/config`, so the first
-question already goes out in the right mode. And once a question went out with tab history, the
-page stays in that mode: switching halfway would lose the earlier turns.
+Two details make the switch safe. A question waits up to 15 seconds for `/config` (a slow
+`/config` means the API is waking up, and `/ask` would be just as slow), so the first question
+already goes out in the right mode. And once a question went out with tab history, the page
+stays in that mode: switching halfway would lose the earlier turns.
 
 ## 3. A chat engine without React (`web/lib/chat/`)
 

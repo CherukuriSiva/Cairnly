@@ -20,7 +20,9 @@ import { TransportError, type ChatTransport } from "@/lib/chat/transport";
 import type { Channel, ChatState, FailureKind, UserRow, Vote } from "@/lib/chat/types";
 
 export const WAKING_AFTER_MS = 5_000; // no answer text yet: say the model is probably waking
-export const CONFIG_WAIT_MS = 4_000; // a question waits this long at most for GET /config
+// A question waits this long at most for GET /config. A slow /config means a waking API, which
+// would answer /ask just as slowly, so waiting costs nothing; an unreachable API fails fast.
+export const CONFIG_WAIT_MS = 15_000;
 
 /** What GET /config decided, or the demo. */
 export interface ChatSetup {

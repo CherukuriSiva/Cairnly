@@ -75,9 +75,10 @@ Two constraints shape the change:
 - `controller.ts` ties them together and decides the mode from `/config`: saved conversations
   (the id lives in `localStorage` under `cairnly.conversation.v1`, the conversation is restored
   on load, the server keeps the history) or, when the feature is missing or `/config` fails,
-  history in the tab exactly as before. A question waits up to 4 s for `/config`, so the first
-  question already uses the right mode; once a question went out with tab history the page stays
-  in that mode.
+  history in the tab exactly as before. A question waits up to 15 s for `/config` (a slow
+  `/config` means a waking API, which would answer `/ask` just as slowly), so the first
+  question already uses the right mode; once a question went out with tab history the page
+  stays in that mode.
 
 **The page** renders the rows: answers typed out with `requestAnimationFrame` (about 80
 characters a second plus speed for the backlog, at most about 30 React commits a second, never
