@@ -40,6 +40,7 @@ def fresh_limits(monkeypatch):
     """Every test starts with empty rate-limit counters and all answer slots free."""
     monkeypatch.setattr(api, "limiter", RateLimiter(10, 200, 2000))
     monkeypatch.setattr(api, "slots", AnswerSlots(4))
+    monkeypatch.setattr(api, "store_limiter", RateLimiter(30, 1000, 5000))
 
 
 @pytest.fixture
@@ -160,7 +161,8 @@ ASK = {"question": "What is RAG?"}
 def test_config_lists_only_ollama_by_default(client, monkeypatch, fresh_settings):
     monkeypatch.delenv("ALLOW_ANTHROPIC", raising=False)
     fresh_settings()
-    assert client.get("/config").json() == {"providers": ["ollama"], "default_provider": "ollama"}
+    body = client.get("/config").json()
+    assert body["providers"] == ["ollama"] and body["default_provider"] == "ollama"
 
     monkeypatch.setenv("ALLOW_ANTHROPIC", "true")
     fresh_settings()

@@ -38,6 +38,11 @@ class Settings:
     rate_limit_per_day: int = 200
     global_answers_per_day: int = 2000  # /ask, all clients together
     max_concurrent_answers: int = 4
+    conversations: bool = True  # save chats server-side (conversations.py); off: history only
+    conversation_retention_days: int = 30  # idle conversations are deleted after this
+    store_rate_per_minute: int = 30  # per client IP, the conversation and feedback routes
+    store_rate_per_day: int = 1000
+    conversations_per_day: int = 5000  # new conversations, all clients together
     first_token_timeout_s: float = 90  # covers a cold GPU start
     answer_timeout_s: float = 60  # measured from the first token
     trace_content: bool = False  # put question and answer text into traces (local only)
@@ -119,6 +124,11 @@ def get_settings() -> Settings:
         rate_limit_per_day=int(env("RATE_LIMIT_PER_DAY", "200")),
         global_answers_per_day=int(env("GLOBAL_ANSWERS_PER_DAY", "2000")),
         max_concurrent_answers=int(env("MAX_CONCURRENT_ANSWERS", "4")),
+        conversations=env("CONVERSATIONS", "1").strip().lower() in TRUE_WORDS,
+        conversation_retention_days=int(env("CONVERSATION_RETENTION_DAYS", "30")),
+        store_rate_per_minute=int(env("STORE_RATE_LIMIT_PER_MINUTE", "30")),
+        store_rate_per_day=int(env("STORE_RATE_LIMIT_PER_DAY", "1000")),
+        conversations_per_day=int(env("CONVERSATIONS_PER_DAY", "5000")),
         first_token_timeout_s=float(env("FIRST_TOKEN_TIMEOUT_S", "90")),
         answer_timeout_s=float(env("ANSWER_TIMEOUT_S", "60")),
         trace_content=flag("TRACE_CONTENT"),

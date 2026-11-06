@@ -6,6 +6,7 @@ infra/README.md):
     uvx modal deploy deploy/modal_api.py       # serves <workspace>--cairnly-api-web.modal.run
     uvx modal run deploy/modal_api.py::check   # every key and service, no secret printed
     uvx modal run deploy/modal_api.py::ingest  # migrate, then ingest every KB in kbs.yaml
+    uvx modal run deploy/modal_api.py::migrate # only create or upgrade the tables
 
 What it does:
 - Builds the image the way the Dockerfile does: Python 3.12, the locked dependencies with the
@@ -99,6 +100,16 @@ def ingest():
     main(["migrate"])
     for name in load_kbs():
         main(["ingest", "--kb", name])
+
+
+@app.function(secrets=SECRETS, env=API_ENV, timeout=300)
+def migrate():
+    """Create or upgrade the tables only (safe to re-run), e.g. the saved-conversation tables
+    after an API update, without re-ingesting anything."""
+    use_production_settings()
+    from cairnly.cli import main
+
+    main(["migrate"])
 
 
 @app.function(secrets=SECRETS, env=API_ENV, timeout=600)
