@@ -23,9 +23,12 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.12.23"
-      - run: uv sync --frozen
+      # The voice extra is the Pipecat framework only (no speech models, no torch): the voice
+      # tests run the real pipeline with fake speech services.
+      - run: uv sync --frozen --extra voice
       - run: uv run ruff check .
-      # Tests use fake embedders and LLMs, so CI needs Postgres but not Ollama or an API key.
+      # Tests use fake embedders, LLMs and speech, so CI needs Postgres but not Ollama, speech
+      # models or an API key.
       - run: uv run pytest -q
       # Guard gate: wrong blocks and missed attacks on evals/redteam.jsonl (no DB, no model).
       - run: uv run cairnly eval-redteam --gate evals/gates.yaml

@@ -23,11 +23,27 @@ rerank = [
     "sentence-transformers>=5",
     "torch>=2.4",
 ]
+# Voice mode (src/cairnly/voice): the Pipecat framework, its WebSocket and WebRTC transports and
+# the Silero VAD (ONNX, bundled). No speech models: tests run it with fakes.
+voice = [
+    "pipecat-ai[silero,webrtc,websocket]==1.15.0",
+]
+# The speech models the voice server runs: Whisper (faster-whisper) and Kokoro (ONNX).
+voice-models = [
+    "faster-whisper==1.2.1",
+    "pipecat-ai[kokoro]==1.15.0",
+]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.17.3",
+]
+# The voice benchmark (evals/voice_bench.py): word error rate, Parakeet (ONNX) and Piper.
+voice-bench = [
+    "jiwer==4.0.0",
+    "onnx-asr[cpu,hub]==0.12.0",
+    "piper-tts==1.8.0",
 ]
 
 [build-system]
