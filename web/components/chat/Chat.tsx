@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Composer } from "@/components/chat/Composer";
 import { TurnView } from "@/components/chat/TurnView";
+import { useFollow } from "@/components/chat/useFollow";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { featuresOf, fetchConfig, getSessionId, NO_FEATURES, PROVIDER_LABELS, warmUp, type Provider } from "@/lib/ask";
 import { ChatController } from "@/lib/chat/controller";
@@ -80,6 +81,8 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const [demo, setDemo] = useState(false);
   const [starters, setStarters] = useState<Starter[]>(LIVE_STARTERS);
   const busy = state.status !== "idle";
+  const transcript = useRef<HTMLElement>(null);
+  const { toBottom } = useFollow(transcript);
 
   useEffect(() => {
     providerRef.current = chooseProvider ? provider : null;
@@ -90,8 +93,9 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       if (!question.trim() || chat.busy) return;
       setInput("");
       chat.send(question, scope, { newConversation });
+      toBottom();
     },
-    [chat],
+    [chat, toBottom],
   );
 
   function newChat() {
@@ -208,7 +212,9 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       </div>
       {demo && <DemoNotice />}
 
-      <section aria-label="Conversation" className="flex-1 space-y-8 py-8">
+      {/* The transcript is a log, but not a live one: screen readers would read every token.
+          Each finished answer (and each error) is announced once by the status region below. */}
+      <section ref={transcript} role="log" aria-live="off" aria-label="Conversation" className="flex-1 space-y-8 py-8">
         {turns.length === 0 && (
           <div>
             <SectionHeader
@@ -248,6 +254,10 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
           />
         ))}
       </section>
+
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {state.announcement && <p key={state.announcement.id}>{state.announcement.text}</p>}
+      </div>
 
       <Composer
         value={input}

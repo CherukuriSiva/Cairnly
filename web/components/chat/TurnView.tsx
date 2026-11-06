@@ -3,6 +3,7 @@
 import { BookOpen, Check, Copy, FileText, Mic, RotateCcw, Route, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Answer } from "@/components/chat/Answer";
+import { useReveal } from "@/components/chat/useReveal";
 import { CairnMark } from "@/components/ui/Logo";
 import type { Source } from "@/lib/ask";
 import { failureTitle } from "@/lib/chat/reducer";
@@ -155,11 +156,13 @@ function SourceCard({ group, active }: { group: SourceGroup; active: number | nu
   );
 }
 
-/** One answer: its text, sources (one card per document), the full-page link, Copy and the
- * notes line. `debug` adds the model, best match and rewritten query (?debug=1 or development). */
+/** One answer: its text (typed out while it streams in), sources (one card per document), the
+ * full-page link, Copy and the notes line. `debug` adds the model, best match and rewritten
+ * query (?debug=1 or development). */
 function AssistantMessage({ row, debug }: { row: AssistantRow; debug: boolean }) {
   const [active, setActive] = useState<number | null>(null);
-  const finished = !row.live && !row.cut;
+  const { shown, revealing } = useReveal(row.text, row.live);
+  const finished = !row.live && !row.cut && !revealing;
   const status = row.refused ? "refused" : finished ? "done" : "streaming";
   const link = fullPageLink({ status, answer: row.text, sources: row.sources });
   const groups = groupSources(row.sources);
@@ -171,8 +174,8 @@ function AssistantMessage({ row, debug }: { row: AssistantRow; debug: boolean })
   ].filter(Boolean);
   return (
     <div>
-      {row.text && <Answer text={row.text} onCite={setActive} />}
-      {row.live && row.text && (
+      {shown && <Answer text={shown} onCite={setActive} />}
+      {(row.live || revealing) && shown && (
         <span aria-hidden="true" className="motion-safe:animate-pulse text-accent">
           ▍
         </span>
