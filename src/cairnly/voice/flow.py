@@ -166,7 +166,7 @@ class CallBrain(FrameProcessor):
     async def _answer(self, question: str, turn: TurnTimings) -> None:
         if self.tap is not None:
             self.tap.watch(turn, holding=True, on_audio=self._turn_audio)
-        await self._speak(speech.HOLDING)
+        await self._speak(speech.HOLDING, holding=True)
         outcome = "answered"
         try:
             outcome = await self._stream(question, turn)
@@ -205,10 +205,11 @@ class CallBrain(FrameProcessor):
         await self._speak(speech.TROUBLE, answer=True)  # the stream ended without `done`
         return "error"
 
-    async def _speak(self, text: str, answer: bool = False) -> None:
+    async def _speak(self, text: str, answer: bool = False, holding: bool = False) -> None:
         if answer:
             self.answer_heard = True
-        await self.push_frame(OutputTransportMessageFrame(message=protocol.bot_caption(text)))
+        await self.push_frame(OutputTransportMessageFrame(
+            message=protocol.bot_caption(text, holding)))
         await self.push_frame(TTSSpeakFrame(text, append_to_context=False))
 
     def _turn_audio(self, turn: TurnTimings) -> None:

@@ -238,6 +238,21 @@ describe("ChatController", () => {
     expect(gone.read()).toBeNull();
   });
 
+  it("reload shows the turns a voice call saved, replacing the rows", async () => {
+    const saved: Record<string, SavedMessage[]> = { [CID]: [{ id: 1, role: "user", text: "Typed", channel: "text", created_at: "" }] };
+    const { api } = fakeApi(saved);
+    const chat = make(replayTransport(), memoryStorage(CID));
+    chat.configure({ features: FEATURES, conversations: api });
+    await chat.restore();
+    expect(chat.getState().rows).toHaveLength(1);
+    saved[CID].push(
+      { id: 2, role: "user", text: "Spoken", channel: "voice", created_at: "" },
+      { id: 3, role: "assistant", text: "Answer [1].", channel: "voice", created_at: "", sources: [] },
+    );
+    await chat.reload();
+    expect(chat.getState().rows.map((r) => (r.kind === "user" ? `${r.channel}:${r.text}` : r.kind))).toEqual(["text:Typed", "voice:Spoken", "assistant"]);
+  });
+
   it("a shared ?q= link starts a new conversation instead of restoring the stored one", async () => {
     const storage = memoryStorage(CID);
     const { api, calls } = fakeApi({ [CID]: [{ id: 1, role: "user", text: "old", channel: "text", created_at: "" }] });

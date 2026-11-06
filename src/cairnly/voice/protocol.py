@@ -4,7 +4,8 @@ Server to browser (over the WebRTC data channel, or as text frames on the WebSoc
 
     call.ready     {call_id, max_seconds}       the call is connected; the clock runs
     caption.user   {text}                       what the caller said (a finished turn)
-    caption.bot    {text}                       a sentence the bot is about to speak
+    caption.bot    {text, holding?}             a sentence the bot is about to speak (holding:
+                                                the "let me check" line before an answer)
     turn.saved     {message_id}                 the answer was saved into the conversation
     call.ending    {seconds_left}               the call ends soon
     call.closed    {reason}                     the call is over (see calls.END_REASONS)
@@ -30,8 +31,9 @@ def user_caption(text: str) -> dict:
     return {"kind": "caption.user", "text": text}
 
 
-def bot_caption(text: str) -> dict:
-    return {"kind": "caption.bot", "text": text}
+def bot_caption(text: str, holding: bool = False) -> dict:
+    caption = {"kind": "caption.bot", "text": text}
+    return {**caption, "holding": True} if holding else caption
 
 
 def saved(message_id: int) -> dict:

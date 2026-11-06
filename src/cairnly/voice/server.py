@@ -115,7 +115,7 @@ def livez() -> dict:
 @app.get("/voice/status")
 def status(request: Request) -> dict:
     return {**book.status(_ip(request)), "transports": list(settings.transports),
-            "half_duplex": settings.half_duplex}
+            "half_duplex": settings.half_duplex, "ice_servers": list(settings.stun_urls)}
 
 
 @app.post("/voice/calls")

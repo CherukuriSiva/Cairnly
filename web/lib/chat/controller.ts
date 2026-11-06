@@ -136,6 +136,26 @@ export class ChatController {
     }
   }
 
+  /** Show the saved conversation as the server has it now, replacing the rows (after a voice
+   * call, whose turns the voice server saved). Skipped while a question is in flight. */
+  async reload(): Promise<void> {
+    await this.ready;
+    const id = this.conversationId;
+    if (!this.api || !id || this.busy) return;
+    const token = ++this.restoreToken;
+    try {
+      const messages = await this.api.load(id);
+      if (token !== this.restoreToken || this.disposed || this.busy) return;
+      if (messages === null) {
+        this.forget();
+        return;
+      }
+      this.dispatch({ type: "restore", rows: rowsFromMessages(messages) });
+    } catch {
+      // the API is unreachable: the turns show on the next page load
+    }
+  }
+
   /** The saved conversation, created on first use; null in tab-history mode. */
   async ensureConversation(): Promise<string | null> {
     if (this.conversationId) return this.conversationId;
