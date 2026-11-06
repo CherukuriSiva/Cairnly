@@ -95,6 +95,14 @@ def cmd_serve(args: argparse.Namespace) -> None:
                 proxy_headers=False)
 
 
+def cmd_voice_serve(args: argparse.Namespace) -> None:
+    import uvicorn
+
+    # Needs `uv sync --extra voice --extra voice-models` (or VOICE_FAKE_MODELS=1 without the
+    # models). proxy_headers=False for the same reason as `serve`.
+    uvicorn.run("cairnly.voice.server:app", host=args.host, port=args.port, proxy_headers=False)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="cairnly")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -152,6 +160,11 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--port", type=int, default=8010)
     p.add_argument("--reload", action="store_true")
     p.set_defaults(func=cmd_serve)
+
+    p = sub.add_parser("voice-serve", help="run the voice server (needs the voice extra)")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8020)
+    p.set_defaults(func=cmd_voice_serve)
 
     args = parser.parse_args(argv)
     if getattr(args, "provider", None):
