@@ -11,8 +11,8 @@
 
 Errors: 503 with Retry-After when voice is unavailable (off, busy, a limit or the daily minutes
 spent), 409 with Retry-After while the previous call is still closing, 429 for too many starts.
-The browser origin must be in CORS_ORIGINS, for the routes and the socket alike. A call has one
-socket: a second socket for a call that already has one is refused.
+The browser origin must be in CORS_ORIGINS, for the routes and the socket alike; a socket with
+no Origin header is refused, and so is a second socket for a call that already has one.
 """
 
 import asyncio
@@ -173,13 +173,12 @@ def end_call(body: EndRequest, call_id: str = CallId) -> dict:
 
 @app.websocket("/voice/calls/{call_id}/socket")
 async def call_socket(websocket: WebSocket, call_id: str, token: str = "") -> None:
+    # Browsers always send Origin on a WebSocket; a socket without one is not from the site.
     origin = websocket.headers.get("origin")
     allowed = list(api_settings.cors_origins)
     # The token is checked and the call claimed in one step, before the socket is accepted:
     # a second socket for the same call is refused and never touches it.
-    call = None
-    if origin is None or origin in allowed:
-        call = book.claim_socket(call_id, token)
+    call = book.claim_socket(call_id, token) if origin in allowed else None
     if call is None:
         await websocket.close(code=1008)  # policy violation: no such call for this caller
         return
@@ -190,7 +189,7 @@ async def call_socket(websocket: WebSocket, call_id: str, token: str = "") -> No
     task = asyncio.current_task()
     sessions.add(task)
     try:
-        await session.run(websocket_transport(websocket, allowed if origin else []))
+        await session.run(websocket_transport(websocket, allowed))
     finally:
         sessions.discard(task)
 

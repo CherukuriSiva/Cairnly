@@ -152,6 +152,21 @@ def test_a_wrong_token_cannot_join_or_end_a_call(voice):
     assert end.status_code == 404
 
 
+def test_a_socket_needs_the_site_origin(voice):
+    base, _ = voice
+    call = start(base).json()
+
+    async def join(**origin):
+        async with connect(f"ws://{base}{call['socket_path']}", **origin) as ws:
+            await ws.recv()
+
+    for origin in ({}, {"origin": "https://elsewhere.example"}):  # none (not a browser), foreign
+        with pytest.raises(InvalidStatus) as refused:
+            asyncio.run(join(**origin))
+        assert refused.value.response.status_code == 403
+    assert server.book.get(call["call_id"]).state == "starting"  # still free for the browser
+
+
 def test_a_second_socket_for_the_same_call_is_refused(voice):
     """Two sockets with one token, at the same moment: one call, one session, and the second
     socket is turned away before it can touch the call (no ghost call outside the limits)."""
