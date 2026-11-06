@@ -56,6 +56,7 @@ def test_one_call_at_a_time_and_closing_is_retryable():
     assert busy.value.reason == "busy" and not isinstance(busy.value, CallClosing)
     assert b.status("2.2.2.2")["available"] is False
     b.closing(a.id, "hung_up")
+    assert b.status("2.2.2.2")["available"] is True  # the mic stays: the place frees soon
     with pytest.raises(CallClosing):
         b.start(CONV_B, "key-0003", "2.2.2.2", "websocket")
     b.finish(a.id, "hung_up")

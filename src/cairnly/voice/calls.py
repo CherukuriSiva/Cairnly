@@ -101,7 +101,8 @@ class CallBook:
         with self._lock:
             self._tidy()
             try:
-                seconds = self._admit(ip, conversation_id=None)
+                # A call that is hanging up frees its place in a moment: the microphone stays.
+                seconds = self._admit(ip, conversation_id=None, closing_frees=True)
             except VoiceUnavailable as exc:
                 return {"available": False, "reason": exc.reason, "max_call_seconds": 0}
             return {"available": True, "reason": None, "max_call_seconds": seconds}
@@ -190,12 +191,13 @@ class CallBook:
 
     # -- rules ---------------------------------------------------------------------------
 
-    def _admit(self, ip: str, conversation_id: str | None) -> int:
+    def _admit(self, ip: str, conversation_id: str | None, closing_frees: bool = False) -> int:
         """The seconds a new call may last, or raise why there is none."""
         if not self.enabled:
             raise VoiceUnavailable("off", 3600)
         others = [c for c in self.calls.values()
-                  if c.active and c.conversation_id != conversation_id]
+                  if c.active and c.conversation_id != conversation_id
+                  and not (closing_frees and c.state == "closing")]
         if len(others) >= self.max_calls:
             if any(c.state == "closing" for c in others):
                 raise CallClosing()
