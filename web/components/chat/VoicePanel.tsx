@@ -17,7 +17,13 @@ function Orb({ state }: { state: VoiceState }) {
  * (they hear the bot already); the state line above is the one that is announced. */
 function Captions({ state }: { state: VoiceState }) {
   if (!state.userCaption && !state.botCaption) {
-    return <p className="text-sm text-muted">{state.phase === "connecting" ? "Allow the microphone if your browser asks." : "Ask a question out loud. Captions show here."}</p>;
+    const hint =
+      state.phase !== "connecting"
+        ? "Ask a question out loud. Captions show here."
+        : state.wakingSeconds !== null
+          ? "The voice model sleeps when nobody is calling. Waking it can take up to a minute."
+          : "Allow the microphone if your browser asks.";
+    return <p className="text-sm text-muted">{hint}</p>;
   }
   return (
     <dl className="space-y-2 text-sm">
@@ -89,6 +95,8 @@ export function VoicePanel({
             {label}
             {state.endingSoon && <span className="sr-only">. The call ends in less than 30 seconds.</span>}
           </p>
+          {/* Not in the status line above: a screen reader would read every second. */}
+          {state.wakingSeconds !== null && <p className="mt-0.5 font-mono text-xs text-muted">{state.wakingSeconds} s</p>}
           {timeLeft && (
             <p className={`mt-0.5 font-mono text-xs ${state.endingSoon ? "text-warning" : "text-muted"}`}>
               {timeLeft} left{state.endingSoon ? " · ending soon" : ""}

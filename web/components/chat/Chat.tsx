@@ -18,7 +18,7 @@ import { askHref, STARTERS } from "@/lib/starters";
 import { SITE_NAME } from "@/lib/site";
 import { browserVoiceAdapter } from "@/lib/voice/browser";
 import { VOICE_URL, VoiceController } from "@/lib/voice/controller";
-import { inCall, initialVoiceState } from "@/lib/voice/machine";
+import { inCall, initialVoiceState, showMic } from "@/lib/voice/machine";
 import type { Transport } from "@/lib/voice/types";
 
 const noSubscribe = () => () => {};
@@ -88,8 +88,9 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       }),
   );
   const state = useSyncExternalStore(chat.subscribe, chat.getState, () => initialChatState);
-  // Voice mode exists only when the site was built with NEXT_PUBLIC_VOICE_URL, and shows only
-  // once that server says calls are possible (see the config effect below).
+  // Voice mode exists only when the site was built with NEXT_PUBLIC_VOICE_URL. Loading the page
+  // never contacts the voice server (that would wake its GPU for every visit): the mic shows
+  // once the API has saved conversations, and the first click asks the voice server.
   const [voice] = useState(() =>
     VOICE_URL
       ? new VoiceController({
@@ -186,7 +187,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       setFeedback(chat.getFeatures().feedback);
       void chat.restore();
       // Voice turns are saved into the conversation, so voice needs saved conversations.
-      if (voice && chat.getFeatures().conversations) void voice.checkStatus();
+      voice?.offer(chat.getFeatures().conversations);
     });
     return () => {
       live = false;
@@ -311,7 +312,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
         placeholder={turns.length ? "Ask a follow-up…" : "Ask a question…"}
         scopeTitle={track ? (trackTitles[track] ?? track) : null}
         onClearScope={clearScope}
-        onVoice={voice && voiceState.available && !demo && !voiceState.closing ? () => voice.start() : undefined}
+        onVoice={voice && !demo && showMic(voiceState) ? () => voice.start() : undefined}
         voicePanel={
           voice && calling ? (
             <VoicePanel

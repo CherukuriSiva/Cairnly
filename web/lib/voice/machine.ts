@@ -17,8 +17,11 @@ export const SPEAKING_HOLD_MS = 1_200;
 export const ENDING_NOTICE_S = 30;
 
 export type VoiceAction =
+  | { type: "offer"; offered: boolean }
   | { type: "status"; available: boolean; said?: boolean }
   | { type: "start" }
+  | { type: "waking"; now: number }
+  | { type: "woke" }
   | { type: "ready"; callId: string; maxSeconds: number; now: number }
   | { type: "event"; event: VoiceEvent; now: number }
   | { type: "levels"; user: number; bot: number; now: number }
@@ -31,8 +34,11 @@ export type VoiceAction =
 
 export const initialVoiceState: VoiceState = {
   phase: "idle",
+  offered: false,
   available: null,
   saidUnavailable: false,
+  wakingSince: null,
+  wakingSeconds: null,
   callId: null,
   deadline: null,
   secondsLeft: null,
@@ -50,6 +56,12 @@ export const initialVoiceState: VoiceState = {
   userLevel: 0,
   botLevel: 0,
 };
+
+/** The microphone button shows until a call has been refused: the voice server is not asked
+ * anything before the reader clicks it (asking would wake its GPU for every visit). */
+export function showMic(state: VoiceState): boolean {
+  return state.offered && state.available !== false && !state.closing && !inCall(state);
+}
 
 /** A call is in progress (or being set up): the composer shows the voice panel. */
 export function inCall(state: VoiceState): boolean {
@@ -114,6 +126,8 @@ function onEvent(state: VoiceState, event: VoiceEvent, now: number): VoiceState 
 
 export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState {
   switch (action.type) {
+    case "offer":
+      return state.offered === action.offered ? state : { ...state, offered: action.offered };
     case "status": {
       const saidUnavailable = !action.available && Boolean(action.said);
       if (state.available === action.available && state.saidUnavailable === saidUnavailable) return state;
@@ -121,12 +135,19 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
     }
     case "start":
       if (inCall(state) || state.closing) return state;
-      return { ...initialVoiceState, available: state.available, phase: "connecting" };
+      return { ...initialVoiceState, offered: state.offered, available: state.available, phase: "connecting" };
+    case "waking":
+      if (state.phase !== "connecting" || state.wakingSince !== null) return state;
+      return { ...state, wakingSince: action.now, wakingSeconds: 0 };
+    case "woke":
+      return state.wakingSince === null ? state : { ...state, wakingSince: null, wakingSeconds: null };
     case "ready":
       if (state.phase !== "connecting") return state;
       return {
         ...state,
         phase: "greeting",
+        wakingSince: null,
+        wakingSeconds: null,
         callId: action.callId,
         deadline: action.now + action.maxSeconds * 1000,
         secondsLeft: action.maxSeconds,
@@ -142,6 +163,10 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
       return settle(next, action.now);
     }
     case "tick": {
+      if (state.wakingSince !== null && state.phase === "connecting") {
+        const wakingSeconds = Math.max(0, Math.floor((action.now - state.wakingSince) / 1000));
+        return wakingSeconds === state.wakingSeconds ? state : { ...state, wakingSeconds };
+      }
       if (state.deadline === null || !inCall(state)) return state;
       const secondsLeft = Math.max(0, Math.ceil((state.deadline - action.now) / 1000));
       if (secondsLeft === state.secondsLeft) return state;
@@ -152,11 +177,11 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
     case "closing":
       return state.closing ? state : { ...state, closing: true };
     case "ended":
-      return { ...state, phase: "ended", endReason: state.endReason ?? action.reason, closing: false, userLevel: 0, botLevel: 0 };
+      return { ...state, phase: "ended", endReason: state.endReason ?? action.reason, closing: false, wakingSince: null, wakingSeconds: null, userLevel: 0, botLevel: 0 };
     case "failed":
-      return { ...state, phase: "failed", failure: action.failure, closing: false, userLevel: 0, botLevel: 0 };
+      return { ...state, phase: "failed", failure: action.failure, closing: false, wakingSince: null, wakingSeconds: null, userLevel: 0, botLevel: 0 };
     case "dismiss":
-      return inCall(state) ? state : { ...initialVoiceState, available: state.available, saidUnavailable: state.saidUnavailable };
+      return inCall(state) ? state : { ...initialVoiceState, offered: state.offered, available: state.available, saidUnavailable: state.saidUnavailable };
   }
 }
 
@@ -164,7 +189,7 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
 export function phaseLabel(state: VoiceState): string {
   switch (state.phase) {
     case "connecting":
-      return "Connecting…";
+      return state.wakingSeconds !== null ? "Waking the voice model…" : "Connecting…";
     case "greeting":
       return "Cairnly is saying hello";
     case "listening":

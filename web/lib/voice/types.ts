@@ -13,7 +13,7 @@ export type VoiceFailure =
 
 export type VoicePhase =
   | "idle" // no call
-  | "connecting" // microphone, conversation and connection being set up
+  | "connecting" // microphone, conversation and connection being set up (and the GPU waking)
   | "greeting" // connected; the bot says hello
   | "listening" // the caller's turn
   | "thinking" // the caller finished; the answer is being looked up
@@ -55,8 +55,11 @@ export interface StartReply {
 
 export interface VoiceState {
   phase: VoicePhase;
-  available: boolean | null; // null: not asked yet; false hides the microphone
-  saidUnavailable: boolean; // the server answered "not now" (not merely unreachable)
+  offered: boolean; // the page offers voice (the API saves conversations); nothing asked yet
+  available: boolean | null; // null: not asked yet (the mic shows); false hides the microphone
+  saidUnavailable: boolean; // a call was refused, or the server could not be reached
+  wakingSince: number | null; // ms since epoch: the first request to the voice server left
+  wakingSeconds: number | null; // seconds since then, until the server answers the start
   callId: string | null;
   deadline: number | null; // ms since epoch, from the browser clock when the call connected
   secondsLeft: number | null;

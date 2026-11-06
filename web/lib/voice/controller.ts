@@ -1,10 +1,14 @@
-// Drives a voice call: asks the voice server whether calls are possible, starts one inside the
-// reader's click, feeds the state machine (events, audio levels, the clock), hangs up
-// gracefully, then reloads the saved conversation so the spoken turns show as normal messages.
-// No React: the page subscribes to it (useSyncExternalStore), and tests run it with a fake
-// adapter and a fake fetch.
+// Drives a voice call: starts one inside the reader's click, feeds the state machine (events,
+// audio levels, the clock), hangs up gracefully, then reloads the saved conversation so the
+// spoken turns show as normal messages. No React: the page subscribes to it
+// (useSyncExternalStore), and tests run it with a fake adapter and a fake fetch.
+//
+// The voice server runs on a GPU that sleeps when nobody calls, and any request to it wakes it.
+// So nothing is sent to it until the reader clicks the microphone: the first click asks for its
+// status (once per page) and starts the call, showing "Waking the voice model" with the seconds
+// it takes. A refusal hides the microphone with one neutral line.
 
-import { inCall, initialVoiceState, voiceReducer, type VoiceAction } from "@/lib/voice/machine";
+import { inCall, initialVoiceState, showMic, voiceReducer, type VoiceAction } from "@/lib/voice/machine";
 import { MicError, type VoiceAdapter, type VoiceLink } from "@/lib/voice/adapter";
 import type { EndReason, StartReply, Transport, VoiceEvent, VoiceFailure, VoiceState, VoiceStatus } from "@/lib/voice/types";
 
@@ -58,6 +62,7 @@ export class VoiceController {
   private hungUp = false; // this side ended the call
   private finishing: Promise<void> | null = null;
   private disposed = false;
+  private abort: AbortController | null = null; // cancels the setup's requests on a hang-up
 
   constructor(private readonly options: VoiceControllerOptions) {}
 
@@ -84,33 +89,35 @@ export class VoiceController {
     this.listeners.forEach((l) => l());
   }
 
-  /** GET /voice/status. Anything but a clear "available" hides the microphone. */
-  async checkStatus(): Promise<boolean> {
-    let status: VoiceStatus | null = null;
-    let said = false; // the server answered, and said no
+  /** The page has loaded and can offer voice (the API saves conversations): the mic shows.
+   * Nothing is sent to the voice server here; that waits for a click. */
+  offer(offered: boolean): void {
+    this.dispatch({ type: "offer", offered });
+  }
+
+  /** GET /voice/status, after a click only (it wakes the GPU). Anything but a clear
+   * "available" with a transport is no. */
+  private async fetchStatus(): Promise<VoiceStatus | null> {
     try {
-      const res = await this.fetch(`${this.options.baseUrl}/voice/status`, { cache: "no-store" });
+      const res = await this.fetch(`${this.options.baseUrl}/voice/status`, { cache: "no-store", signal: this.abort?.signal });
       const body = res.ok ? ((await res.json()) as Partial<VoiceStatus>) : null;
-      if (body?.available === true && Array.isArray(body.transports) && body.transports.length > 0) status = body as VoiceStatus;
-      else said = body?.available === false;
+      if (body?.available === true && Array.isArray(body.transports) && body.transports.length > 0) return body as VoiceStatus;
     } catch {
-      // unreachable: no voice, and nothing to say about it
+      // unreachable: the same as "not now"
     }
-    if (this.disposed) return false;
-    this.status = status;
-    this.dispatch({ type: "status", available: status !== null, said });
-    return status !== null;
+    return null;
   }
 
   /** Start a call. Call it synchronously from the click handler: the audio is unlocked here,
    * before anything is awaited. */
   start(): void {
-    if (!this.status || inCall(this.state) || this.state.closing || this.finishing) return;
+    if (!showMic(this.state) || this.finishing) return;
     this.options.adapter.prepare();
     this.hungUp = false;
     this.reply = null;
+    this.abort = new AbortController();
     this.dispatch({ type: "start" });
-    void this.connect(this.status);
+    void this.connect();
   }
 
   /** End the call the graceful way: tell the server, let it close, then close our side. */
@@ -119,7 +126,12 @@ export class VoiceController {
     this.hungUp = true;
     this.dispatch({ type: "closing" });
     const link = this.link;
-    if (!link) return; // still connecting: connect() sees the closing state and stops
+    if (!link) {
+      // Still connecting (the GPU may take a minute to wake): drop its requests now, and
+      // connect() sees the closing state and stops.
+      this.abort?.abort();
+      return;
+    }
     link.send({ kind: "call.hangup" });
     await link.close();
     await this.finish();
@@ -138,6 +150,7 @@ export class VoiceController {
 
   dispose(): void {
     this.disposed = true;
+    this.abort?.abort();
     this.stopTimers();
     const link = this.link;
     this.link = null;
@@ -149,7 +162,7 @@ export class VoiceController {
     }
   }
 
-  private async connect(status: VoiceStatus): Promise<void> {
+  private async connect(): Promise<void> {
     const { adapter, chat } = this.options;
     try {
       await adapter.openMic();
@@ -157,6 +170,15 @@ export class VoiceController {
       return this.fail(err instanceof MicError ? err.kind : "no-mic");
     }
     if (this.abandoned()) return;
+    // From here on the voice server is asked, which wakes its GPU if it sleeps: count the seconds
+    // until it answers the start. Its status is asked once per page, not before every call.
+    this.dispatch({ type: "waking", now: this.now() });
+    this.startTimers();
+    const status = this.status ?? (await this.fetchStatus());
+    if (this.abandoned()) return;
+    if (!status) return this.refused();
+    this.status = status;
+    this.dispatch({ type: "status", available: true });
     const conversationId = await chat.ensureConversation();
     if (!conversationId) return this.fail("unavailable");
     if (this.abandoned()) return;
@@ -183,18 +205,24 @@ export class VoiceController {
       this.startTimers();
     } catch (err) {
       adapter.release();
+      if (this.abandoned()) return;
       const kind = err instanceof StartError ? err.kind : "transport";
-      if (kind === "unavailable") {
-        this.status = null;
-        this.dispatch({ type: "status", available: false, said: true });
-      }
-      this.fail(kind === "unavailable" ? "unavailable" : "transport");
+      if (kind === "unavailable") return this.refused();
+      this.fail("transport");
     }
+  }
+
+  /** Voice said no (off, busy, a limit) or could not be reached: hide the mic, say so once. */
+  private refused(): void {
+    this.status = null;
+    if (!this.disposed) this.dispatch({ type: "status", available: false, said: true });
+    this.fail("unavailable");
   }
 
   /** The reader hung up (or left) while the call was being set up. */
   private abandoned(): boolean {
     if (!this.state.closing && !this.disposed) return false;
+    this.stopTimers();
     this.options.adapter.release();
     if (!this.disposed) this.dispatch({ type: "ended", reason: "hung_up" });
     return true;
@@ -208,6 +236,7 @@ export class VoiceController {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: this.abort?.signal,
       });
     } catch {
       throw new StartError("transport");
@@ -220,6 +249,7 @@ export class VoiceController {
     if ([409, 429, 503].includes(res.status)) throw new StartError("unavailable");
     if (!res.ok) throw new StartError("transport");
     this.reply = (await res.json()) as StartReply;
+    this.dispatch({ type: "woke" });
     return this.reply;
   }
 
@@ -266,8 +296,8 @@ export class VoiceController {
       if (this.disposed) return;
       if (reason) this.dispatch({ type: "ended", reason });
       else this.dispatch({ type: "failed", failure: "transport" });
+      // No status check here: it could keep the GPU awake. A next call that is refused says so.
       await this.options.chat.reload();
-      void this.checkStatus(); // the budgets may have changed
     })().finally(() => {
       this.finishing = null;
     });

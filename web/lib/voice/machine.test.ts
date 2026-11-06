@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockText, ENDING_NOTICE_S, inCall, initialVoiceState, SPEAKING_HOLD_MS, voiceReducer, type VoiceAction } from "@/lib/voice/machine";
+import { clockText, ENDING_NOTICE_S, inCall, initialVoiceState, phaseLabel, showMic, SPEAKING_HOLD_MS, voiceReducer, type VoiceAction } from "@/lib/voice/machine";
 import type { VoiceState } from "@/lib/voice/types";
 
 const run = (actions: VoiceAction[], from: VoiceState = initialVoiceState) => actions.reduce(voiceReducer, from);
@@ -78,6 +78,30 @@ describe("voiceReducer", () => {
     expect(s).toMatchObject({ phase: "failed", failure: "mic-denied" });
     expect(voiceReducer(s, loud(1))).toBe(s);
     expect(voiceReducer(s, { type: "dismiss" }).phase).toBe("idle");
+  });
+
+  it("shows the mic once offered, without asking, until a call is refused", () => {
+    expect(showMic(initialVoiceState)).toBe(false);
+    let s = run([{ type: "offer", offered: true }]);
+    expect(showMic(s)).toBe(true); // available is still null: nothing was asked
+    s = run([{ type: "start" }], s);
+    expect(showMic(s)).toBe(false); // in a call
+    s = run([{ type: "status", available: false, said: true }, { type: "failed", failure: "unavailable" }, { type: "dismiss" }], s);
+    expect(s).toMatchObject({ offered: true, saidUnavailable: true });
+    expect(showMic(s)).toBe(false);
+  });
+
+  it("counts the seconds the voice model takes to wake", () => {
+    let s = run([{ type: "offer", offered: true }, { type: "start" }, { type: "waking", now: 1_000 }]);
+    expect(s).toMatchObject({ phase: "connecting", wakingSeconds: 0 });
+    expect(phaseLabel(s)).toBe("Waking the voice model…");
+    s = voiceReducer(s, { type: "tick", now: 38_500 });
+    expect(s.wakingSeconds).toBe(37);
+    s = voiceReducer(s, { type: "woke" });
+    expect(s).toMatchObject({ wakingSince: null, wakingSeconds: null });
+    expect(phaseLabel(s)).toBe("Connecting…");
+    const failed = run([{ type: "waking", now: 0 }, { type: "failed", failure: "unavailable" }], run([{ type: "start" }]));
+    expect(failed.wakingSeconds).toBeNull();
   });
 
   it("formats the clock", () => {

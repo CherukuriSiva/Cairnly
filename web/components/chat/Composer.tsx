@@ -7,8 +7,8 @@ const MAX_LINES = 6;
 
 /** The input pinned under the chat: an auto-growing textarea (up to 6 lines), the scope chip,
  * and Ask or Stop. Enter sends, Shift+Enter adds a line, and Enter while an IME is composing
- * does not send. With voice mode: a microphone button (`onVoice`, only when the voice server
- * says calls are possible), the voice panel in place of the input during a call (`voicePanel`)
+ * does not send. With voice mode: a microphone button (`onVoice`, until the voice server has
+ * refused a call), the voice panel in place of the input during a call (`voicePanel`)
  * and a notice above it after a call (`voiceNotice`). */
 export function Composer({
   value,

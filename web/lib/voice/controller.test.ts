@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MicError, parseVoiceEvent, type ConnectOptions, type VoiceAdapter, type VoiceLink } from "@/lib/voice/adapter";
 import { VoiceController } from "@/lib/voice/controller";
+import { failureLine, phaseLabel, showMic } from "@/lib/voice/machine";
 import type { VoiceEvent } from "@/lib/voice/types";
 
 const BASE = "http://voice.test";
@@ -81,14 +82,99 @@ describe("VoiceController", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("hides the mic unless the server clearly says available", async () => {
-    for (const route of [() => json({ ...STATUS, available: false }), () => json({}, 500), () => json({ ...STATUS, transports: [] })]) {
-      const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: fakeFetch({ "GET /voice/status": route }).impl });
-      expect(await v.checkStatus()).toBe(false);
-      expect(v.getState().available).toBe(false);
+  it("loading /ask makes no request to the voice server; the mic shows until a click asks", async () => {
+    const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY) });
+    const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: f.impl });
+    expect(showMic(v.getState())).toBe(false); // before /config says conversations are saved
+    v.offer(true); // what the page does once /config has answered
+    await vi.advanceTimersByTimeAsync(60_000); // a reader who stays on /ask a minute and never clicks
+    expect(f.calls).toEqual([]);
+    expect(showMic(v.getState())).toBe(true); // the mic shows without asking
+    v.start();
+    await flush();
+    expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status", "POST /voice/calls"]);
+  });
+
+  it("asks the status once per page, not again after each call", async () => {
+    const f = fakeFetch({
+      "GET /voice/status": () => json(STATUS),
+      "POST /voice/calls": () => json(REPLY),
+      "GET /voice/calls/call-1": () => json({ end_reason: "hung_up" }),
+    });
+    const a = fakeAdapter();
+    const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
+    v.offer(true);
+    v.start();
+    await flush();
+    await v.hangUp();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status", "POST /voice/calls", "GET /voice/calls/call-1"]);
+    v.dismiss();
+    v.start();
+    await flush();
+    expect(f.calls.map((c) => c.key).filter((k) => k === "GET /voice/status")).toHaveLength(1);
+  });
+
+  it("shows the seconds the voice model takes to wake, until the start is answered", async () => {
+    let wake: () => void = () => {};
+    const f = fakeFetch({
+      "GET /voice/status": () => new Promise<Response>((resolve) => (wake = () => resolve(json(STATUS)))),
+      "POST /voice/calls": () => json(REPLY),
+    });
+    let now = 0;
+    const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: f.impl, now: () => now });
+    v.offer(true);
+    v.start();
+    await flush();
+    expect(v.getState()).toMatchObject({ phase: "connecting", wakingSeconds: 0 });
+    expect(phaseLabel(v.getState())).toBe("Waking the voice model…");
+    now = 12_000;
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(v.getState().wakingSeconds).toBe(12);
+    wake();
+    await flush();
+    expect(v.getState()).toMatchObject({ phase: "connecting", wakingSeconds: null });
+    expect(phaseLabel(v.getState())).toBe("Connecting…");
+  });
+
+  it("hanging up while the model wakes stops at once", async () => {
+    const f = fakeFetch({
+      "GET /voice/status": (init) =>
+        new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))),
+    });
+    const a = fakeAdapter();
+    const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
+    v.offer(true);
+    v.start();
+    await flush();
+    await v.hangUp();
+    await flush();
+    expect(v.getState()).toMatchObject({ phase: "ended", endReason: "hung_up", wakingSeconds: null });
+    expect(a.log).toContain("release");
+    expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status"]);
+  });
+
+  it("a click on a refusing or unreachable voice server hides the mic with one neutral line", async () => {
+    for (const routes of [
+      { "GET /voice/status": () => json({ ...STATUS, available: false }) },
+      { "GET /voice/status": () => json({}, 500) },
+      { "GET /voice/status": () => json({ ...STATUS, transports: [] }) },
+      {},
+    ] as Record<string, Route>[]) {
+      const f = fakeFetch(routes);
+      const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: f.impl });
+      v.offer(true);
+      v.start();
+      await flush();
+      expect(v.getState()).toMatchObject({ phase: "failed", failure: "unavailable", available: false, saidUnavailable: true });
+      expect(failureLine(v.getState().failure)).toBe("Voice isn't available right now.");
+      expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status"]); // no start after a no
+      v.dismiss();
+      expect(showMic(v.getState())).toBe(false);
+      v.start(); // the mic is gone; nothing more is asked
+      await flush();
+      expect(f.calls).toHaveLength(1);
     }
-    const down = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: fakeFetch({}).impl });
-    expect(await down.checkStatus()).toBe(false);
   });
 
   it("calls the browser's fetch as a plain function (a method call is an Illegal invocation)", async () => {
@@ -98,7 +184,10 @@ describe("VoiceController", () => {
     });
     try {
       const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat });
-      expect(await v.checkStatus()).toBe(true);
+      v.offer(true);
+      v.start();
+      await flush();
+      expect(v.getState().available).toBe(true);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -114,7 +203,7 @@ describe("VoiceController", () => {
     const c = chat();
     let now = 0;
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: c.chat, fetchImpl: f.impl, now: () => now, newKey: () => "key-12345678" });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     expect(a.log[0]).toBe("prepare"); // before anything was awaited
     expect(v.getState().phase).toBe("connecting");
@@ -144,7 +233,7 @@ describe("VoiceController", () => {
     const a = fakeAdapter();
     let now = 0;
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl, now: () => now });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     a.emit({ kind: "call.ready", call_id: "call-1", max_seconds: 40 });
@@ -167,7 +256,7 @@ describe("VoiceController", () => {
     const a = fakeAdapter();
     const c = chat();
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: c.chat, fetchImpl: f.impl });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     a.emit({ kind: "call.ready", call_id: "call-1", max_seconds: 300 });
@@ -182,7 +271,7 @@ describe("VoiceController", () => {
     const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY), "GET /voice/calls/call-1": () => json({ end_reason: null }) });
     const a = fakeAdapter();
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     a.drop();
@@ -194,11 +283,11 @@ describe("VoiceController", () => {
     const f = fakeFetch({ "GET /voice/status": () => json(STATUS) });
     const a = fakeAdapter({ mic: "mic-denied" });
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     expect(v.getState()).toMatchObject({ phase: "failed", failure: "mic-denied" });
-    expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status"]);
+    expect(f.calls).toEqual([]); // a refused mic never wakes the voice server
     expect(a.log).toContain("release");
   });
 
@@ -209,7 +298,7 @@ describe("VoiceController", () => {
     });
     const a = fakeAdapter();
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl, sleep: async () => {}, newKey: () => "key-same-1" });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     const starts = f.calls.filter((c) => c.key === "POST /voice/calls");
@@ -219,7 +308,7 @@ describe("VoiceController", () => {
 
     const g = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json({ detail: "x" }, 503, { "Retry-After": "30" }) });
     const w = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: g.impl });
-    await w.checkStatus();
+    w.offer(true);
     w.start();
     await flush();
     expect(w.getState()).toMatchObject({ phase: "failed", failure: "unavailable", available: false });
@@ -228,7 +317,7 @@ describe("VoiceController", () => {
   it("no saved conversation (an older API): voice is unavailable", async () => {
     const f = fakeFetch({ "GET /voice/status": () => json(STATUS) });
     const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat(null).chat, fetchImpl: f.impl });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     expect(v.getState()).toMatchObject({ phase: "failed", failure: "unavailable" });
@@ -238,7 +327,7 @@ describe("VoiceController", () => {
     const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY) });
     const a = fakeAdapter();
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl, transport: "webrtc" });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     expect(a.log).toContain("connect webrtc");
@@ -248,7 +337,7 @@ describe("VoiceController", () => {
     const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY) });
     const a = fakeAdapter();
     const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
-    await v.checkStatus();
+    v.offer(true);
     v.start();
     await flush();
     v.toggleMute();
