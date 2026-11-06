@@ -128,6 +128,9 @@ lessons do not cover, which is where most off-task requests end up.
 
 ## Limits
 
+Follow-ups in a saved conversation use the history the server kept, not history the browser
+sends, so earlier turns cannot be forged; turns the guard refused are left out of it.
+
 To keep the free deploy free and fair (numbers are the defaults, per API process; the default
 deploy runs one API container, so they hold for the whole site):
 
@@ -138,9 +141,13 @@ deploy runs one API container, so they hold for the whole site):
   after that, measured on the wall clock; a follow-up's rewrite step must finish within 90
   seconds. With every step at its limit (rewrite, query embedding, first token, answer) the
   worst case is about 6 minutes; a warm GPU answers in seconds
+- the saved-conversation routes (create, read, delete, vote) have their own limit: 30 a minute
+  and 1,000 a day from one IP address, and 5,000 new conversations a day for the whole site; a
+  vote reason is at most 300 characters
 
 Over a limit, the API answers 429 (with a Retry-After header) or 503, and the chat says how
-long to wait.
+long to wait. A short wait (a cold start, or a rate limit of 10 seconds or less) is waited out
+once by the chat itself before it shows a Retry button.
 
 ## Claude is local only
 

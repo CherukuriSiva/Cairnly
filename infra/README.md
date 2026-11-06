@@ -51,8 +51,9 @@ Run every command from the repo root.
 5. **Check every key:** `uvx modal run deploy/modal_api.py::check`. It prints one PASS or FAIL
    line per check (database, Ollama with the token, Ollama without it must be 401, Langfuse),
    never a value, and fails when any check fails.
-6. **Fill the database:** `uvx modal run deploy/modal_api.py::ingest` (migrate, then every
-   knowledge base in `kbs.yaml`). It prints how many chunks were embedded.
+6. **Fill the database:** `uvx modal run deploy/modal_api.py::ingest` (migrate, which also
+   creates the saved-conversation tables, then every knowledge base in `kbs.yaml`). It prints
+   how many chunks were embedded.
 7. **The site on Vercel:** import the GitHub repo in the Vercel dashboard under your personal
    account. Root Directory `web`, framework Next.js, and turn on "Include files outside the
    root directory in the Build Step" (the build reads `../content`). Add the environment
@@ -61,12 +62,15 @@ Run every command from the repo root.
    uploads only `web/` and `content/` ([.vercelignore](../.vercelignore)).
 8. **CORS:** `CORS_ORIGINS` in `deploy/modal_api.py` is the site's production domain,
    `https://cairnly-blond.vercel.app`. If yours differs, set it there and deploy the API again.
-9. **Smoke test:** `curl <api>/health` answers 200, `curl <api>/config` lists only Ollama, and
-   a question in the chat on the site gets a cited answer.
+9. **Smoke test:** `curl <api>/health` answers 200, `curl <api>/config` lists only Ollama and
+   `"features": {"conversations": true, "feedback": true}`, and a question in the chat on the
+   site gets a cited answer with vote buttons that survives a reload. `<site>/ask?demo=1`
+   replays a recorded chat without calling the API.
 
 | Situation | Do this |
 |---|---|
-| Ship a new API version | `uvx modal deploy deploy/modal_api.py` |
+| Ship a new API version | `uvx modal deploy deploy/modal_api.py`, then `uvx modal run deploy/modal_api.py::migrate` when the schema changed (safe to re-run) |
+| Turn on saved conversations (ADR 0018) | Deploy the API, then `uvx modal run deploy/modal_api.py::migrate` (creates `conversations`, `messages`, `feedback`). The site may ship before or after: until the API lists `features` in `/config`, the chat keeps its history in the tab. To keep them off, set `CONVERSATIONS=0` in `API_ENV` |
 | Ship a new site version | Push to `main`; Vercel builds it |
 | Lessons, `syllabus.yaml`, `kbs.yaml` or `prompts/` changed | Push (the site), then `uvx modal deploy deploy/modal_api.py` (the API image holds its own copy of these files), then `uvx modal run deploy/modal_api.py::ingest`; only changed files are re-embedded |
 | Rotate a key | Edit the value in the `cairnly-api` secret, then `uvx modal deploy deploy/modal_api.py` so new containers read it; run `check` |

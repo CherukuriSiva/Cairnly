@@ -8,13 +8,17 @@ visit, where, and for how long. The tracing design is in
 
 Each question goes to the API with:
 
-- the question and up to 6 earlier questions and answers from the same chat (for follow-ups),
+- the question,
+- the **conversation id** of your saved chat (see below), or, when the API does not save
+  conversations, up to 6 earlier questions and answers from the same chat (for follow-ups),
 - the track the chat is limited to, if any,
 - a **session id**: a random id made by your browser tab (`crypto.randomUUID()`) and kept in that
   tab's `sessionStorage`. A new tab gets a new id. It is not linked to you, your device or your
   IP address; it only lets an operator see that two questions came from the same conversation.
 
-The chat stores nothing else in your browser.
+In your browser the chat keeps the session id (above) and the conversation id, in
+`localStorage` under `cairnly.conversation.v1`, so a reload brings the chat back. Nothing else.
+"New chat" forgets the id. The demo at `/ask?demo=1` replays recordings and sends nothing.
 
 ## What the server keeps
 
@@ -22,12 +26,35 @@ The chat stores nothing else in your browser.
 |---|---|---|
 | Your IP address and request counts, for rate limits | the API's memory only, never written to disk | until the process restarts; addresses from past days are dropped once more than 10,000 are held |
 | API logs | the default deploy: the API app's logs on Modal; the AWS deploy: Uvicorn access logs (client address, path, status code, time) in CloudWatch | Modal's log retention; 14 days on AWS (the log group retention) |
+| Saved conversations: your questions, the answers with their sources, and your votes (see below) | the API's Postgres database (Neon on the default deploy) | deleted 30 days after the conversation was last used; at once when you press "New chat" |
 | Traces (see below) | the operator's Langfuse project (Langfuse Cloud, US region, on the default deploy) | the retention set in that project |
 
 On AWS, behind the load balancer, the client address in the API's access logs is usually the
 load balancer's own address. Load balancer access logs are not turned on.
 
-Questions and answers are not stored in the database. The database holds only the lessons.
+## Saved conversations
+
+So that a reload does not lose your chat, the API saves each finished question and answer:
+
+- the question as you typed it and the answer as you saw it (a refusal included), the answer's
+  sources, and whether it was typed or spoken (`text` or `voice`),
+- a thumbs-up or thumbs-down on an answer, if you give one, and the optional reason you type
+  after a thumbs-down (at most 300 characters).
+
+A conversation is keyed by a random id (a UUIDv4) that the server makes and only your browser
+keeps. There are no accounts and no list of conversations: the database never stores your IP
+address or the session id with them. One link exists outside the database: the API's access
+logs (see the table) record the request path, which for the conversation routes contains the
+conversation id, next to the client address. Anyone who has the
+id can read that conversation, so do not share it, and do not type personal details you would
+not want stored.
+
+A conversation is deleted, with its votes, 30 days after its last question
+(`CONVERSATION_RETENTION_DAYS`), and at once when you press "New chat". Answers that fail or
+that you stop are not saved. An operator can turn saving off (`CONVERSATIONS=0`); the chat then
+keeps the conversation in your tab only, as before.
+
+Apart from saved conversations, the database holds only the lessons.
 
 ## What a trace holds
 

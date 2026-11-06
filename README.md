@@ -60,14 +60,17 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Guard | Rules for injection, jailbreaks, prompt extraction and junk; an output check that withdraws prompt leaks and flags uncited answers ([SAFETY.md](SAFETY.md)) | `guard.py` |
 | Limits | Per-IP and site-wide rate limits, 4 answers at once, first-token and answer time limits | `limits.py` |
 | Providers | Ollama (local, or on a Modal GPU in production); the Claude API for local development only | `llm.py`, `ollama.py` |
-| API | FastAPI: `/health`, `/config`, `/search`, streaming `/ask` (Server-Sent Events) with history and track | `api.py` |
-| Chat | Next.js chat at `/ask` with clickable citations, source cards, a link to the full lesson under each answer, follow-ups, a track scope, and a friendly cold-start card with one automatic retry | `web/components/chat/` |
+| API | FastAPI: `/health`, `/config` (providers and optional features), `/search`, streaming `/ask` (Server-Sent Events) with history or a saved conversation, and track; `/conversations` to create, read and delete a saved chat and vote on its answers | `api.py` |
+| Saved conversations | Questions, answers (with sources) and votes in Postgres, keyed by a random id only the browser keeps; the server holds the follow-up history; idle chats deleted after 30 days ([ADR 0018](docs/adr/0018-saved-conversations-and-chat-engine.md), [PRIVACY.md](PRIVACY.md)) | `conversations.py` |
+| Chat engine | Framework-free: SSE event parser, a reducer from events to rows, a recovery table (one automatic retry per failure kind), a live transport with a stall timer and a replay transport with recorded streams | `web/lib/chat/` |
+| Chat | Next.js chat at `/ask`: answers typed out smoothly, clickable citations, source cards, a link to the full lesson, thumbs up and down, follow-ups, a track scope, auto-scroll that stops when you scroll up, a reload that keeps the chat, friendly cold-start cards, and a recorded demo at `/ask?demo=1`. Works against older APIs too (it reads `/config`) | `web/components/chat/` |
 | Evals | Golden set of quiz plus written questions (reported per source), off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
 | Tracing | One Langfuse trace per question (guard, rewrite, retrieve, generate, output check), with no user text by default ([PRIVACY.md](PRIVACY.md)) | `tracing.py` |
 | Deploy | Vercel + Modal (API and Ollama GPU) + Neon on free plans, Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy | [infra/](infra/README.md), `deploy/` |
 
 How and why each piece works, in plain English: [LEARN-M1](docs/LEARN-M1.md),
-[LEARN-M2](docs/LEARN-M2.md), [LEARN-M3](docs/LEARN-M3.md), [LEARN-M4](docs/LEARN-M4.md).
+[LEARN-M2](docs/LEARN-M2.md), [LEARN-M3](docs/LEARN-M3.md), [LEARN-M4](docs/LEARN-M4.md),
+[LEARN-CHAT](docs/LEARN-CHAT.md) (saved conversations and the chat engine).
 Design decisions: [docs/adr/](docs/adr/). Safety and privacy: [SAFETY.md](SAFETY.md),
 [PRIVACY.md](PRIVACY.md).
 
@@ -129,7 +132,12 @@ uv run cairnly ask "What is RAG and when does it beat pure prompting?"
 ```
 
 Then open http://localhost:3010/ask and click a starter question. The answer streams in with
-`[n]` citations that open the lesson section they came from.
+`[n]` citations that open the lesson section they came from. Reload the page: the chat comes
+back from the database. http://localhost:3010/ask?demo=1 replays recorded answers (a cited
+answer, a refusal, a guard block, a slow cold start and an error mid-answer) without the API.
+
+After pulling a new version, run `uv run cairnly migrate` again: it is safe to re-run and
+creates any new tables (for example the saved-conversation tables).
 
 ### Common problems
 
@@ -141,6 +149,7 @@ Then open http://localhost:3010/ask and click a starter question. The answer str
 | The chat shows "Waking up the model…" for a long time | The first answer loads qwen3:8b into memory; later answers are faster |
 | The chat cannot reach the API | Start `uv run cairnly serve`; for another address set `NEXT_PUBLIC_API_URL` and add the site to `CORS_ORIGINS` |
 | `429 Too Many Requests` | The local rate limits from `.env` apply to you too; raise `RATE_LIMIT_PER_MINUTE` for testing |
+| The chat forgets the conversation on reload, or votes are missing | `/config` has no `features` (an older API) or the conversation tables are missing: run `uv run cairnly migrate` and restart the API |
 
 `http://localhost:3010/ask?q=your+question&track=ai-engineering` opens the chat with a question
 already asked and the search limited to one track. Every lesson page has an "Ask Cairnly
@@ -187,10 +196,11 @@ the build when a metric breaks `evals/gates.yaml`.
 ```bash
 uv run pytest -m "not db"          # fast unit tests, no services needed
 uv run pytest                      # everything (needs `docker compose up -d db`)
-cd web && npm test                 # syllabus, links, anchors, quiz and chat client
+cd web && npm test                 # syllabus, links, anchors, quiz and the chat engine
 ```
 
-Tests use fake embedders and LLMs, so they need neither Ollama nor an API key. CI runs lint,
+Tests use fake embedders and LLMs, so they need neither Ollama nor an API key. The chat engine
+is tested through its replay transport with recorded event streams and fake timers. CI runs lint,
 tests against a real pgvector container, the eval gate with real embeddings, Terraform and
 Helm validation, both image builds, and the web tests and build.
 
@@ -213,13 +223,13 @@ its pages are generated from `content/`.
 ```
 content/          lessons, insights and roadmaps (MDX) + syllabus.yaml
 src/cairnly/      the Python package: ingest, search, answer, guard, limits, API, CLI
-web/              Next.js site and chat
+web/              Next.js site and chat (web/lib/chat: the chat engine, no React)
 evals/            written questions, off-topic, follow-up and red-team sets + CI gates
 prompts/          versioned answer and rewrite prompts
 deploy/           Modal apps: the API with its jobs, Ollama on a GPU
 infra/            Helm chart, Terraform for AWS, deploy guide
 tests/            pytest suite (fake models, optional real database)
-docs/             LEARN-M1..M4 write-ups and ADRs
+docs/             LEARN-M1..M4 and LEARN-CHAT write-ups and ADRs
 ```
 
 ## Roadmap
