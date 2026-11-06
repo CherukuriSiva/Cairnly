@@ -20,6 +20,24 @@ In your browser the chat keeps the session id (above) and the conversation id, i
 `localStorage` under `cairnly.conversation.v1`, so a reload brings the chat back. Nothing else.
 "New chat" forgets the id. The demo at `/ask?demo=1` replays recordings and sends nothing.
 
+## Voice mode
+
+When you start a call, your browser streams your microphone to the voice server (a separate
+app, `cairnly-voice`) for the length of the call, and plays its answers.
+
+- **Audio is never stored**, not by the voice server, not by the API, not in traces. It is
+  turned into text in memory and dropped.
+- **Captions are not stored.** They are shown live in your tab only.
+- What is stored is what a typed chat stores: each finished spoken question (as the speech to
+  text heard it) and its answer, saved into your conversation with the channel `voice`, under
+  the same 30-day retention. The voice server asks the API exactly as the chat does.
+- The voice server keeps, in its memory only: your IP address and how many calls it started
+  today (for the per-address limit; forgotten when the server restarts or the day ends), and
+  for each call its id, its conversation id, its state and why it ended, for one hour, so your
+  browser can read how the call ended.
+- Per-turn timings (how long each step took, no text) go to the operator's Langfuse project.
+- The microphone is used only during a call; the browser shows its own indicator while it is.
+
 ## What the server keeps
 
 | What | Where | How long |
@@ -27,6 +45,7 @@ In your browser the chat keeps the session id (above) and the conversation id, i
 | Your IP address and request counts, for rate limits | the API's memory only, never written to disk | until the process restarts; addresses from past days are dropped once more than 10,000 are held |
 | API logs | the default deploy: the API app's logs on Modal; the AWS deploy: Uvicorn access logs (client address, path, status code, time) in CloudWatch | Modal's log retention; 14 days on AWS (the log group retention) |
 | Saved conversations: your questions, the answers with their sources, and your votes (see below) | the API's Postgres database (Neon on the default deploy) | deleted 30 days after the conversation was last used; at once when you press "New chat" |
+| Voice calls: your IP address and call count for the day, each call's state and end reason (no audio, no captions; see Voice mode) | the voice server's memory only | the day (counts) and one hour (calls), or until the server restarts |
 | Traces (see below) | the operator's Langfuse project (Langfuse Cloud, US region, on the default deploy) | the retention set in that project |
 
 On AWS, behind the load balancer, the client address in the API's access logs is usually the

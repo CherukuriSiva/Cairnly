@@ -4,7 +4,8 @@ A free, public site for learning AI engineering, made for new graduates, with a 
 answers from the lessons. 126 lessons in six tracks, 7 roadmaps and 29 insights, all
 generated from one folder of MDX. Chat answers stream back with citations that open the exact
 lesson section they came from, and questions the lessons don't cover get an honest "not
-found" instead of a guess.
+found" instead of a guess. You can also talk to it: a voice mode answers out loud from the same
+lessons, with live captions.
 
 Built in public, one milestone at a time. **Now: M4 (production ready).**
 
@@ -26,6 +27,13 @@ tuning set. On 11 fresh attacks it was never tuned on, it misses 8, so it is a f
 not a wall: the output check behind it withdraws any answer that leaks the system prompt
 ([SAFETY.md](SAFETY.md)).
 
+**Voice** ([ADR 0019](docs/adr/0019-voice-stack.md), synthetic speech, an Apple M5 Max CPU):
+Whisper large-v3-turbo hears 40 spoken questions in ten accents with a 1.5% word error rate
+(Parakeet-TDT 2.7%, but 50 times faster); Kokoro starts speaking a sentence in 0.5 s. Locally,
+the first words of an answer play about 4.6 s after the caller stops talking, with a holding
+line ("Let me check the lessons.") after 2.6 s; speech to text runs on the CPU here and on a GPU
+in production.
+
 M2 added a cross-encoder reranker and a confidence gate calibrated from evals (Recall@5
 0.88 → 0.94). M3 measured the gate again on all public content with 40 off-topic questions
 and raised it to 0.70 ([ADR 0011](docs/adr/0011-recalibrated-confidence-gate.md)). Cycle 4
@@ -44,6 +52,9 @@ content/*.mdx --+--> web build --> static lesson pages (heading ids)
 question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + vector, RRF)
   --> cross-encoder rerank --> confidence gate --> LLM --> streamed answer + [n] citations
                                                            (each citation links /<track>/<lesson>#<section>)
+
+spoken question --> voice server: Silero VAD --> Whisper --> /ask (all of the above, saved as voice)
+  --> speakable sentences --> Kokoro --> spoken answer + live captions
 ```
 
 | Piece | What it does | Code |
@@ -64,13 +75,14 @@ question (+ earlier turns) --> rewrite follow-up --> hybrid search (keyword + ve
 | Saved conversations | Questions, answers (with sources) and votes in Postgres, keyed by a random id only the browser keeps; the server holds the follow-up history; idle chats deleted after 30 days ([ADR 0018](docs/adr/0018-saved-conversations-and-chat-engine.md), [PRIVACY.md](PRIVACY.md)) | `conversations.py` |
 | Chat engine | Framework-free: SSE event parser, a reducer from events to rows, a recovery table (one automatic retry per failure kind), a live transport with a stall timer and a replay transport with recorded streams | `web/lib/chat/` |
 | Chat | Next.js chat at `/ask`: answers typed out smoothly, clickable citations, source cards, a link to the full lesson, thumbs up and down, follow-ups, a track scope, auto-scroll that stops when you scroll up, a reload that keeps the chat, friendly cold-start cards, and a recorded demo at `/ask?demo=1`. Works against older APIs too (it reads `/config`) | `web/components/chat/` |
+| Voice | A Pipecat pipeline per call: Silero VAD, Whisper large-v3-turbo, a brain that asks `/ask` (so the guard, limits, gate, citations and saving are the text chat's), Kokoro. Holding line, sentence-by-sentence speech, barge-in (or half duplex), captions, call budgets; WebSocket audio in production, WebRTC locally ([ADR 0019](docs/adr/0019-voice-stack.md)) | `voice/`, `web/lib/voice/` |
 | Evals | Golden set of quiz plus written questions (reported per source), off-topic set, Recall@k, MRR, gate errors, follow-up eval, red-team gate, CI gates | `evals.py` |
 | Tracing | One Langfuse trace per question (guard, rewrite, retrieve, generate, output check), with no user text by default ([PRIVACY.md](PRIVACY.md)) | `tracing.py` |
 | Deploy | Vercel + Modal (API and Ollama GPU) + Neon on free plans, Docker Compose, Helm (tested on kind), Terraform for AWS + GitHub OIDC deploy | [infra/](infra/README.md), `deploy/` |
 
 How and why each piece works, in plain English: [LEARN-M1](docs/LEARN-M1.md),
 [LEARN-M2](docs/LEARN-M2.md), [LEARN-M3](docs/LEARN-M3.md), [LEARN-M4](docs/LEARN-M4.md),
-[LEARN-CHAT](docs/LEARN-CHAT.md) (saved conversations and the chat engine).
+[LEARN-CHAT](docs/LEARN-CHAT.md) (saved conversations, the chat engine and voice mode).
 Design decisions: [docs/adr/](docs/adr/). Safety and privacy: [SAFETY.md](SAFETY.md),
 [PRIVACY.md](PRIVACY.md).
 
@@ -151,6 +163,23 @@ creates any new tables (for example the saved-conversation tables).
 | `429 Too Many Requests` | The local rate limits from `.env` apply to you too; raise `RATE_LIMIT_PER_MINUTE` for testing |
 | The chat forgets the conversation on reload, or votes are missing | `/config` has no `features` (an older API) or the conversation tables are missing: run `uv run cairnly migrate` and restart the API |
 
+### Voice mode (optional)
+
+Talk to the chat and hear the answer. It needs a third process, the voice server, and about
+2 GB of speech models (downloaded on first start):
+
+```bash
+uv sync --extra voice --extra voice-models     # Pipecat, faster-whisper, Kokoro (no PyTorch)
+CORS_ORIGINS=http://localhost:3010 uv run cairnly voice-serve   # voice server on :8020
+cd web && NEXT_PUBLIC_VOICE_URL=http://localhost:8020 npm run dev
+```
+
+Open http://localhost:3010/ask: a microphone appears next to Ask. A call greets you, captions
+what you say and what it answers, lets you talk over it, and ends after 5 minutes, 50 quiet
+seconds or a "goodbye"; the spoken turns then show in the chat. `?transport=webrtc` uses
+peer-to-peer WebRTC instead of the WebSocket. `VOICE_FAKE_MODELS=1` runs the server without
+models (scripted speech, a tone for the voice). Settings: `.env.example`, `VOICE_*`.
+
 `http://localhost:3010/ask?q=your+question&track=ai-engineering` opens the chat with a question
 already asked and the search limited to one track. Every lesson page has an "Ask Cairnly
 about this lesson" button that does this for you.
@@ -186,6 +215,8 @@ uv run cairnly eval --kb lessons --gate evals/gates.yaml   # Recall@5, MRR, gate
 uv run cairnly eval --kb lessons --judge --limit 40         # + LLM-as-judge faithfulness
 uv run cairnly eval-followups                               # follow-up rewriting (needs a chat model)
 uv run cairnly eval-redteam --gate evals/gates.yaml         # input guard: wrong blocks, missed attacks
+uv sync --extra voice --extra voice-models --group voice-bench
+uv run python evals/voice_bench.py --e2e                    # speech to text, text to speech, voice turns
 ```
 
 CI runs the lessons eval on all content with real embeddings and the red-team gate, and fails
@@ -200,7 +231,10 @@ cd web && npm test                 # syllabus, links, anchors, quiz and the chat
 ```
 
 Tests use fake embedders and LLMs, so they need neither Ollama nor an API key. The chat engine
-is tested through its replay transport with recorded event streams and fake timers. CI runs lint,
+is tested through its replay transport with recorded event streams and fake timers. Voice
+tests (with `--extra voice`) run real Pipecat pipelines with fake speech: an energy VAD,
+scripted transcripts, a tone for the voice, and a WebSocket client; the browser side runs on a
+fake adapter. CI runs lint,
 tests against a real pgvector container, the eval gate with real embeddings, Terraform and
 Helm validation, both image builds, and the web tests and build.
 
@@ -210,7 +244,9 @@ The default production route runs on free and hobby plans
 ([ADR 0017](docs/adr/0017-free-tier-production.md)): the site on Vercel, the API on Modal
 ([deploy/modal_api.py](deploy/modal_api.py), one container that switches off when idle), the
 models on a Modal T4 GPU ([deploy/modal_ollama.py](deploy/modal_ollama.py)) and Postgres +
-pgvector on Neon. Every secret lives in one Modal secret, `cairnly-api`.
+pgvector on Neon. Every secret lives in one Modal secret, `cairnly-api`. Voice mode is a third,
+optional Modal app on a T4 GPU ([deploy/modal_voice.py](deploy/modal_voice.py)); the site shows
+the microphone only when it is built with `NEXT_PUBLIC_VOICE_URL`.
 
 See [infra/README.md](infra/README.md) for the steps, and for the other routes: Docker Compose,
 Kubernetes (`scripts/kind-up.sh`), and AWS (ECS Fargate + RDS + ALB) deployed by a GitHub
@@ -222,11 +258,11 @@ its pages are generated from `content/`.
 
 ```
 content/          lessons, insights and roadmaps (MDX) + syllabus.yaml
-src/cairnly/      the Python package: ingest, search, answer, guard, limits, API, CLI
-web/              Next.js site and chat (web/lib/chat: the chat engine, no React)
+src/cairnly/      the Python package: ingest, search, answer, guard, limits, API, CLI, voice/
+web/              Next.js site and chat (web/lib/chat and web/lib/voice: no React)
 evals/            written questions, off-topic, follow-up and red-team sets + CI gates
 prompts/          versioned answer and rewrite prompts
-deploy/           Modal apps: the API with its jobs, Ollama on a GPU
+deploy/           Modal apps: the API with its jobs, Ollama on a GPU, the voice server
 infra/            Helm chart, Terraform for AWS, deploy guide
 tests/            pytest suite (fake models, optional real database)
 docs/             LEARN-M1..M4 and LEARN-CHAT write-ups and ADRs

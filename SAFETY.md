@@ -145,6 +145,19 @@ deploy runs one API container, so they hold for the whole site):
   and 1,000 a day from one IP address, and 5,000 new conversations a day for the whole site; a
   vote reason is at most 300 characters
 
+Voice calls (the `cairnly-voice` app, ADR 0019) have limits of their own, on top of the API's,
+because a call holds a GPU:
+
+- one call at a time on the whole site; a call lasts at most 5 minutes (the page warns 30
+  seconds before the end, then the bot says goodbye) and hangs up after 50 seconds in which
+  nobody spoke
+- 10 calls a day from one IP address, 5 call starts a minute from one IP address
+- 60 minutes of calls a day for the whole site; a call never gets more time than is left, and
+  once the minutes are spent the microphone disappears until the next UTC day
+- every spoken question goes through `/ask` with the same guard, gate and output check as a
+  typed one; all of them reach the API from the voice server's one address, so the API's
+  per-address limit (10 a minute, 200 a day) also caps spoken questions for the whole site
+
 Over a limit, the API answers 429 (with a Retry-After header) or 503, and the chat says how
 long to wait. A short wait (a cold start, or a rate limit of 10 seconds or less) is waited out
 once by the chat itself before it shows a Retry button.

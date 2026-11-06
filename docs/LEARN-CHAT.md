@@ -3,7 +3,8 @@
 M4 made the chat safe to leave running. This step makes it feel solid: a reload keeps the
 conversation, readers can say an answer was wrong, answers appear smoothly, and the chat
 recovers from a sleeping server by itself. It also moves the chat logic out of React into a
-small engine that a voice mode can reuse. Design record: [ADR 0018](adr/0018-saved-conversations-and-chat-engine.md).
+small engine that a voice mode reuses (section 9). Design records: [ADR 0018](adr/0018-saved-conversations-and-chat-engine.md),
+[ADR 0019](adr/0019-voice-stack.md).
 
 ## 1. Where does a conversation live? (`conversations.py`, `db.py`)
 
@@ -127,6 +128,64 @@ and is undone if the API refuses it; clicking the pressed thumb clears the vote;
 wins on the server. Thumbs down opens an optional "what was wrong" box: focus moves into it and
 Escape closes it and returns focus to the thumb. Votes come back after a reload.
 
+## 9. Voice mode: a phone call with the lessons (`src/cairnly/voice/`, `web/lib/voice/`)
+
+Design record: [ADR 0019](adr/0019-voice-stack.md). A voice turn is a text turn with three
+extra problems: knowing when the caller has finished, turning speech into text, and turning the
+answer back into speech, all while the caller hears silence.
+
+**A pipeline of small processors.** [Pipecat](https://github.com/pipecat-ai/pipecat) moves
+"frames" (audio chunks, transcripts, text to speak, control signals) through a chain of
+processors. One call is: the caller's audio → Silero VAD (is this speech?) → Whisper (what was
+said?) → our brain → Kokoro (say this) → back to the caller. Each piece does one thing and can
+be swapped; the tests swap the models for fakes and run the same chain.
+
+**The brain has no model.** It sends each finished question to the API's `/ask`, exactly as the
+chat does, with the conversation id and `channel: "voice"`. The guard, the rate limits, the
+confidence gate, the citations and saving the turn are therefore the same code for typing and
+talking. After the call, the page reloads the conversation and the spoken turns appear as
+messages with a microphone mark.
+
+**Hiding the wait.** The moment the caller's turn is final, the bot says "Let me check the
+lessons.", which plays while the API searches. Then it speaks the answer one sentence at a time
+as the tokens arrive, instead of waiting for the whole answer. Written answers have markdown,
+code blocks, tables, links and `[n]` markers; `SpeechChunker` drops or rewrites all of those so
+nothing odd is read aloud.
+
+**Talking over the bot (barge-in).** If the VAD hears the caller while the bot speaks, the brain
+cancels the answer and sends an interruption, which empties every queue of speech still to be
+played; on the WebSocket, the browser also drops the audio it has buffered. It only works if
+the bot does not hear itself: the browser's echo cancellation removes the bot's voice from the
+microphone. Where that fails (some speakers, some rooms), `VOICE_HALF_DUPLEX=1` replaces the
+caller's audio with silence while the bot speaks.
+
+**Calls are a scarce resource.** `calls.py` decides who may call: one call at a time, 10 calls
+a day per address, 60 minutes a day for the whole site, 5 minutes per call, hang-up after 50
+quiet seconds or on "goodbye". A start carries a random key, so a retried request never opens a
+second call. Every call records why it ended (farewell, idle, max_duration, hung_up, replaced,
+error), and the page reads it afterwards.
+
+**WebSocket or WebRTC?** WebRTC is made for live audio, but it sends media over UDP, and a
+server in the cloud is only reachable that way for every caller with a TURN relay (phones on
+carrier networks sit behind NAT that blocks direct paths). Modal documents no inbound UDP, so
+production sends 16 kHz audio up and 24 kHz audio down over a WebSocket, on the same HTTPS
+address as everything else. Locally both work: `?transport=webrtc` on `/ask`.
+
+**The browser side, without React.** `machine.ts` is a pure state machine: idle, connecting,
+greeting, listening, thinking, speaking, ended or failed. It decides "speaking" from the bot's
+audio level (measured every 100 ms, held 1.2 s so pauses between words do not flicker) and from
+captions. The countdown keeps an absolute deadline and compares it with the clock each second,
+so a tab that slept in the background is right the moment it wakes. `controller.ts` starts the
+call inside the click: browsers (iOS above all) only let audio start from a user gesture, so
+the audio context is resumed before anything is awaited. `browser.ts` holds everything the
+browser provides (microphone, sockets, Web Audio) behind an interface, so the tests run the
+controller against fakes.
+
+**Accessibility.** Captions sit in an ordinary box, not a live region: a screen reader already
+hears the bot, and reading every caption would double it. One short status line ("Listening",
+"Cairnly is speaking") is announced instead, plus the 30-second warning. The orb that pulses
+with the voice is decoration (`aria-hidden`) and stands still under reduced motion.
+
 ## Try it
 
 ```bash
@@ -136,4 +195,10 @@ uv run cairnly serve
 curl -s localhost:8010/config               # ..."features": {"conversations": true, ...}
 cd web && npm test && npm run dev           # http://localhost:3010/ask, then reload the page
 open "http://localhost:3010/ask?demo=1"     # recorded demo, no API needed
+
+# Voice mode (README: "Voice mode")
+uv sync --extra voice --extra voice-models
+uv run pytest tests/test_voice_*.py         # the pipeline with fake speech, no models
+CORS_ORIGINS=http://localhost:3010 uv run cairnly voice-serve
+cd web && NEXT_PUBLIC_VOICE_URL=http://localhost:8020 npm run dev
 ```

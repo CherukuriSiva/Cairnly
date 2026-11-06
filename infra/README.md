@@ -20,6 +20,7 @@ Ollama and Postgres, points at the Modal URL with the proxy-token secret, and se
 browser ─▶ Vercel: the Next.js site (static pages, News refreshed hourly)
 browser ─▶ Modal: cairnly-api (FastAPI, one CPU container) ─┬─▶ Neon: Postgres + pgvector
                                                            └─▶ Modal: cairnly-ollama (one T4 GPU, proxy auth)
+browser ─▶ Modal: cairnly-voice (optional; one T4 GPU, audio over WSS) ─▶ cairnly-api /ask
 ```
 
 - Both Modal apps switch off after 5 idle minutes and run at most one container each. One API
@@ -67,6 +68,29 @@ Run every command from the repo root.
    site gets a cited answer with vote buttons that survives a reload. `<site>/ask?demo=1`
    replays a recorded chat without calling the API.
 
+### Voice mode (optional, ADR 0019)
+
+The voice server is a third Modal app, `cairnly-voice` ([deploy/modal_voice.py](../deploy/modal_voice.py)):
+one T4 container with Whisper large-v3-turbo and Kokoro baked in, the WebSocket transport, at
+most 60 call minutes a day (`VOICE_MINUTES_PER_DAY`), switched off after 2 idle minutes. It asks
+the deployed `cairnly-api` for every answer, so deploy the API (with `migrate`) first. It holds
+no database URL and no model token.
+
+1. **Its secret:** in the Modal dashboard, Secrets → create a custom secret named
+   `cairnly-voice` with only `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_HOST`
+   (the same values as in `cairnly-api`; per-turn timings, no text). An empty secret works too:
+   no tracing. Nothing else goes in it, and never an Anthropic key.
+2. **Deploy:** `uvx modal deploy deploy/modal_voice.py`. The first build downloads both models
+   (about 2 GB) into the image. It prints `https://<workspace>--cairnly-voice-web.modal.run`.
+3. **Smoke test:** `curl <voice>/voice/status` answers `{"available": true, ...,
+   "transports": ["websocket"]}` (the first call wakes the GPU: up to a minute).
+4. **The site:** in Vercel, add `NEXT_PUBLIC_VOICE_URL` = that URL (Production), then redeploy
+   (Deployments → Redeploy, or push). The microphone appears on `/ask` once the status says
+   available; without the variable, or while the API lacks saved conversations, the site shows
+   no microphone at all.
+5. **CORS:** `CORS_ORIGINS` in `VOICE_ENV` (deploy/modal_voice.py) must be the site's domain;
+   the voice server checks it for the routes and for the call socket.
+
 | Situation | Do this |
 |---|---|
 | Ship a new API version | `uvx modal deploy deploy/modal_api.py`, then `uvx modal run deploy/modal_api.py::migrate` when the schema changed (safe to re-run) |
@@ -80,7 +104,11 @@ Run every command from the repo root.
 | Search and answers fail with 401 from Modal | The proxy token in the secret is wrong: fix it, redeploy the API, run `check` |
 | Readers get 429 | A rate limit or the daily cap was reached; with one API container the limits are site-wide |
 | The browser shows a CORS error | `CORS_ORIGINS` in `deploy/modal_api.py` does not match the site's domain |
-| Modal bill grows | Check the spend limit and that both apps still set `max_containers=1` |
+| Modal bill grows | Check the spend limit and that every app still sets `max_containers=1`; for voice, lower `VOICE_MINUTES_PER_DAY` in `VOICE_ENV` and deploy it again |
+| Ship a new voice server | `uvx modal deploy deploy/modal_voice.py` |
+| Turn voice off | Remove `NEXT_PUBLIC_VOICE_URL` in Vercel and redeploy the site, or `uvx modal app stop cairnly-voice` (the mic then disappears: the status cannot be reached) |
+| The mic never appears | `curl <voice>/voice/status`: `available: false` with a `reason` (busy, limit, budget, off); or the site was built without `NEXT_PUBLIC_VOICE_URL`; or `/config` lacks `features.conversations` |
+| Calls connect but nothing is heard | Check the voice app's logs for the per-turn timings; a 403 on the socket means `CORS_ORIGINS` does not match the site |
 
 ## AWS architecture
 
