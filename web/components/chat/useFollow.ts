@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import { followAfterScroll, stopsFollowing } from "@/lib/chat/follow";
 
-function pageBottom(): number {
-  return document.documentElement.scrollHeight;
+/** Where the chat ends, in page coordinates: following keeps this edge at the bottom of the
+ * window (the site footer below the chat stays out of the way). */
+function chatEnd(chat: HTMLElement | null): number {
+  return chat ? chat.getBoundingClientRect().bottom + window.scrollY : document.documentElement.scrollHeight;
 }
 
 function isEditable(target: EventTarget | null): boolean {
@@ -12,11 +14,12 @@ function isEditable(target: EventTarget | null): boolean {
 }
 
 /**
- * Keep the page scrolled to the newest text while the reader is at the bottom (lib/chat/
- * follow.ts has the rules). Watches `content` for growth. `toBottom()` jumps to the end and
- * follows again, for when the reader sends a question.
+ * Keep the page scrolled to the newest text while the reader is at the end of the chat
+ * (lib/chat/follow.ts has the rules). Watches `chat` (the element that holds the transcript
+ * and the composer) for growth. `toBottom()` jumps to the end and follows again, for when the
+ * reader sends a question.
  */
-export function useFollow(content: RefObject<HTMLElement | null>): { toBottom: () => void } {
+export function useFollow(chat: RefObject<HTMLElement | null>): { toBottom: () => void } {
   const following = useRef(true);
   const lastTop = useRef(0);
   const touchY = useRef<number | null>(null);
@@ -25,7 +28,7 @@ export function useFollow(content: RefObject<HTMLElement | null>): { toBottom: (
     lastTop.current = window.scrollY;
     const onScroll = () => {
       const top = window.scrollY;
-      following.current = followAfterScroll(following.current, lastTop.current, top, window.innerHeight, pageBottom());
+      following.current = followAfterScroll(following.current, lastTop.current, top, window.innerHeight, chatEnd(chat.current));
       lastTop.current = top;
     };
     const stop = (e: Parameters<typeof stopsFollowing>[0]) => {
@@ -46,9 +49,9 @@ export function useFollow(content: RefObject<HTMLElement | null>): { toBottom: (
     window.addEventListener("keydown", onKey);
 
     const grown = new ResizeObserver(() => {
-      if (following.current) window.scrollTo({ top: pageBottom() });
+      if (following.current) window.scrollTo({ top: chatEnd(chat.current) - window.innerHeight });
     });
-    if (content.current) grown.observe(content.current);
+    if (chat.current) grown.observe(chat.current);
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("wheel", onWheel);
@@ -57,11 +60,11 @@ export function useFollow(content: RefObject<HTMLElement | null>): { toBottom: (
       window.removeEventListener("keydown", onKey);
       grown.disconnect();
     };
-  }, [content]);
+  }, [chat]);
 
   const toBottom = useCallback(() => {
     following.current = true;
-    window.scrollTo({ top: pageBottom() });
-  }, []);
+    window.scrollTo({ top: chatEnd(chat.current) - window.innerHeight });
+  }, [chat]);
   return { toBottom };
 }

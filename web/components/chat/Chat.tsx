@@ -82,8 +82,8 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const [feedback, setFeedback] = useState(false); // vote buttons: only when the API has them
   const [starters, setStarters] = useState<Starter[]>(LIVE_STARTERS);
   const busy = state.status !== "idle";
-  const transcript = useRef<HTMLElement>(null);
-  const { toBottom } = useFollow(transcript);
+  const page = useRef<HTMLElement>(null);
+  const { toBottom } = useFollow(page);
 
   useEffect(() => {
     providerRef.current = chooseProvider ? provider : null;
@@ -179,7 +179,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const Eyebrow = turns.length > 0 ? "h1" : "p";
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-3xl flex-col px-4 pt-8">
+    <main ref={page} className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-3xl flex-col px-4 pt-8">
       <Suspense fallback={null}>
         <UrlParams onChange={applyUrl} />
       </Suspense>
@@ -216,7 +216,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
 
       {/* The transcript is a log, but not a live one: screen readers would read every token.
           Each finished answer (and each error) is announced once by the status region below. */}
-      <section ref={transcript} role="log" aria-live="off" aria-label="Conversation" className="flex-1 space-y-8 py-8">
+      <section role="log" aria-live="off" aria-label="Conversation" className="flex-1 space-y-8 py-8">
         {turns.length === 0 && (
           <div>
             <SectionHeader
