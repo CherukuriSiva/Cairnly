@@ -85,9 +85,11 @@ no database URL and no model token.
 3. **Smoke test:** `curl <voice>/voice/status` answers `{"available": true, ...,
    "transports": ["websocket"]}` (the first call wakes the GPU: up to a minute).
 4. **The site:** in Vercel, add `NEXT_PUBLIC_VOICE_URL` = that URL (Production), then redeploy
-   (Deployments → Redeploy, or push). The microphone appears on `/ask` once the status says
-   available; without the variable, or while the API lacks saved conversations, the site shows
-   no microphone at all.
+   (Deployments → Redeploy, or push). The microphone appears on `/ask` once the API reports
+   saved conversations; loading the page sends nothing to the voice app (that would wake the
+   GPU for every visit). The first click wakes it and starts a call; if voice is off, busy or
+   out of minutes, the mic disappears with "Voice isn't available right now." Without the
+   variable, or while the API lacks saved conversations, the site shows no microphone at all.
 5. **CORS:** `CORS_ORIGINS` in `VOICE_ENV` (deploy/modal_voice.py) must be the site's domain;
    the voice server checks it for the routes and for the call socket.
 
@@ -106,8 +108,9 @@ no database URL and no model token.
 | The browser shows a CORS error | `CORS_ORIGINS` in `deploy/modal_api.py` does not match the site's domain |
 | Modal bill grows | Check the spend limit and that every app still sets `max_containers=1`; for voice, lower `VOICE_MINUTES_PER_DAY` in `VOICE_ENV` and deploy it again |
 | Ship a new voice server | `uvx modal deploy deploy/modal_voice.py` |
-| Turn voice off | Remove `NEXT_PUBLIC_VOICE_URL` in Vercel and redeploy the site, or `uvx modal app stop cairnly-voice` (the mic then disappears: the status cannot be reached) |
-| The mic never appears | `curl <voice>/voice/status`: `available: false` with a `reason` (busy, limit, budget, off); or the site was built without `NEXT_PUBLIC_VOICE_URL`; or `/config` lacks `features.conversations` |
+| Turn voice off | Remove `NEXT_PUBLIC_VOICE_URL` in Vercel and redeploy the site (the mic disappears), or `uvx modal app stop cairnly-voice` (the mic still shows; a click says "Voice isn't available right now." and hides it) |
+| The mic never appears | The site was built without `NEXT_PUBLIC_VOICE_URL`, or `/config` lacks `features.conversations` |
+| A click on the mic says voice isn't available | `curl <voice>/voice/status`: `available: false` with a `reason` (busy, limit, budget, off), or the voice app is stopped or unreachable |
 | Calls connect but nothing is heard | Check the voice app's logs for the per-turn timings; a 403 on the socket means `CORS_ORIGINS` does not match the site |
 
 ## AWS architecture

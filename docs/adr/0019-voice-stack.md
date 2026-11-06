@@ -52,8 +52,10 @@ caller audio -> [half-duplex gate] -> Silero VAD -> Whisper large-v3-turbo -> br
   notice 30 s before, a hang-up after 50 s of silence or on a spoken goodbye, and an end reason
   per call (farewell, idle, max_duration, hung_up, replaced, error) readable for an hour.
   Budgets per UTC day: 10 calls per address and **60 voice minutes for the whole site**; a call
-  never gets more time than the budget has left, and once it is spent the status says
-  unavailable and the microphone disappears.
+  never gets more time than the budget has left, and once it is spent a start is refused and
+  the microphone disappears after that click. A call has exactly one socket: the token is
+  checked and the call claimed in one step before the socket is accepted, and a socket without
+  the site's `Origin` is refused. A start that never connects frees its place after 10 s.
 - **Events** to the browser (`protocol.py`): `call.ready`, `caption.user`, `caption.bot`
   (marked when it is the holding line), `turn.saved`, `call.ending`, `call.closed` and, on the
   WebSocket, `audio.clear`. A bot caption is queued with the audio, so it reaches the browser
@@ -68,8 +70,12 @@ absolute deadline; a controller that starts the call inside the click (the audio
 resumed and the audio element unlocked before anything is awaited, for iOS), retries once while
 the last call is still closing, hangs up gracefully and then reloads the conversation, so the
 spoken turns appear as normal messages; and an adapter interface with WebSocket and WebRTC
-implementations. The mic shows only when the site was built with `NEXT_PUBLIC_VOICE_URL`, the
-API has saved conversations, and the voice status says available.
+implementations. The mic shows when the site was built with `NEXT_PUBLIC_VOICE_URL` and the
+API has saved conversations; **loading `/ask` sends nothing to the voice server.** The first
+click asks for its status (once per page, not again after each call) and starts the call,
+showing "Waking the voice model…" with the seconds it takes; a refusal (off, busy, a limit, the
+minutes spent) or a server that cannot be reached hides the mic with one neutral line, "Voice
+isn't available right now."
 
 ### Transport: WebSocket in production, WebRTC locally
 
@@ -152,10 +158,18 @@ need no GPU at all, which would cut the cost of every wake-up (see below).
 
 - Voice needs saved conversations; against an API without them (today's production) the mic
   never appears. The site ships safely before either Modal app is redeployed.
-- **Each status check can wake the GPU container.** The status route lives in the same container
-  as the models, so a visit to `/ask` may start a T4 for about two minutes (`scaledown_window`
-  120 s). Bounded by `max_containers=1` and the spend limit; a CPU-only status function reading
-  the budget from a shared store, or Parakeet on the CPU, would remove it.
+- **Only a click on the mic wakes the GPU.** Every route of the voice app, `/voice/status`
+  included, runs in the GPU container, and any request starts a T4 for about two minutes
+  (`scaledown_window` 120 s). A first version asked the status on every `/ask` load, so steady
+  visits alone could keep the T4 warm (about $18-20 a day); the page now asks nothing until the
+  reader clicks. The price: the first call after a quiet spell waits for a cold start (up to
+  about a minute, shown with a seconds counter), and since the status is not re-asked after a
+  call, the mic can show while the day's minutes are spent; that click then gets the neutral
+  line. A CPU-only status function reading the budget from a shared store, or Parakeet on the
+  CPU, would remove the wait.
+- **Logs carry no speech.** Pipecat logs through loguru at DEBUG by default, and its DEBUG
+  lines quote what the bot says. The voice server replaces that handler at import with one at
+  INFO that also drops the few higher lines that quote speech, so captions stay unstored.
 - All voice questions reach the API from the voice server's address, so they share one per-IP
   bucket there (10 a minute, 200 a day): a second, site-wide cap on spoken questions. The voice
   server's own per-address call limit is what is per caller.

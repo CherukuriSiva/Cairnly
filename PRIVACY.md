@@ -27,7 +27,8 @@ app, `cairnly-voice`) for the length of the call, and plays its answers.
 
 - **Audio is never stored**, not by the voice server, not by the API, not in traces. It is
   turned into text in memory and dropped.
-- **Captions are not stored.** They are shown live in your tab only.
+- **Captions are not stored.** They are shown live in your tab only. The voice server's logs
+  hold no speech or caption text (only call endings and per-turn timings).
 - What is stored is what a typed chat stores: each finished spoken question (as the speech to
   text heard it) and its answer, saved into your conversation with the channel `voice`, under
   the same 30-day retention. The voice server asks the API exactly as the chat does.

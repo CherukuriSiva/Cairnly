@@ -162,8 +162,17 @@ caller's audio with silence while the bot speaks.
 **Calls are a scarce resource.** `calls.py` decides who may call: one call at a time, 10 calls
 a day per address, 60 minutes a day for the whole site, 5 minutes per call, hang-up after 50
 quiet seconds or on "goodbye". A start carries a random key, so a retried request never opens a
-second call. Every call records why it ended (farewell, idle, max_duration, hung_up, replaced,
+second call, and a call has exactly one socket: the server checks the token and claims the call
+in one step before it accepts the socket, so a second socket with the same token is refused. Every call records why it ended (farewell, idle, max_duration, hung_up, replaced,
 error), and the page reads it afterwards.
+
+**Do not wake the GPU for a page view.** The voice server sleeps on a GPU when nobody calls,
+and any request to it, even "are calls possible?", wakes it for two minutes. So `/ask` sends it
+nothing when it loads: the mic shows whenever the site has a voice URL and the API saves
+conversations. The click asks for the status (once per page), starts the call and shows
+"Waking the voice model…" with a seconds counter while the GPU starts; if voice says no, the
+mic goes away with one neutral line. The cost of a status check is paid only by someone who
+wants to talk.
 
 **WebSocket or WebRTC?** WebRTC is made for live audio, but it sends media over UDP, and a
 server in the cloud is only reachable that way for every caller with a TURN relay (phones on

@@ -174,7 +174,9 @@ CORS_ORIGINS=http://localhost:3010 uv run cairnly voice-serve   # voice server o
 cd web && NEXT_PUBLIC_VOICE_URL=http://localhost:8020 npm run dev
 ```
 
-Open http://localhost:3010/ask: a microphone appears next to Ask. A call greets you, captions
+Open http://localhost:3010/ask: a microphone appears next to Ask. The page asks the voice server
+nothing until you click it (in production that would wake a GPU for every visit); the click
+wakes it, with a "Waking the voice model…" counter, and starts the call. A call greets you, captions
 what you say and what it answers, lets you talk over it, and ends after 5 minutes, 50 quiet
 seconds or a "goodbye"; the spoken turns then show in the chat. `?transport=webrtc` uses
 peer-to-peer WebRTC instead of the WebSocket. `VOICE_FAKE_MODELS=1` runs the server without

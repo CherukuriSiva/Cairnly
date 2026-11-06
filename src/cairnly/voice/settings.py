@@ -28,7 +28,7 @@ class VoiceSettings:
     max_calls: int = 1  # calls at once on this server
     calls_per_ip_per_day: int = 10
     starts_per_ip_per_minute: int = 5  # start requests, retries included
-    minutes_per_day: int = 60  # all calls together; status says unavailable once spent
+    minutes_per_day: int = 60  # all calls together; starts are refused once spent
     stt_model: str = WHISPER_TURBO
     stt_device: str = "cpu"  # "cuda" on the Modal GPU
     stt_compute: str = "int8"  # "float16" on the GPU

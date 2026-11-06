@@ -8,7 +8,7 @@ Everything here is plain Python with an injectable clock, so the rules are teste
   the old one ends with the reason "replaced".
 - **Budgets** (per UTC day, in memory, per server process like the API's rate limits): calls per
   client address, and the minutes of all calls together. The minute cap protects the GPU spend
-  limit, so once it is spent the status route says unavailable and the microphone disappears.
+  limit, so once it is spent starts are refused (and the status says unavailable).
   A call never gets more time than the budget has left.
 - **Concurrency.** At most `max_calls` calls at once (one by default: one container, one GPU).
   A call that is still closing holds its place; a start then gets "closing" and retries once.

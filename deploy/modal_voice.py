@@ -93,7 +93,7 @@ def use_production_settings() -> None:
 # outlast VOICE_MAX_CALL_S (300 s) with room for the goodbye.
 @app.function(gpu="T4", secrets=SECRETS, env=VOICE_ENV, max_containers=1,
               scaledown_window=120, timeout=600, cpu=4, memory=8192)
-@modal.concurrent(max_inputs=8)  # one call at a time (the CallBook) plus status checks
+@modal.concurrent(max_inputs=8)  # one call at a time (the CallBook) plus its HTTP requests
 @modal.asgi_app()
 def web():
     """The public voice endpoint. No proxy auth: the browser calls it directly."""

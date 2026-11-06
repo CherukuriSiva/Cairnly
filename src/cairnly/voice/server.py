@@ -1,7 +1,8 @@
 """The voice server's HTTP routes (`cairnly voice-serve`, or the cairnly-voice Modal app).
 
     GET  /voice/status                 can a call start now? {available, reason, max_call_seconds,
-                                       transports, half_duplex}; the chat hides the mic if not
+                                       transports, half_duplex}; asked after a click on the mic,
+                                       never on page load (any request wakes the GPU)
     POST /voice/calls                  start a call (idempotent per key; see calls.py). WebSocket:
                                        returns where to connect. WebRTC: send the SDP offer,
                                        get the answer.
