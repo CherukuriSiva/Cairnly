@@ -1,13 +1,13 @@
 "use client";
 
-import { SquarePen } from "lucide-react";
+import { PlayCircle, SquarePen } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Composer } from "@/components/chat/Composer";
 import { TurnView } from "@/components/chat/TurnView";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { featuresOf, fetchConfig, getSessionId, PROVIDER_LABELS, warmUp, type Provider } from "@/lib/ask";
+import { featuresOf, fetchConfig, getSessionId, NO_FEATURES, PROVIDER_LABELS, warmUp, type Provider } from "@/lib/ask";
 import { ChatController } from "@/lib/chat/controller";
 import { browserStorage, httpConversationApi } from "@/lib/chat/conversations";
 import { groupTurns, initialChatState } from "@/lib/chat/reducer";
@@ -32,9 +32,34 @@ function UrlParams({ onChange }: { onChange: (q: string | null, track: string | 
   return null;
 }
 
+/** A sample question; in the demo each one plays a recorded scenario, named by `label`. */
+interface Starter {
+  question: string;
+  label?: string;
+}
+
+const LIVE_STARTERS: Starter[] = STARTERS.map((question) => ({ question }));
+
+/** Says plainly that the demo replays recordings, with a way back to the live chat. */
+function DemoNotice() {
+  return (
+    <div role="note" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
+      <PlayCircle size={16} aria-hidden="true" className="shrink-0 text-accent" />
+      <p className="min-w-0 flex-1 text-text">
+        <span className="font-medium">Recorded demo.</span>{" "}
+        <span className="text-muted">Answers are replayed from recordings of the real chat, not written live.</span>
+      </p>
+      <a href="/ask" className="font-medium text-accent underline decoration-border underline-offset-2 hover:decoration-accent">
+        Use the live chat
+      </a>
+    </div>
+  );
+}
+
 /** The chat at /ask. The turn logic lives in lib/chat (ChatController); this component renders
  * its rows and wires the page around it: GET /config (providers and optional features), the
- * shareable ?q= and ?track= links, the provider select and New chat. */
+ * shareable ?q= and ?track= links, the provider select, New chat, and ?demo=1, which replays
+ * recorded answers so the chat can be shown while the API sleeps. */
 export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const providerRef = useRef<Provider | null>(null);
   const [chat] = useState(
@@ -52,6 +77,8 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   const [provider, setProvider] = useState<Provider>("ollama");
   const chooseProvider = providers.length > 1; // the select only appears when there is a choice
   const [track, setTrack] = useState<string | null>(null);
+  const [demo, setDemo] = useState(false);
+  const [starters, setStarters] = useState<Starter[]>(LIVE_STARTERS);
   const busy = state.status !== "idle";
 
   useEffect(() => {
@@ -98,10 +125,22 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   }, []);
 
   // Wake the API, ask what it offers, then restore the saved conversation (newer APIs only).
-  // Without an answer the chat keeps its history in the tab, as older versions did.
+  // Without an answer the chat keeps its history in the tab, as older versions did. With
+  // ?demo=1 the API is never called: the replay transport (loaded only then) plays recordings.
   useEffect(() => {
-    warmUp();
     let live = true;
+    if (new URLSearchParams(window.location.search).get("demo") === "1") {
+      setDemo(true);
+      import("@/lib/chat/replay").then(({ replayTransport, SCENARIOS }) => {
+        if (!live) return;
+        setStarters(SCENARIOS.map((s) => ({ question: s.question, label: s.label })));
+        chat.configure({ features: NO_FEATURES, conversations: null, transport: replayTransport() });
+      });
+      return () => {
+        live = false;
+      };
+    }
+    warmUp();
     fetchConfig().then((config) => {
       if (!live) return;
       if (config) {
@@ -167,6 +206,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
           </button>
         </div>
       </div>
+      {demo && <DemoNotice />}
 
       <section aria-label="Conversation" className="flex-1 space-y-8 py-8">
         {turns.length === 0 && (
@@ -177,17 +217,18 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
               description="Ask about the AI engineering lessons. Every answer links to the lessons it comes from."
             />
             <ul className="mt-8 grid gap-2 sm:grid-cols-2" aria-label="Sample questions">
-              {STARTERS.map((q) => (
-                <li key={q}>
+              {starters.map(({ question, label }) => (
+                <li key={question}>
                   <Link
-                    href={askHref(q)}
+                    href={askHref(question)}
                     onClick={(e) => {
                       e.preventDefault();
-                      submit(q, track);
+                      submit(question, track);
                     }}
                     className="block h-full rounded-xl border border-border bg-surface-1 px-4 py-3 text-sm text-text hover:border-accent"
                   >
-                    {q}
+                    {label && <span className="eyebrow mb-1 block text-faint">{label}</span>}
+                    {question}
                   </Link>
                 </li>
               ))}

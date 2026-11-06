@@ -51,6 +51,7 @@ export class ChatController {
   private creating: Promise<string | null> | null = null;
   private storeBroken = false; // creating a conversation failed: history in the tab from now on
   private historyMode = false; // a question went out without a conversation: stay that way
+  private freshStart = false; // a ?q= link: start a new conversation, ignore the stored one
   private configured = false;
   private ready: Promise<void>;
   private markReady!: () => void;
@@ -107,7 +108,7 @@ export class ChatController {
       if (setup.features.conversations && setup.conversations && !this.historyMode) {
         this.features = setup.features;
         this.api = setup.conversations;
-        this.conversationId = this.storage.read();
+        this.conversationId = this.freshStart ? null : this.storage.read();
       }
     }
     this.markReady();
@@ -157,8 +158,11 @@ export class ChatController {
   send(text: string, scope: string | null, { newConversation = false, channel = "text" as Channel } = {}): void {
     if (!text.trim() || this.busy) return;
     if (newConversation) {
-      this.restoreToken++; // a restore still in flight must not replace this question
-      this.forget();
+      // The stored id is replaced once the new conversation exists (never in the demo, which
+      // has none); a restore still in flight must not replace this question.
+      this.restoreToken++;
+      this.freshStart = true;
+      this.conversationId = null;
     }
     const key = `t${this.nextKey++}`;
     this.dispatch({ type: "send", key, text, scope, channel });
