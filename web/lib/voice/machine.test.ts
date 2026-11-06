@@ -13,6 +13,7 @@ describe("voiceReducer", () => {
     expect(s.phase).toBe("connecting");
     s = voiceReducer(s, { type: "ready", callId: "c1", maxSeconds: 300, now: 1_000 });
     expect(s).toMatchObject({ phase: "greeting", callId: "c1", deadline: 301_000, secondsLeft: 300 });
+    expect(voiceReducer(s, quiet(1_050)).phase).toBe("greeting"); // the greeting has not sounded yet
     s = run([{ type: "event", event: { kind: "caption.bot", text: "Hi" }, now: 1_100 }, loud(1_200)], s);
     expect(s.phase).toBe("greeting");
     expect(s.botCaption).toBe("Hi");

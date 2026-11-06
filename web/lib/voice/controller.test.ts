@@ -91,6 +91,19 @@ describe("VoiceController", () => {
     expect(await down.checkStatus()).toBe(false);
   });
 
+  it("calls the browser's fetch as a plain function (a method call is an Illegal invocation)", async () => {
+    vi.stubGlobal("fetch", function (this: unknown) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(json(STATUS));
+    });
+    try {
+      const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat });
+      expect(await v.checkStatus()).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("runs a whole call: prepare in the click, captions, countdown, hang-up, reload", async () => {
     const f = fakeFetch({
       "GET /voice/status": () => json(STATUS),
@@ -126,7 +139,7 @@ describe("VoiceController", () => {
     expect(c.calls).toEqual(["ensure", "reload"]);
   });
 
-  it("hangs up at zero, from the deadline it was given", async () => {
+  it("hangs up after zero if the server has not closed the call, from the deadline it was given", async () => {
     const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY), "GET /voice/calls/call-1": () => json({ end_reason: "max_duration" }) });
     const a = fakeAdapter();
     let now = 0;
@@ -140,6 +153,10 @@ describe("VoiceController", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(v.getState()).toMatchObject({ endingSoon: true, secondsLeft: 30 });
     now = 40_000;
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(v.getState().secondsLeft).toBe(0);
+    expect(a.log).not.toContain("send call.hangup"); // the server says goodbye and closes first
+    now = 45_000;
     await vi.advanceTimersByTimeAsync(1_000);
     expect(a.log).toContain("send call.hangup");
     expect(v.getState()).toMatchObject({ phase: "ended", endReason: "max_duration" });

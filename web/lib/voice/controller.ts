@@ -13,6 +13,9 @@ export const VOICE_URL = (process.env.NEXT_PUBLIC_VOICE_URL ?? "").replace(/\/$/
 
 export const LEVELS_MS = 100;
 export const TICK_MS = 1_000;
+// At zero the server says a short goodbye and closes the call itself; the browser hangs up
+// on its own only if the call is still open this long after the deadline.
+export const DEADLINE_GRACE_MS = 5_000;
 const MAX_CLOSING_WAIT_S = 3;
 const DEFAULT_ICE = ["stun:stun.l.google.com:19302"];
 
@@ -65,8 +68,9 @@ export class VoiceController {
     return () => this.listeners.delete(listener);
   };
 
+  /** fetch, never called as a method of this object (browsers refuse that: Illegal invocation). */
   private get fetch(): typeof fetch {
-    return this.options.fetchImpl ?? fetch;
+    return this.options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   }
 
   private now(): number {
@@ -83,16 +87,18 @@ export class VoiceController {
   /** GET /voice/status. Anything but a clear "available" hides the microphone. */
   async checkStatus(): Promise<boolean> {
     let status: VoiceStatus | null = null;
+    let said = false; // the server answered, and said no
     try {
       const res = await this.fetch(`${this.options.baseUrl}/voice/status`, { cache: "no-store" });
       const body = res.ok ? ((await res.json()) as Partial<VoiceStatus>) : null;
       if (body?.available === true && Array.isArray(body.transports) && body.transports.length > 0) status = body as VoiceStatus;
+      else said = body?.available === false;
     } catch {
-      // unreachable: no voice
+      // unreachable: no voice, and nothing to say about it
     }
     if (this.disposed) return false;
     this.status = status;
-    this.dispatch({ type: "status", available: status !== null });
+    this.dispatch({ type: "status", available: status !== null, said });
     return status !== null;
   }
 
@@ -180,7 +186,7 @@ export class VoiceController {
       const kind = err instanceof StartError ? err.kind : "transport";
       if (kind === "unavailable") {
         this.status = null;
-        this.dispatch({ type: "status", available: false });
+        this.dispatch({ type: "status", available: false, said: true });
       }
       this.fail(kind === "unavailable" ? "unavailable" : "transport");
     }
@@ -236,8 +242,10 @@ export class VoiceController {
       }, LEVELS_MS),
       // The deadline is absolute, so a tab that was in the background catches up at once.
       setInterval(() => {
-        this.dispatch({ type: "tick", now: this.now() });
-        if (this.state.secondsLeft === 0 && inCall(this.state)) void this.hangUp();
+        const now = this.now();
+        this.dispatch({ type: "tick", now });
+        const { deadline } = this.state;
+        if (deadline !== null && now >= deadline + DEADLINE_GRACE_MS && inCall(this.state)) void this.hangUp();
       }, TICK_MS),
     );
   }

@@ -17,7 +17,7 @@ export const SPEAKING_HOLD_MS = 1_200;
 export const ENDING_NOTICE_S = 30;
 
 export type VoiceAction =
-  | { type: "status"; available: boolean }
+  | { type: "status"; available: boolean; said?: boolean }
   | { type: "start" }
   | { type: "ready"; callId: string; maxSeconds: number; now: number }
   | { type: "event"; event: VoiceEvent; now: number }
@@ -32,6 +32,7 @@ export type VoiceAction =
 export const initialVoiceState: VoiceState = {
   phase: "idle",
   available: null,
+  saidUnavailable: false,
   callId: null,
   deadline: null,
   secondsLeft: null,
@@ -65,7 +66,10 @@ function settle(state: VoiceState, now: number): VoiceState {
   if (botSpeaking(state, now)) {
     return state.phase === "greeting" ? state : { ...state, phase: "speaking" };
   }
-  if (state.phase === "greeting") return { ...state, phase: "listening", greeted: true };
+  if (state.phase === "greeting") {
+    // Still waiting for the greeting's first sound (it is being synthesised): keep greeting.
+    return state.botVoiceAt === 0 ? state : { ...state, phase: "listening", greeted: true };
+  }
   return { ...state, phase: state.awaitingAnswer ? "thinking" : "listening" };
 }
 
@@ -110,8 +114,11 @@ function onEvent(state: VoiceState, event: VoiceEvent, now: number): VoiceState 
 
 export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState {
   switch (action.type) {
-    case "status":
-      return state.available === action.available ? state : { ...state, available: action.available };
+    case "status": {
+      const saidUnavailable = !action.available && Boolean(action.said);
+      if (state.available === action.available && state.saidUnavailable === saidUnavailable) return state;
+      return { ...state, available: action.available, saidUnavailable };
+    }
     case "start":
       if (inCall(state) || state.closing) return state;
       return { ...initialVoiceState, available: state.available, phase: "connecting" };
@@ -149,7 +156,7 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
     case "failed":
       return { ...state, phase: "failed", failure: action.failure, closing: false, userLevel: 0, botLevel: 0 };
     case "dismiss":
-      return inCall(state) ? state : { ...initialVoiceState, available: state.available };
+      return inCall(state) ? state : { ...initialVoiceState, available: state.available, saidUnavailable: state.saidUnavailable };
   }
 }
 
@@ -177,9 +184,9 @@ export function endLine(reason: EndReason | null): string {
     case "farewell":
       return "Call ended. Goodbye!";
     case "idle":
-      return "Call ended after a quiet minute.";
+      return "Call ended because it went quiet.";
     case "max_duration":
-      return "Call ended: calls last at most a few minutes.";
+      return "Call ended: that was the time limit for one call.";
     case "replaced":
       return "This call was replaced by a newer one.";
     case "error":

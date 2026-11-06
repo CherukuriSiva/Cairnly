@@ -56,6 +56,7 @@ export interface StartReply {
 export interface VoiceState {
   phase: VoicePhase;
   available: boolean | null; // null: not asked yet; false hides the microphone
+  saidUnavailable: boolean; // the server answered "not now" (not merely unreachable)
   callId: string | null;
   deadline: number | null; // ms since epoch, from the browser clock when the call connected
   secondsLeft: number | null;

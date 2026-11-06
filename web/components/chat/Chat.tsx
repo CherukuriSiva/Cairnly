@@ -7,6 +7,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStor
 import { Composer } from "@/components/chat/Composer";
 import { TurnView } from "@/components/chat/TurnView";
 import { useFollow } from "@/components/chat/useFollow";
+import { VoicePanel } from "@/components/chat/VoicePanel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { featuresOf, fetchConfig, getSessionId, NO_FEATURES, PROVIDER_LABELS, warmUp, type Provider } from "@/lib/ask";
 import { ChatController } from "@/lib/chat/controller";
@@ -15,6 +16,20 @@ import { groupTurns, initialChatState } from "@/lib/chat/reducer";
 import { liveTransport } from "@/lib/chat/transport";
 import { askHref, STARTERS } from "@/lib/starters";
 import { SITE_NAME } from "@/lib/site";
+import { browserVoiceAdapter } from "@/lib/voice/browser";
+import { VOICE_URL, VoiceController } from "@/lib/voice/controller";
+import { inCall, initialVoiceState } from "@/lib/voice/machine";
+import type { Transport } from "@/lib/voice/types";
+
+const noSubscribe = () => () => {};
+const idleVoice = () => initialVoiceState;
+
+/** ?transport=webrtc|websocket picks the voice transport (local testing); else the server's. */
+function transportParam(): Transport | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("transport");
+  return value === "webrtc" || value === "websocket" ? value : null;
+}
 
 /** Remove one query parameter from the address bar without reloading. */
 function dropParam(name: string) {
@@ -73,6 +88,20 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       }),
   );
   const state = useSyncExternalStore(chat.subscribe, chat.getState, () => initialChatState);
+  // Voice mode exists only when the site was built with NEXT_PUBLIC_VOICE_URL, and shows only
+  // once that server says calls are possible (see the config effect below).
+  const [voice] = useState(() =>
+    VOICE_URL
+      ? new VoiceController({
+          baseUrl: VOICE_URL,
+          adapter: browserVoiceAdapter(),
+          chat: { ensureConversation: () => chat.ensureConversation(), reload: () => chat.reload() },
+          transport: transportParam(),
+        })
+      : null,
+  );
+  const voiceState = useSyncExternalStore(voice?.subscribe ?? noSubscribe, voice?.getState ?? idleVoice, idleVoice);
+  const calling = inCall(voiceState);
   const [input, setInput] = useState("");
   const [providers, setProviders] = useState<Provider[]>(["ollama"]);
   const [provider, setProvider] = useState<Provider>("ollama");
@@ -156,11 +185,13 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
       chat.configure(config ? { features, conversations: features.conversations ? httpConversationApi() : null } : null);
       setFeedback(chat.getFeatures().feedback);
       void chat.restore();
+      // Voice turns are saved into the conversation, so voice needs saved conversations.
+      if (voice && chat.getFeatures().conversations) void voice.checkStatus();
     });
     return () => {
       live = false;
     };
-  }, [chat]);
+  }, [chat, voice]);
 
   // Leaving the page stops the stream and any pending retry. Dev StrictMode runs this cleanup and
   // the effect again in one go, so the stop waits a microtask and only a real unmount cancels.
@@ -170,10 +201,19 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     return () => {
       mounted.current = false;
       queueMicrotask(() => {
-        if (!mounted.current) chat.dispose();
+        if (!mounted.current) {
+          chat.dispose();
+          voice?.dispose();
+        }
       });
     };
-  }, [chat]);
+  }, [chat, voice]);
+
+  // "Type instead": end the call and put the caret in the box.
+  function typeInstead() {
+    void voice?.hangUp();
+    requestAnimationFrame(() => document.getElementById("chat-input")?.focus());
+  }
 
   const turns = groupTurns(state.rows);
   const Eyebrow = turns.length > 0 ? "h1" : "p";
@@ -271,6 +311,33 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
         placeholder={turns.length ? "Ask a follow-up…" : "Ask a question…"}
         scopeTitle={track ? (trackTitles[track] ?? track) : null}
         onClearScope={clearScope}
+        onVoice={voice && voiceState.available && !demo && !voiceState.closing ? () => voice.start() : undefined}
+        voicePanel={
+          voice && calling ? (
+            <VoicePanel
+              state={voiceState}
+              onMute={() => voice.toggleMute()}
+              onEnd={() => void voice.hangUp()}
+              onTypeInstead={typeInstead}
+              onRetry={() => voice.start()}
+              onDismiss={() => voice.dismiss()}
+            />
+          ) : undefined
+        }
+        voiceNotice={
+          voice && voiceState.phase === "idle" && voiceState.saidUnavailable && !demo ? (
+            <p className="mb-2 text-xs text-muted">Voice isn&apos;t available right now.</p>
+          ) : voice && (voiceState.phase === "ended" || voiceState.phase === "failed") ? (
+            <VoicePanel
+              state={voiceState}
+              onMute={() => {}}
+              onEnd={() => {}}
+              onTypeInstead={() => {}}
+              onRetry={() => voice.start()}
+              onDismiss={() => voice.dismiss()}
+            />
+          ) : undefined
+        }
       />
     </main>
   );
