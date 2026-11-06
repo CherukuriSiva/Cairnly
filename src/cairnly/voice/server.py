@@ -11,7 +11,8 @@
 
 Errors: 503 with Retry-After when voice is unavailable (off, busy, a limit or the daily minutes
 spent), 409 with Retry-After while the previous call is still closing, 429 for too many starts.
-The browser origin must be in CORS_ORIGINS, for the routes and the socket alike.
+The browser origin must be in CORS_ORIGINS, for the routes and the socket alike. A call has one
+socket: a second socket for a call that already has one is refused.
 """
 
 import asyncio
@@ -172,12 +173,14 @@ def end_call(body: EndRequest, call_id: str = CallId) -> dict:
 
 @app.websocket("/voice/calls/{call_id}/socket")
 async def call_socket(websocket: WebSocket, call_id: str, token: str = "") -> None:
-    call = book.get(call_id)
     origin = websocket.headers.get("origin")
     allowed = list(api_settings.cors_origins)
-    if (call is None or call.transport != "websocket" or call.state != "starting"
-            or not hmac.compare_digest(call.token, token)
-            or (origin is not None and origin not in allowed)):
+    # The token is checked and the call claimed in one step, before the socket is accepted:
+    # a second socket for the same call is refused and never touches it.
+    call = None
+    if origin is None or origin in allowed:
+        call = book.claim_socket(call_id, token)
+    if call is None:
         await websocket.close(code=1008)  # policy violation: no such call for this caller
         return
     from cairnly.voice.session import CallSession, websocket_transport

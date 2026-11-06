@@ -27,6 +27,7 @@ from cairnly.voice.models import fake_services  # noqa: E402
 
 CONV = "44444444-4444-4444-8444-444444444444"
 CHUNK = 640  # 20 ms of 16 kHz 16-bit audio
+ORIGIN = server.api_settings.cors_origins[0]  # the site; browsers always send it on a socket
 asked: list[dict] = []
 
 
@@ -140,7 +141,8 @@ def test_a_wrong_token_cannot_join_or_end_a_call(voice):
     call = start(base).json()
 
     async def join():
-        async with connect(f"ws://{base}/voice/calls/{call['call_id']}/socket?token=nope") as ws:
+        url = f"ws://{base}/voice/calls/{call['call_id']}/socket?token=nope"
+        async with connect(url, origin=ORIGIN) as ws:
             await ws.recv()
 
     with pytest.raises(InvalidStatus) as refused:  # closed before the handshake: HTTP 403
@@ -150,13 +152,44 @@ def test_a_wrong_token_cannot_join_or_end_a_call(voice):
     assert end.status_code == 404
 
 
+def test_a_second_socket_for_the_same_call_is_refused(voice):
+    """Two sockets with one token, at the same moment: one call, one session, and the second
+    socket is turned away before it can touch the call (no ghost call outside the limits)."""
+    base, _ = voice
+    call = start(base).json()
+    url = f"ws://{base}{call['socket_path']}"
+    seen: list[dict] = []
+    refused: list[int] = []
+
+    async def join(ws_holder: list):
+        try:
+            ws_holder.append(await connect(url, origin=ORIGIN))
+        except InvalidStatus as exc:
+            refused.append(exc.response.status_code)
+
+    async def run():
+        held: list = []
+        await asyncio.gather(join(held), join(held))
+        assert refused == [403] and len(held) == 1
+        ws = held[0]
+        await events_until(ws, "call.ready", seen)
+        assert len(server.sessions) == 1
+        await ws.send(json.dumps({"kind": "call.hangup"}))
+        assert (await events_until(ws, "call.closed", seen))["reason"] == "hung_up"
+        await ws.close()
+
+    asyncio.run(run())
+    assert sum(1 for c in server.book.calls.values()) == 1
+    assert server.book.ip_calls == {"127.0.0.1": 1}
+
+
 def test_a_call_answers_a_spoken_question_and_hangs_up(voice):
     base, _ = voice
     call = start(base).json()
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             ready = await events_until(ws, "call.ready", seen)
             assert ready["max_seconds"] == 60
             greeting = await events_until(ws, "caption.bot", seen)
@@ -193,7 +226,7 @@ def test_goodbye_ends_the_call_with_a_farewell(voice, monkeypatch):
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             await events_until(ws, "caption.bot", seen)
             await say(ws, noise(0.4) + silence(0.6))
             assert (await events_until(ws, "caption.bot", seen))["text"] == speech.FAREWELL
@@ -211,7 +244,7 @@ def test_barge_in_clears_the_bot_audio(voice, monkeypatch):
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             await events_until(ws, "caption.bot", seen)
             await asyncio.sleep(0.5)
             await say(ws, noise(0.4))
@@ -229,7 +262,7 @@ def test_api_failure_is_spoken_plainly(voice, monkeypatch):
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             await events_until(ws, "caption.bot", seen)
             await say(ws, noise(0.4) + silence(0.6))
             await events_until(ws, "caption.user", seen)
@@ -248,7 +281,7 @@ def test_idle_and_time_limits_end_the_call(voice, monkeypatch):
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             assert (await events_until(ws, "call.closed", seen))["reason"] == "idle"
 
     asyncio.run(run())
@@ -260,7 +293,7 @@ def test_idle_and_time_limits_end_the_call(voice, monkeypatch):
     seen.clear()
 
     async def run_long():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             ending = await events_until(ws, "call.ending", seen)
             assert 0 < ending["seconds_left"] <= 5
             assert (await events_until(ws, "call.closed", seen, timeout=15))["reason"] == (
@@ -275,7 +308,7 @@ def test_a_second_call_on_the_conversation_replaces_the_first(voice):
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{first['socket_path']}") as ws:
+        async with connect(f"ws://{base}{first['socket_path']}", origin=ORIGIN) as ws:
             await events_until(ws, "call.ready", seen)
             second = start(base, key="key-00000002")
             assert second.status_code == 200
@@ -293,7 +326,7 @@ def test_hanging_up_mid_answer_ends_the_call_at_once(voice, monkeypatch):
     seen: list[dict] = []
 
     async def run():
-        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
             await events_until(ws, "caption.bot", seen)  # the greeting starts
             await say(ws, noise(0.4) + silence(0.6))
             await events_until(ws, "caption.user", seen)

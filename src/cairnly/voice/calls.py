@@ -12,10 +12,13 @@ Everything here is plain Python with an injectable clock, so the rules are teste
   A call never gets more time than the budget has left.
 - **Concurrency.** At most `max_calls` calls at once (one by default: one container, one GPU).
   A call that is still closing holds its place; a start then gets "closing" and retries once.
+  A call has exactly one socket: the first to present the token claims it; any other is
+  refused. A start that never connects frees its place after `CONNECT_WINDOW_S`.
 - **End reasons.** Each call records why it ended (first reason wins) and keeps it for an hour,
   so the browser can read it after the call.
 """
 
+import hmac
 import math
 import secrets
 import threading
@@ -59,7 +62,7 @@ class Call:
     token: str  # one-time secret the socket must present
     created_at: float
     max_seconds: int
-    state: str = "starting"  # starting, live, closing, closed
+    state: str = "starting"  # starting, connecting (its socket is claimed), live, closing, closed
     started_at: float | None = None
     ended_at: float | None = None
     end_reason: str | None = None
@@ -143,11 +146,24 @@ class CallBook:
             self.end(replaced.id, "replaced")
         return call, True
 
+    def claim_socket(self, call_id: str, token: str) -> Call | None:
+        """The one socket a WebSocket call gets. Checks the token and marks the call
+        "connecting" in one step, so a second socket with the same token (a double connect,
+        a replayed link) finds it taken and is refused before it touches the call."""
+        with self._lock:
+            self._tidy()
+            call = self.calls.get(call_id)
+            if (call is None or call.transport != "websocket" or call.state != "starting"
+                    or not hmac.compare_digest(call.token, token)):
+                return None
+            call.state = "connecting"
+            return call
+
     def went_live(self, call_id: str) -> Call | None:
         """The caller connected: the clock starts now."""
         with self._lock:
             call = self.calls.get(call_id)
-            if call is None or call.state != "starting":
+            if call is None or call.state not in ("starting", "connecting"):
                 return None
             call.state, call.started_at = "live", self.now()
             call.deadline = call.started_at + call.max_seconds
@@ -226,7 +242,8 @@ class CallBook:
         if today != self.day:
             self.day, self.used_s, self.ip_calls = today, 0.0, {}
         for call in list(self.calls.values()):
-            if call.state == "starting" and now - call.created_at > CONNECT_WINDOW_S:
+            if (call.state in ("starting", "connecting")
+                    and now - call.created_at > CONNECT_WINDOW_S):
                 call.state, call.ended_at = "closed", now
                 call.end_reason = call.end_reason or "error"
             if call.state == "closed" and now - (call.ended_at or now) > KEEP_ENDED_S:

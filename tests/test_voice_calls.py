@@ -108,6 +108,29 @@ def test_unconnected_call_is_given_up_and_end_reason_is_kept():
     assert b.get(call.id) is None  # forgotten after an hour
 
 
+def test_a_call_has_one_socket():
+    clock = Clock()
+    b = book(clock, max_calls=2)
+    call, _ = b.start(CONV_A, "key-0001", "1.1.1.1", "websocket")
+    assert b.claim_socket(call.id, "wrong-token") is None
+    assert b.claim_socket(call.id, call.token) is call
+    assert call.state == "connecting"
+    assert b.claim_socket(call.id, call.token) is None  # the second socket finds it taken
+    assert b.went_live(call.id) is call and call.state == "live"
+    assert b.claim_socket(call.id, call.token) is None
+    rtc, _ = b.start(CONV_B, "key-0002", "1.1.1.1", "webrtc")
+    assert b.claim_socket(rtc.id, rtc.token) is None  # a WebRTC call has no socket
+
+
+def test_claimed_socket_that_never_connects_is_given_up():
+    clock = Clock()
+    b = book(clock)
+    call, _ = b.start(CONV_A, "key-0001", "1.1.1.1", "websocket")
+    b.claim_socket(call.id, call.token)
+    clock.t += 11
+    assert b.get(call.id).end_reason == "error" and b.status("2.2.2.2")["available"] is True
+
+
 def test_turned_off():
     b = CallBook(enabled=False, now=Clock())
     assert b.status("1.1.1.1")["reason"] == "off"
