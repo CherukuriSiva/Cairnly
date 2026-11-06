@@ -30,17 +30,20 @@ CHUNK = 640  # 20 ms of 16 kHz 16-bit audio
 asked: list[dict] = []
 
 
+ANSWER = ["RAG retrieves lesson text first [1]. ", "Then the model writes ", "an answer from it."]
+LONG_ANSWER = [f"This is sentence number {n} of a long answer about retrieval. " for n in range(12)]
+
+
 class FakeAnswers:
-    def __init__(self, fail: str | None = None):
-        self.fail = fail
+    def __init__(self, fail: str | None = None, pieces: list[str] = ANSWER):
+        self.fail, self.pieces = fail, pieces
 
     async def ask(self, question, conversation_id, session_id):
         asked.append({"question": question, "conversation_id": conversation_id})
         if self.fail:
             raise AskFailed(self.fail)
         yield {"type": "sources", "sources": []}
-        for piece in ["RAG retrieves lesson text first [1]. ", "Then the model writes ",
-                      "an answer from it."]:
+        for piece in self.pieces:
             await asyncio.sleep(0.01)
             yield {"type": "token", "text": piece}
         yield {"type": "done", "refused": False, "text": "...", "message_id": 42}
@@ -279,3 +282,29 @@ def test_a_second_call_on_the_conversation_replaces_the_first(voice):
             assert (await events_until(ws, "call.closed", seen))["reason"] == "replaced"
 
     asyncio.run(run())
+
+
+def test_hanging_up_mid_answer_ends_the_call_at_once(voice, monkeypatch):
+    base, _ = voice
+    # A long answer in a slow voice: it would take about 40 s to play out.
+    monkeypatch.setattr(server, "services", fake_services(["What is RAG?"], seconds_per_char=0.05))
+    monkeypatch.setattr(server, "answers_factory", lambda: FakeAnswers(pieces=LONG_ANSWER))
+    call = start(base).json()
+    seen: list[dict] = []
+
+    async def run():
+        async with connect(f"ws://{base}{call['socket_path']}") as ws:
+            await events_until(ws, "caption.bot", seen)  # the greeting starts
+            await say(ws, noise(0.4) + silence(0.6))
+            await events_until(ws, "caption.user", seen)
+            await events_until(ws, "caption.bot", seen)  # the holding line
+            await events_until(ws, "caption.bot", seen)  # the answer starts playing
+            await ws.send(json.dumps({"kind": "call.hangup"}))
+            assert (await events_until(ws, "call.closed", seen))["reason"] == "hung_up"
+            await asyncio.sleep(0.5)  # the browser waits for the server to close, then closes
+
+    asyncio.run(run())
+    deadline = time.monotonic() + 3  # nowhere near the time the queued speech would take
+    while server.book.get(call["call_id"]).state != "closed":
+        assert time.monotonic() < deadline, "the call is still closing"
+        time.sleep(0.05)

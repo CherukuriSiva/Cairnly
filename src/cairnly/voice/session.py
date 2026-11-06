@@ -45,6 +45,7 @@ log = logging.getLogger("cairnly.voice")
 TICK_S = 0.5
 MAX_AUDIO_MESSAGE = 64_000  # bytes; 2 s of 16 kHz audio, far more than a 20 ms chunk
 LINE_GRACE_S = 3.0  # how long past its expected length a goodbye may take to play
+CLOSE_GRACE_S = 5.0  # a call that has not ended this long after its EndFrame is cancelled
 
 
 class CallSocketSerializer(FrameSerializer):
@@ -195,10 +196,19 @@ class CallSession:
 
     async def _close(self, reason: str) -> None:
         self.book.closing(self.call.id, reason)
+        # Drop the answer and any speech still queued: an EndFrame waits until everything
+        # queued has been played, which after a hang-up could be a whole answer to nobody.
+        self.brain.ending = True
+        await self.brain.stop_answer("interrupted")
+        await self.brain.broadcast_interruption()
         await self._queue(OutputTransportMessageUrgentFrame(message=protocol.closed(
             self.call.end_reason or reason)))
         await asyncio.sleep(0.1)  # let the event leave before the socket closes
         await self._queue(EndFrame())
+        await asyncio.sleep(CLOSE_GRACE_S)
+        if self.worker is not None and not self.worker.has_finished():
+            log.warning("voice call did not end in time; cancelling it")
+            await self.worker.cancel(reason="did not end in time")
 
     async def _farewell(self) -> None:
         self.end("farewell", speech.FAREWELL)
