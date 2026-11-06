@@ -55,6 +55,7 @@ function fakeAdapter({ mic = "ok" as "ok" | "mic-denied" | "no-mic" } = {}) {
       return link;
     },
     release: () => log.push("release"),
+    dispose: () => log.push("dispose"),
   };
   return {
     adapter,
@@ -331,6 +332,21 @@ describe("VoiceController", () => {
     v.start();
     await flush();
     expect(a.log).toContain("connect webrtc");
+  });
+
+  it("leaving the page hangs up and then closes the audio", async () => {
+    const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY) });
+    const a = fakeAdapter();
+    const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
+    v.offer(true);
+    v.start();
+    await flush();
+    v.dispose();
+    await flush();
+    expect(a.log.slice(-3)).toEqual(["send call.hangup", "close", "dispose"]);
+    const idle = fakeAdapter();
+    new VoiceController({ baseUrl: BASE, adapter: idle.adapter, chat: chat().chat }).dispose();
+    expect(idle.log).toEqual(["dispose"]);
   });
 
   it("mute is passed to the link", async () => {

@@ -56,6 +56,7 @@ export interface BrowserDeps {
   createPeer: (config: RTCConfiguration) => RTCPeerConnection;
   createAudioElement: () => HTMLAudioElement;
   workletUrl: () => string;
+  revokeUrl: (url: string) => void;
   createWorklet: (context: AudioContext, name: string) => AudioWorkletNode;
 }
 
@@ -75,6 +76,7 @@ function defaultDeps(): BrowserDeps {
       return audio;
     },
     workletUrl: () => URL.createObjectURL(new Blob([CAPTURE_WORKLET], { type: "text/javascript" })),
+    revokeUrl: (url) => URL.revokeObjectURL(url),
     createWorklet: (context, name) => new AudioWorkletNode(context, name),
   };
 }
@@ -103,10 +105,24 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
   let audio: HTMLAudioElement | null = null;
   let output: MediaStreamAudioDestinationNode | null = null;
   let mic: MediaStream | null = null;
+  let worklet: Promise<void> | null = null; // the capture module, added once per audio context
 
   function release() {
     mic?.getTracks().forEach((t) => t.stop());
     mic = null;
+  }
+
+  /** Add the capture module to the context once; its Blob URL is revoked once it has loaded. */
+  function loadWorklet(context: AudioContext): Promise<void> {
+    if (!worklet) {
+      const url = deps.workletUrl();
+      const loading = context.audioWorklet.addModule(url).finally(() => deps.revokeUrl(url));
+      loading.catch(() => {
+        if (worklet === loading) worklet = null; // a failed load is tried again next call
+      });
+      worklet = loading;
+    }
+    return worklet;
   }
 
   return {
@@ -133,6 +149,16 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
     },
 
     release,
+
+    dispose() {
+      release();
+      worklet = null;
+      if (audio) audio.srcObject = null;
+      void ctx?.close().catch(() => {});
+      ctx = null;
+      audio = null;
+      output = null;
+    },
 
     async connect(options: ConnectOptions): Promise<VoiceLink> {
       if (!ctx || !audio || !output || !mic) throw new Error("prepare() and openMic() come first");
@@ -232,8 +258,7 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
         }
 
         // WebSocket: the microphone through the capture worklet, the bot's PCM through Web Audio.
-        const url = deps.workletUrl();
-        await context.audioWorklet.addModule(url);
+        await loadWorklet(context);
         const capture = deps.createWorklet(context, "cairnly-capture");
         const sink = context.createGain();
         sink.gain.value = 0; // keeps the worklet running without playing the microphone back

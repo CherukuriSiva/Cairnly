@@ -154,11 +154,12 @@ export class VoiceController {
     this.stopTimers();
     const link = this.link;
     this.link = null;
+    const { adapter } = this.options;
     if (link) {
       link.send({ kind: "call.hangup" });
-      void link.close();
+      void link.close().finally(() => adapter.dispose());
     } else {
-      this.options.adapter.release();
+      adapter.dispose();
     }
   }
 

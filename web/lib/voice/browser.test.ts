@@ -20,6 +20,7 @@ function fakes() {
   const context = {
     currentTime: 10,
     resume: vi.fn(async () => {}),
+    close: vi.fn(async () => {}),
     destination: node(),
     createMediaStreamDestination: () => node({ stream: { id: "out" } }),
     createMediaStreamSource: () => node(),
@@ -53,10 +54,13 @@ function fakes() {
     createAudioContext: () => context as unknown as AudioContext,
     createSocket: (url) => ((socket.url = url), socket as unknown as WebSocket),
     createAudioElement: () => audio as unknown as HTMLAudioElement,
-    workletUrl: () => "blob:capture",
+    workletUrl: vi.fn(() => "blob:capture"),
+    revokeUrl: vi.fn(),
     createWorklet: () => node({ port }) as unknown as AudioWorkletNode,
   };
-  return { deps, context, socket, track, getUserMedia, audio, started, stopped, sent, port };
+  const createAudioContext = vi.fn(() => context as unknown as AudioContext);
+  deps.createAudioContext = createAudioContext;
+  return { deps, context, socket, track, getUserMedia, audio, started, stopped, sent, port, createAudioContext };
 }
 
 describe("browserVoiceAdapter (WebSocket)", () => {
@@ -117,5 +121,50 @@ describe("browserVoiceAdapter (WebSocket)", () => {
     await closing;
     expect(onClosed).toHaveBeenCalledTimes(1);
     expect(f.track.stop).toHaveBeenCalled(); // the microphone is released
+  });
+});
+
+/** One WebSocket call on `adapter`, from the click to the open socket, then hung up. */
+async function oneCall(adapter: ReturnType<typeof browserVoiceAdapter>, f: ReturnType<typeof fakes>) {
+  adapter.prepare();
+  await adapter.openMic();
+  f.socket.onopen = null;
+  f.socket.readyState = 0;
+  const linking = adapter.connect({
+    transport: "websocket",
+    baseUrl: "https://voice.test",
+    start: async () => ({ call_id: "c", token: "t", transport: "websocket", max_seconds: 300, socket_path: "/voice/calls/c/socket?token=t" }),
+    handlers: { onEvent: () => {}, onClosed: () => {} },
+  });
+  await vi.waitFor(() => expect(f.socket.onopen).not.toBeNull());
+  f.socket.readyState = 1;
+  (f.socket.onopen as null | (() => void))?.(); // set again by connect()
+  const link = await linking;
+  const closing = link.close();
+  f.socket.onclose?.();
+  await closing;
+}
+
+describe("browserVoiceAdapter (resources)", () => {
+  it("adds the capture module once per audio context and revokes its Blob URL", async () => {
+    const f = fakes();
+    const adapter = browserVoiceAdapter(f.deps);
+    await oneCall(adapter, f);
+    await oneCall(adapter, f);
+    expect(f.context.audioWorklet.addModule).toHaveBeenCalledTimes(1);
+    expect(f.deps.workletUrl).toHaveBeenCalledTimes(1);
+    expect(f.deps.revokeUrl).toHaveBeenCalledWith("blob:capture");
+  });
+
+  it("closes the audio context when the page goes away; a new one loads the module again", async () => {
+    const f = fakes();
+    const adapter = browserVoiceAdapter(f.deps);
+    await oneCall(adapter, f);
+    adapter.dispose();
+    expect(f.context.close).toHaveBeenCalledTimes(1);
+    expect(f.audio.srcObject).toBeNull();
+    await oneCall(adapter, f);
+    expect(f.createAudioContext).toHaveBeenCalledTimes(2);
+    expect(f.context.audioWorklet.addModule).toHaveBeenCalledTimes(2);
   });
 });

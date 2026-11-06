@@ -48,6 +48,8 @@ export interface VoiceAdapter {
   connect(options: ConnectOptions): Promise<VoiceLink>;
   /** Release the microphone and audio without a call (a start that failed half-way). */
   release(): void;
+  /** The page is going away: release the microphone and close the audio context. */
+  dispose(): void;
 }
 
 /** Parse a server message; anything unexpected is dropped, never fatal. */
