@@ -4,8 +4,11 @@ a tone for text to speech, and fake answers instead of the API. No models, no ne
 
 import asyncio
 import dataclasses
+import io
 import json
+import logging
 import socket
+import sys
 import threading
 import time
 
@@ -16,6 +19,7 @@ pytest.importorskip("pipecat")  # the voice extra
 import httpx  # noqa: E402
 import numpy as np  # noqa: E402
 import uvicorn  # noqa: E402
+from loguru import logger as loguru  # noqa: E402
 from websockets.asyncio.client import connect  # noqa: E402
 from websockets.exceptions import InvalidStatus  # noqa: E402
 
@@ -382,3 +386,53 @@ def test_hanging_up_mid_answer_ends_the_call_at_once(voice, monkeypatch):
     while server.book.get(call["call_id"]).state != "closed":
         assert time.monotonic() < deadline, "the call is still closing"
         time.sleep(0.05)
+
+
+def test_no_spoken_text_reaches_the_logs(voice, monkeypatch):
+    """Captions are not stored (PRIVACY.md), so neither the caller's words nor the bot's may
+    appear in any log line: Pipecat's own (loguru, which logs speech at DEBUG) or ours."""
+    base, _ = voice
+    out = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", out)  # where the voice server's log lines go
+    ours = logging.StreamHandler(out)
+    logging.getLogger("cairnly").addHandler(ours)
+    logging.getLogger("cairnly").setLevel(logging.DEBUG)
+    call = start(base).json()
+    seen: list[dict] = []
+
+    async def run():
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
+            await events_until(ws, "caption.bot", seen)  # the greeting
+            await say(ws, silence(0.3) + noise(0.5) + silence(0.6))
+            await events_until(ws, "caption.user", seen)
+            await events_until(ws, "caption.bot", seen)  # the holding line
+            await events_until(ws, "caption.bot", seen)  # the first sentence of the answer
+            await ws.send(json.dumps({"kind": "call.hangup"}))
+            await events_until(ws, "call.closed", seen)
+
+    try:
+        asyncio.run(run())
+        loguru.info("probe: the server's loguru sink")
+        loguru.debug("probe: a debug line")
+        while server.book.get(call["call_id"]).state != "closed":
+            time.sleep(0.05)
+    finally:
+        logging.getLogger("cairnly").removeHandler(ours)
+        logging.getLogger("cairnly").setLevel(logging.NOTSET)
+    logs = out.getvalue()
+    assert "probe: the server's loguru sink" in logs  # Pipecat's lines do land here
+    assert "voice call ended: hung_up" in logs  # and ours
+    spoken = [e["text"] for e in seen if e.get("kind", "").startswith("caption.")]
+    assert speech.GREETING in spoken and "What is RAG?" in spoken
+    for text in spoken + [speech.HOLDING, "RAG retrieves lesson text first", "What is RAG"]:
+        assert text not in logs, text
+    assert "probe: a debug line" not in logs
+
+
+def test_log_lines_that_quote_speech_are_dropped_at_any_level(monkeypatch):
+    out = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", out)
+    loguru.warning("KokoroTTS#0: service is no longer usable, not speaking [Hello there]")
+    loguru.error("Error parsing JSON message {'said': 'Hello there'}, bad")
+    loguru.warning("a plain warning")
+    assert "Hello there" not in out.getvalue() and "a plain warning" in out.getvalue()

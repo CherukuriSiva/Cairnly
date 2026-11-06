@@ -18,6 +18,8 @@ no Origin header is refused, and so is a second socket for a call that already h
 import asyncio
 import hmac
 import logging
+import re
+import sys
 from contextlib import asynccontextmanager
 from typing import Literal
 
@@ -40,6 +42,27 @@ CLOSING = "The last call is still closing."
 TOO_MANY = "Too many calls started. Please wait and try again."
 NOT_FOUND = "Call not found."
 
+# Pipecat logs through loguru, at DEBUG by default, and some of its lines quote what is said
+# ("Generating TTS [...]", "TTS request: ... - text", "not speaking [...]"). Captions are not
+# stored anywhere (PRIVACY.md), logs included: keep INFO and up, minus any line that quotes.
+QUOTING_LINES = re.compile(
+    r"Generating TTS \[|TTS request:|not speaking \[|Error parsing JSON message")
+
+
+def _no_speech(record) -> bool:
+    return QUOTING_LINES.search(record["message"]) is None
+
+
+def quiet_pipecat_logs() -> None:
+    """Replace loguru's default DEBUG handler. Runs at import, before any pipeline exists,
+    whatever starts the app (`cairnly voice-serve` or Modal)."""
+    from loguru import logger
+
+    logger.remove()
+    logger.add(lambda line: sys.stderr.write(line), level="INFO", filter=_no_speech)
+
+
+quiet_pipecat_logs()
 settings = get_voice_settings()
 api_settings = get_settings()
 
