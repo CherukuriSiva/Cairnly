@@ -1,46 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ask,
-  AskError,
   buildAskBody,
-  closeTurn,
-  ENDED_EARLY,
-  errorKind,
   errorMessage,
+  featuresOf,
   getSessionId,
   headerTimeout,
   MAX_ANSWER_CHARS,
-  parseFrames,
-  shouldAutoRetry,
-  TIMEOUT_MESSAGE,
   warmUp,
   type PastTurn,
 } from "@/lib/ask";
-
-describe("errorKind", () => {
-  it("classifies the statuses the chat treats differently", () => {
-    expect(errorKind(503)).toBe("waking");
-    expect(errorKind(429)).toBe("rate");
-    expect(errorKind(403)).toBe("forbidden");
-    expect(errorKind(500)).toBe("http");
-    expect(errorKind(404)).toBe("http");
-  });
-});
-
-describe("shouldAutoRetry", () => {
-  it("retries a cold start or a network failure once, after the first attempt", () => {
-    expect(shouldAutoRetry("waking", 1)).toBe(true);
-    expect(shouldAutoRetry("network", 1)).toBe(true);
-    expect(shouldAutoRetry("waking", 2)).toBe(false);
-    expect(shouldAutoRetry("network", 2)).toBe(false);
-  });
-
-  it("never retries limits, refusals, timeouts or other errors on its own", () => {
-    for (const kind of ["rate", "forbidden", "timeout", "http"] as const) {
-      expect(shouldAutoRetry(kind, 1)).toBe(false);
-    }
-  });
-});
 
 describe("headerTimeout", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -70,39 +38,6 @@ describe("headerTimeout", () => {
     expect(timer.signal.aborted).toBe(true);
     expect(timer.timedOut()).toBe(false);
     timer.clear();
-  });
-});
-
-describe("ask errors", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  const body = buildAskBody("q", [], null, "4f2c9a1e-1b2c-4d5e-8f90-123456789abc");
-
-  it("throws a waking AskError with the status on 503", async () => {
-    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ detail: "Starting up" }), { status: 503 }));
-    const error = await ask(body, () => {}).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(AskError);
-    expect(error).toMatchObject({ kind: "waking", status: 503, message: "Starting up" });
-  });
-
-  it("turns a failed fetch into a network AskError", async () => {
-    vi.stubGlobal("fetch", async () => {
-      throw new TypeError("Failed to fetch");
-    });
-    await expect(ask(body, () => {})).rejects.toMatchObject({ kind: "network" });
-  });
-
-  it("times out when no response arrives in time", async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      "fetch",
-      (_url: string, init: RequestInit) =>
-        new Promise((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))),
-    );
-    const pending = ask(body, () => {}, undefined, 5000).catch((e: unknown) => e);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(await pending).toMatchObject({ kind: "timeout", message: TIMEOUT_MESSAGE });
-    vi.useRealTimers();
   });
 });
 
@@ -159,6 +94,29 @@ describe("buildAskBody", () => {
   });
 });
 
+describe("featuresOf", () => {
+  it("turns features on only when /config says so", () => {
+    expect(featuresOf({ providers: ["ollama"], default_provider: "ollama", features: { conversations: true, feedback: true } })).toEqual({
+      conversations: true,
+      feedback: true,
+    });
+  });
+
+  it("treats an older API without features, a failed /config or odd values as off", () => {
+    expect(featuresOf(null)).toEqual({ conversations: false, feedback: false });
+    expect(featuresOf({ providers: ["ollama"], default_provider: "ollama" })).toEqual({ conversations: false, feedback: false });
+    const odd = { providers: ["ollama"], default_provider: "ollama", features: { conversations: "yes", feedback: true } } as never;
+    expect(featuresOf(odd)).toEqual({ conversations: false, feedback: false });
+  });
+
+  it("never offers feedback without saved conversations (votes need a saved answer)", () => {
+    expect(featuresOf({ providers: ["ollama"], default_provider: "ollama", features: { feedback: true } })).toEqual({
+      conversations: false,
+      feedback: false,
+    });
+  });
+});
+
 describe("getSessionId", () => {
   it("returns one id the API accepts and keeps it without storage", () => {
     const id = getSessionId(); // no window in node: the in-memory fallback
@@ -192,52 +150,6 @@ describe("errorMessage", () => {
   it("keeps the plain status otherwise", () => {
     expect(errorMessage(500, "boom", null)).toBe("Request failed (500)");
     expect(errorMessage(503, null, null)).toBe("Request failed (503)");
-  });
-});
-
-describe("parseFrames", () => {
-  it("returns complete events and keeps a partial frame for the next chunk", () => {
-    const text =
-      'data: {"type":"token","text":"Hi"}\n\n' +
-      'data: {"type":"done","refused":false,"model":"m","top_similarity":0.8,"query":"q"}\n\n' +
-      'data: {"type":"tok';
-    const { events, rest } = parseFrames(text);
-    expect(events).toEqual([
-      { type: "token", text: "Hi" },
-      { type: "done", refused: false, model: "m", top_similarity: 0.8, query: "q" },
-    ]);
-    expect(rest).toBe('data: {"type":"tok');
-  });
-
-  it("reads a retract event and the guard fields on done", () => {
-    const text =
-      'data: {"type":"retract","message":"This answer was withdrawn by a safety check."}\n\n' +
-      'data: {"type":"done","refused":true,"model":"m","top_similarity":0.9,"query":"q",' +
-      '"guard":"prompt_leak","uncited":false}\n\n';
-    const { events } = parseFrames(text);
-    expect(events[0]).toEqual({
-      type: "retract",
-      message: "This answer was withdrawn by a safety check.",
-    });
-    expect(events[1]).toMatchObject({ type: "done", guard: "prompt_leak", uncited: false });
-  });
-
-  it("ignores frames without a data line", () => {
-    expect(parseFrames(": keep-alive\n\n").events).toEqual([]);
-  });
-});
-
-describe("closeTurn", () => {
-  it("fails a turn whose stream closed without a done or error event", () => {
-    const cut = { question: "q", answer: "half an ans", status: "streaming" as const, waking: true };
-    expect(closeTurn(cut)).toEqual({ ...cut, status: "error", meta: ENDED_EARLY, waking: false });
-  });
-
-  it("leaves a finished, refused or failed turn as it is", () => {
-    for (const status of ["done", "refused", "error"] as const) {
-      const t = { question: "q", answer: "a", status, meta: "model · best match 0.80" };
-      expect(closeTurn(t)).toBe(t);
-    }
   });
 });
 

@@ -1,6 +1,6 @@
-// Client for POST /ask. The API streams Server-Sent Events: frames separated by a blank line,
-// each with a `data: {json}` line. We read the body incrementally and hand each event to a
-// callback, so the UI can render tokens as they arrive.
+// Shared shapes and helpers for the API: the /ask request and its events, GET /config, the
+// warm-up call and the per-tab session id. The streaming itself lives in lib/chat/ (the
+// transports, the event parser, the reducer and the controller that drives a turn).
 
 import { SITE_NAME } from "@/lib/site";
 
@@ -30,8 +30,12 @@ export type AskEvent =
       top_similarity: number;
       query: string; // what was searched (the rewritten question for a follow-up)
       notice?: string;
+      kb?: string;
+      prompt_version?: string;
       guard?: string | null; // the safety rule that refused the question, if any
       uncited?: boolean; // an answer with no [n] citation
+      text?: string; // the whole answer as the reader should see it (newer APIs)
+      message_id?: number; // the saved answer, when the turn belongs to a saved conversation
     }
   | { type: "error"; message: string };
 
@@ -42,13 +46,31 @@ export const PROVIDER_LABELS: Record<Provider, string> = {
   anthropic: "Claude API (local only)",
 };
 
-/** What the server allows (GET /config). */
+/** What the server allows (GET /config). `features` is missing on APIs older than saved
+ * conversations; the chat then keeps the conversation in the tab, as it always did. */
 export interface AppConfig {
   providers: Provider[];
   default_provider: Provider;
+  features?: { conversations?: boolean; feedback?: boolean };
 }
 
-/** A finished or failed earlier turn, as the chat keeps it. */
+/** The optional API features the chat may use. */
+export interface Features {
+  conversations: boolean;
+  feedback: boolean;
+}
+
+export const NO_FEATURES: Features = { conversations: false, feedback: false };
+
+/** The features a /config answer turns on; anything missing or malformed counts as off. */
+export function featuresOf(config: AppConfig | null): Features {
+  const f = config?.features;
+  if (!f || typeof f !== "object") return NO_FEATURES;
+  const conversations = f.conversations === true;
+  return { conversations, feedback: conversations && f.feedback === true };
+}
+
+/** A finished or failed earlier turn, as history for a follow-up. */
 export interface PastTurn {
   question: string;
   answer: string;
@@ -56,23 +78,7 @@ export interface PastTurn {
   guard?: string; // the safety rule that refused it; such a turn is never sent back as history
 }
 
-/** A turn as the chat shows it while the answer streams in. */
-export interface StreamedTurn extends PastTurn {
-  meta?: string; // the error message of a failed turn
-  waking?: boolean;
-}
-
-export const ENDED_EARLY = "The answer ended early. Please try again.";
-
-/**
- * The turn once the answer stream has closed. Every normal answer ends with a done or error
- * event; a turn still "streaming" lost its stream (a proxy cut it, or the server stopped), so
- * it becomes an error instead of showing "Searching…" and a Stop button forever.
- */
-export function closeTurn<T extends StreamedTurn>(turn: T): T {
-  if (turn.status !== "streaming") return turn;
-  return { ...turn, status: "error", meta: ENDED_EARLY, waking: false };
-}
+export type Channel = "text" | "voice";
 
 export interface AskBody {
   question: string;
@@ -80,6 +86,8 @@ export interface AskBody {
   track: string | null;
   session_id: string;
   provider?: Provider; // only when the reader chose one; otherwise the server default applies
+  conversation_id?: string; // a saved conversation: the server then uses its own history
+  channel?: Channel; // only sent with a conversation id
 }
 
 /** The request body: the last completed turns (errors, unfinished turns and turns the safety
@@ -104,18 +112,6 @@ export function buildAskBody(
   return body;
 }
 
-/** Split buffered SSE text into complete events plus the unfinished remainder. */
-export function parseFrames(buffer: string): { events: AskEvent[]; rest: string } {
-  const frames = buffer.split("\n\n");
-  const rest = frames.pop() ?? "";
-  const events: AskEvent[] = [];
-  for (const frame of frames) {
-    const line = frame.split("\n").find((l) => l.startsWith("data: "));
-    if (line) events.push(JSON.parse(line.slice(6)) as AskEvent);
-  }
-  return { events, rest };
-}
-
 /** The message to show for a refused request: friendly for limits and turned-off features,
  * the plain status otherwise. */
 export function errorMessage(
@@ -132,7 +128,8 @@ export function errorMessage(
   return `Request failed (${status})`;
 }
 
-async function readDetail(res: Response): Promise<string | null> {
+/** The `detail` string of an error response, or null. */
+export async function readDetail(res: Response): Promise<string | null> {
   try {
     const body = (await res.json()) as { detail?: unknown };
     return typeof body.detail === "string" ? body.detail : null;
@@ -192,41 +189,9 @@ export function getSessionId(): string {
   }
 }
 
-/** Why a request failed: the chat shows a different card for each. */
-export type AskErrorKind = "waking" | "rate" | "forbidden" | "network" | "timeout" | "http";
-
-/** A failed /ask request. `message` is the text the reader may see (errorMessage for HTTP
- * errors); `status` is set for HTTP errors only. */
-export class AskError extends Error {
-  constructor(
-    message: string,
-    readonly kind: AskErrorKind,
-    readonly status?: number,
-  ) {
-    super(message);
-    this.name = "AskError";
-  }
-}
-
-/** 503 means the model is still starting (a cold start), 429 a rate limit, 403 a turned-off
- * feature; anything else is a plain HTTP error. */
-export function errorKind(status: number): AskErrorKind {
-  if (status === 503) return "waking";
-  if (status === 429) return "rate";
-  if (status === 403) return "forbidden";
-  return "http";
-}
-
-export const ASK_TIMEOUT_MS = 30_000;
-export const AUTO_RETRY_DELAY_MS = 3_000;
+export const ASK_TIMEOUT_MS = 30_000; // no response headers in this long: "didn't answer in time"
 export const NETWORK_MESSAGE = `Could not reach ${SITE_NAME}.`;
 export const TIMEOUT_MESSAGE = `${SITE_NAME} didn't answer in time.`;
-
-/** One automatic retry, only for a cold start or a network failure, and only after the first
- * attempt (`attempt` counts the attempts made so far, starting at 1). */
-export function shouldAutoRetry(kind: AskErrorKind, attempt: number): boolean {
-  return attempt === 1 && (kind === "waking" || kind === "network");
-}
 
 /**
  * A signal that aborts when `outer` aborts or when `ms` pass first. Call `clear()` as soon as
@@ -247,50 +212,4 @@ export function headerTimeout(
     controller.abort(new DOMException("timed out", "TimeoutError"));
   }, ms);
   return { signal: controller.signal, clear: () => clearTimeout(timer), timedOut: () => expired };
-}
-
-/**
- * POST /ask and hand each streamed event to `onEvent`. Throws an AskError for an HTTP error,
- * a network failure or no response within `timeoutMs`; a Stop (the caller's `signal`)
- * surfaces as the browser's AbortError.
- */
-export async function ask(
-  body: AskBody,
-  onEvent: (event: AskEvent) => void,
-  signal?: AbortSignal,
-  timeoutMs: number = ASK_TIMEOUT_MS,
-): Promise<void> {
-  const timer = headerTimeout(signal, timeoutMs);
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/ask`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: timer.signal,
-    });
-  } catch (err) {
-    if (timer.timedOut()) throw new AskError(TIMEOUT_MESSAGE, "timeout");
-    if (signal?.aborted) throw err;
-    if (err instanceof TypeError) throw new AskError(NETWORK_MESSAGE, "network");
-    throw err;
-  } finally {
-    timer.clear();
-  }
-  if (!res.ok || !res.body) {
-    const detail = [403, 429, 503].includes(res.status) ? await readDetail(res) : null;
-    throw new AskError(errorMessage(res.status, detail, res.headers.get("Retry-After")), errorKind(res.status), res.status);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const { events, rest } = parseFrames(buffer);
-    buffer = rest;
-    events.forEach(onEvent);
-  }
 }

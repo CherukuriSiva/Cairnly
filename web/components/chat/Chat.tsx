@@ -3,29 +3,17 @@
 import { SquarePen } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Composer } from "@/components/chat/Composer";
-import { TurnView, type ChatTurn } from "@/components/chat/TurnView";
+import { TurnView } from "@/components/chat/TurnView";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import {
-  ask,
-  AskError,
-  AUTO_RETRY_DELAY_MS,
-  buildAskBody,
-  closeTurn,
-  fetchConfig,
-  getSessionId,
-  PROVIDER_LABELS,
-  shouldAutoRetry,
-  warmUp,
-  type AskEvent,
-  type Provider,
-} from "@/lib/ask";
+import { featuresOf, fetchConfig, getSessionId, PROVIDER_LABELS, warmUp, type Provider } from "@/lib/ask";
+import { ChatController } from "@/lib/chat/controller";
+import { browserStorage, httpConversationApi } from "@/lib/chat/conversations";
+import { groupTurns, initialChatState } from "@/lib/chat/reducer";
+import { liveTransport } from "@/lib/chat/transport";
 import { askHref, STARTERS } from "@/lib/starters";
 import { SITE_NAME } from "@/lib/site";
-
-const WAKING_MS = 5000; // no token yet after this: the model is probably starting up
-const STOPPED = "Stopped.";
 
 /** Remove one query parameter from the address bar without reloading. */
 function dropParam(name: string) {
@@ -44,146 +32,43 @@ function UrlParams({ onChange }: { onChange: (q: string | null, track: string | 
   return null;
 }
 
-/** The chat at /ask. Answers stream in; a cold start or a network failure shows a friendly
- * card and retries once by itself after 3 s; Retry asks again in place of the failed turn. */
+/** The chat at /ask. The turn logic lives in lib/chat (ChatController); this component renders
+ * its rows and wires the page around it: GET /config (providers and optional features), the
+ * shareable ?q= and ?track= links, the provider select and New chat. */
 export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const providerRef = useRef<Provider | null>(null);
+  const [chat] = useState(
+    () =>
+      new ChatController({
+        transport: liveTransport(),
+        sessionId: getSessionId,
+        provider: () => providerRef.current,
+        storage: browserStorage,
+      }),
+  );
+  const state = useSyncExternalStore(chat.subscribe, chat.getState, () => initialChatState);
   const [input, setInput] = useState("");
   const [providers, setProviders] = useState<Provider[]>(["ollama"]);
   const [provider, setProvider] = useState<Provider>("ollama");
   const chooseProvider = providers.length > 1; // the select only appears when there is a choice
   const [track, setTrack] = useState<string | null>(null);
-  const busy = turns.some((t) => t.status === "streaming" || t.retrying);
+  const busy = state.status !== "idle";
 
-  const turnsRef = useRef<ChatTurn[]>([]);
-  const nextId = useRef(1);
-  const abortRef = useRef<AbortController | null>(null);
-  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const providerRef = useRef<Provider | null>(null);
-
-  useEffect(() => {
-    turnsRef.current = turns;
-  }, [turns]);
   useEffect(() => {
     providerRef.current = chooseProvider ? provider : null;
   }, [chooseProvider, provider]);
 
-  const updateTurn = useCallback((id: number, fn: (t: ChatTurn) => ChatTurn) => {
-    setTurns((all) => all.map((t) => (t.id === id ? fn(t) : t)));
-  }, []);
-
-  const cancelRetry = useCallback(() => {
-    if (retryTimer.current) clearTimeout(retryTimer.current);
-    retryTimer.current = null;
-  }, []);
-
-  /** Stream one attempt of a turn. `before` is the conversation before it (its history). */
-  const run = useCallback(
-    async (id: number, question: string, scope: string | null, attempt: number, before: ChatTurn[]) => {
-      const body = buildAskBody(question, before, scope, getSessionId(), providerRef.current);
-      const controller = new AbortController();
-      abortRef.current = controller;
-      // A cold GPU can take a while for the first token: say so instead of only the dots.
-      const waking = setTimeout(
-        () => updateTurn(id, (t) => (t.status === "streaming" && !t.answer ? { ...t, waking: true } : t)),
-        WAKING_MS,
-      );
-      const onEvent = (e: AskEvent) => {
-        if (e.type !== "sources") clearTimeout(waking);
-        if (e.type === "sources") updateTurn(id, (t) => ({ ...t, sources: e.sources }));
-        else if (e.type === "token") updateTurn(id, (t) => ({ ...t, answer: t.answer + e.text, waking: false }));
-        else if (e.type === "retract") updateTurn(id, (t) => ({ ...t, answer: e.message, status: "refused" }));
-        else if (e.type === "error") updateTurn(id, (t) => ({ ...t, status: "error", meta: e.message, waking: false }));
-        else if (e.type === "done")
-          updateTurn(id, (t) => ({
-            ...t,
-            status: e.refused ? "refused" : "done",
-            waking: false,
-            debug: `${e.model} · best match ${e.top_similarity.toFixed(2)}`,
-            uncited: e.uncited || undefined,
-            searched: e.query && e.query !== t.question ? e.query : undefined,
-            notice: e.notice || undefined,
-            guard: e.guard || undefined,
-          }));
-      };
-      try {
-        await ask(body, onEvent, controller.signal);
-        updateTurn(id, closeTurn); // the stream closed without a done or error event
-      } catch (err) {
-        if (controller.signal.aborted) {
-          updateTurn(id, (t) => ({ ...t, status: "error", meta: STOPPED, errorKind: undefined, waking: false }));
-          return;
-        }
-        const kind = err instanceof AskError ? err.kind : "http";
-        const auto = shouldAutoRetry(kind, attempt);
-        updateTurn(id, (t) => ({ ...t, status: "error", meta: (err as Error).message, errorKind: kind, waking: false, retrying: auto }));
-        if (auto) {
-          retryTimer.current = setTimeout(() => {
-            retryTimer.current = null;
-            retryRef.current(id);
-          }, AUTO_RETRY_DELAY_MS);
-        }
-      } finally {
-        clearTimeout(waking);
-      }
-    },
-    [updateTurn],
-  );
-
-  /** Ask a failed turn again, in its place, with the same question and scope. */
-  const retry = useCallback(
-    (id: number) => {
-      cancelRetry();
-      const all = turnsRef.current;
-      const index = all.findIndex((t) => t.id === id);
-      if (index < 0 || all.some((t) => t.status === "streaming")) return;
-      const failed = all[index];
-      const attempt = failed.attempt + 1;
-      updateTurn(id, (t) => ({
-        id: t.id,
-        question: t.question,
-        scope: t.scope,
-        attempt,
-        answer: "",
-        sources: [],
-        status: "streaming",
-      }));
-      run(id, failed.question, failed.scope, attempt, all.slice(0, index));
-    },
-    [cancelRetry, run, updateTurn],
-  );
-  // The automatic retry runs from a timer; it calls the latest retry through this ref.
-  const retryRef = useRef(retry);
-  useEffect(() => {
-    retryRef.current = retry;
-  }, [retry]);
-
   const submit = useCallback(
-    (question: string, scope: string | null) => {
-      const all = turnsRef.current;
-      if (!question.trim() || all.some((t) => t.status === "streaming" || t.retrying)) return;
-      const id = nextId.current++;
+    (question: string, scope: string | null, newConversation = false) => {
+      if (!question.trim() || chat.busy) return;
       setInput("");
-      const turn: ChatTurn = { id, question, scope, attempt: 1, answer: "", sources: [], status: "streaming" };
-      turnsRef.current = [...all, turn];
-      setTurns(turnsRef.current);
-      run(id, question, scope, 1, all);
+      chat.send(question, scope, { newConversation });
     },
-    [run],
+    [chat],
   );
-
-  function stop() {
-    cancelRetry();
-    abortRef.current?.abort();
-    setTurns((all) => all.map((t) => (t.retrying ? { ...t, retrying: false } : t)));
-  }
 
   function newChat() {
-    cancelRetry();
-    abortRef.current?.abort();
-    abortRef.current = null;
-    turnsRef.current = [];
-    setTurns([]);
+    chat.newChat();
     setInput("");
   }
 
@@ -193,13 +78,14 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
   }
 
   // Shareable links: /ask?q=...&track=... sets the scope and asks each new q once (a second run
-  // with the same q, from dev StrictMode or a track change, does not ask again).
-  const askedQ = useRef<string | null>(null);
+  // with the same q, from dev StrictMode or a track change, does not ask again). A link opened
+  // with the page starts a new conversation; a q pushed while the chat is open follows up.
+  const askedQ = useRef<string | null | undefined>(undefined);
   const applyUrl = useCallback(
     (q: string | null, scope: string | null) => {
       const known = scope && scope in trackTitles ? scope : null;
       setTrack(known);
-      if (q && q !== askedQ.current) submit(q, known);
+      if (q && q !== askedQ.current) submit(q, known, askedQ.current === undefined);
       askedQ.current = q;
     },
     [trackTitles, submit],
@@ -211,36 +97,40 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
     setDebug(process.env.NODE_ENV === "development" || new URLSearchParams(window.location.search).get("debug") === "1");
   }, []);
 
-  // Wake the API for the first question, and ask which providers this server allows. Without
-  // an answer, the chat uses the server default.
+  // Wake the API, ask what it offers, then restore the saved conversation (newer APIs only).
+  // Without an answer the chat keeps its history in the tab, as older versions did.
   useEffect(() => {
     warmUp();
     let live = true;
     fetchConfig().then((config) => {
-      if (!live || !config) return;
-      setProviders(config.providers);
-      if (config.providers.includes(config.default_provider)) setProvider(config.default_provider);
+      if (!live) return;
+      if (config) {
+        setProviders(config.providers);
+        if (config.providers.includes(config.default_provider)) setProvider(config.default_provider);
+      }
+      const features = featuresOf(config);
+      chat.configure(config ? { features, conversations: features.conversations ? httpConversationApi() : null } : null);
+      void chat.restore();
     });
     return () => {
       live = false;
     };
-  }, []);
+  }, [chat]);
 
   // Leaving the page stops the stream and any pending retry. Dev StrictMode runs this cleanup and
-  // the effect again in one go, so the abort waits a microtask and only a real unmount cancels.
+  // the effect again in one go, so the stop waits a microtask and only a real unmount cancels.
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
       queueMicrotask(() => {
-        if (mounted.current) return;
-        cancelRetry();
-        abortRef.current?.abort();
+        if (!mounted.current) chat.dispose();
       });
     };
-  }, [cancelRetry]);
+  }, [chat]);
 
+  const turns = groupTurns(state.rows);
   const Eyebrow = turns.length > 0 ? "h1" : "p";
 
   return (
@@ -304,8 +194,17 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
             </ul>
           </div>
         )}
-        {turns.map((turn) => (
-          <TurnView key={turn.id} turn={turn} busy={busy} debug={debug} onRetry={() => retry(turn.id)} />
+        {turns.map(({ question, replies }) => (
+          <TurnView
+            key={question.key}
+            question={question}
+            replies={replies}
+            pending={state.pending === question.key}
+            waking={state.waking}
+            busy={busy}
+            debug={debug}
+            onRetry={(key) => chat.retry(key)}
+          />
         ))}
       </section>
 
@@ -313,7 +212,7 @@ export function Chat({ trackTitles }: { trackTitles: Record<string, string> }) {
         value={input}
         onChange={setInput}
         onSubmit={() => submit(input, track)}
-        onStop={stop}
+        onStop={() => chat.stop()}
         busy={busy}
         placeholder={turns.length ? "Ask a follow-up…" : "Ask a question…"}
         scopeTitle={track ? (trackTitles[track] ?? track) : null}
