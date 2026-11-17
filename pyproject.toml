@@ -1,6 +1,7 @@
 [project]
 name = "cairnly"
 version = "0.1.0"
+license = "MIT"
 description = "A deployable AI knowledge assistant: point it at your docs, get cited answers."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

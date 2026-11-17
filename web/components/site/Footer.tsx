@@ -4,7 +4,7 @@ import { CATEGORY_LABELS, getRoadmaps } from "@/lib/content";
 import { SITE_NAME } from "@/lib/site";
 import { getTracks } from "@/lib/syllabus";
 
-const REPO_URL = "https://github.com/CherukuriSiva/cairnly";
+const REPO_URL = "https://github.com/CherukuriSiva/Cairnly";
 
 /** The GitHub mark (lucide no longer ships brand icons). */
 function GitHubIcon() {
