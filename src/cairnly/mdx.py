@@ -31,6 +31,8 @@ DROP = {"SourceNote"}  # site-only widgets with no text content
 
 ATTRS = r'(?:\s+\w+="[^"]*")*'
 TAG_LINE = re.compile(r"^\s*<(/?)([A-Z]\w*)" + ATTRS + r"\s*(/?)>\s*$")
+# A dropped widget written on one line with its text, e.g. <SourceNote>credit</SourceNote>.
+DROP_LINE = re.compile(r"^\s*<(" + "|".join(DROP) + r")" + ATTRS + r"\s*>.*</\1>\s*$")
 INLINE_TAG = re.compile(r"</?(" + "|".join([*SECTIONS, *UNWRAP]) + r")" + ATTRS + r"\s*>")
 ROADMAP_PHASE = re.compile(r'^\s*<RoadmapPhase\s+title="([^"]*)"(?:\s+duration="([^"]*)")?\s*>\s*$')
 MATRIX_PROP = re.compile(r"(\w+)=\{(\[.*?\])\}", re.S)
@@ -71,6 +73,8 @@ def mdx_to_markdown(body: str) -> tuple[str, list[str]]:
         elif m := ROADMAP_PHASE.match(line):
             title, duration = m.groups()
             out.append(f"## {title} ({duration})" if duration else f"## {title}")
+        elif DROP_LINE.match(line):
+            out.append("")
         elif m := TAG_LINE.match(line):
             closing, name, self_closing = m.groups()
             if name in SECTIONS and not closing and not self_closing:

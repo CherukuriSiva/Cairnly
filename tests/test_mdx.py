@@ -49,6 +49,14 @@ def test_attributes_on_other_tags_and_self_closing_tags():
     assert warnings == []
 
 
+def test_a_one_line_source_note_with_a_credit_is_dropped():
+    md, warnings = mdx_to_markdown(
+        "<Body>\nx\n</Body>\n<SourceNote>Based on a post by A (2026).</SourceNote>\n"
+    )
+    assert md == "x\n"
+    assert warnings == []
+
+
 def test_titles_come_from_sections_json():
     titles = section_titles()
     assert titles["BookNote"] == "From AI Engineering (Chip Huyen)"
