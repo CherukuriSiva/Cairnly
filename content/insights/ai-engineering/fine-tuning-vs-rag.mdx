@@ -44,7 +44,7 @@ Fine-tuning addresses *behavior*, not knowledge:
 
 - **Style, tone, or format** the model will not reliably hold through prompting — a specific voice, a strict output schema, a house format.
 - **Domain behavior** that prompt-plus-RAG cannot reach, such as specialized reasoning patterns or task adaptation where examples in the prompt are not enough.
-- **Performance enhancement** on a narrow, high-volume task where you want the behavior compiled into the weights for consistency and lower per-call overhead.
+- **Better results** on a narrow, high-volume task where you want the behavior compiled into the weights for consistency and lower per-call overhead.
 
 Note these are mostly *how the model responds* problems, not *what the model knows* problems. That distinction is the cleanest way to decide.
 
@@ -61,7 +61,7 @@ Note these are mostly *how the model responds* problems, not *what the model kno
 
 Two related tools often travel with fine-tuning. **Quantization** (FP32 to INT8/FP4) shrinks a model and speeds up inference, trading a little precision for a lot of efficiency. **Distillation** trains a smaller "student" model to imitate a larger "teacher," capturing much of its behavior in a cheaper-to-run package. Neither replaces the RAG-vs-fine-tune decision, but both help you ship the result affordably.
 
-And one practical truth from the field: when you do fine-tune, expect to spend most of your effort — often around 80% — on data preparation. Quality, diversity, and clear input/output formatting of your training data matter far more than the training run itself.
+And one practical truth from the field: when you do fine-tune, expect to spend most of your effort — often around 80% — on data preparation. Clean, varied examples, each with an unambiguous input and the exact output you want, matter far more than the training run itself.
 </Body>
 
 <CommonMistakes>

@@ -21,68 +21,68 @@ updatedAt: "2026-06-06"
 ---
 
 <InsightSummary>
-Prompt engineering is not magic words — it is a small set of reliable techniques for telling a model exactly what you want. Zero-shot for simple tasks, few-shot to show the format, role and instruction prompting to set expertise and constraints, chain-of-thought for multi-step problems, and output formatting plus delimiters to get usable, structured results. Each is simple on its own; knowing which to reach for is the actual skill. The throughline: prompt engineering is not just about getting an answer, it is about getting a *usable* one.
+Prompt engineering is not magic words — it is a small set of reliable techniques for telling a model exactly what you want. Zero-shot for simple tasks, few-shot to show the format, role and instruction prompting to set expertise and constraints, chain-of-thought for multi-step problems, and output formatting plus delimiters to get usable, structured results. Each is simple on its own; knowing which to reach for is the actual skill. The common thread: the goal is not any answer, it is an answer you can actually *use*.
 </InsightSummary>
 
 <Body>
 ## Zero-shot
 
-Just ask, with no examples. Best for well-defined, simple tasks — quick answers, summaries, explanations, and rewriting. Example: *"Summarize this article in 3 lines."* If the task is unambiguous, zero-shot is the cheapest path and usually enough.
+Just ask, with no examples. It fits small, clear-cut jobs like a fast fact, a short summary, a plain explanation, or a rewrite. Example: *"Give me the main point of this email in two sentences."* If the task is unambiguous, zero-shot is the cheapest path and usually enough.
 
 ## Few-shot
 
 Give a handful of input→output examples before the real task, so the model infers the pattern and format. Example:
 
 ```
-Input: Apple  -> Output: Fruit
-Input: Carrot -> Output: Vegetable
-Input: Mango  -> Output:
+Review: "Arrived broken"    -> Label: negative
+Review: "Works great"       -> Label: positive
+Review: "Fast and reliable" -> Label:
 ```
 
 Two to five examples is the sweet spot. Reach for few-shot when you need a specific output *format* or labeling scheme that is hard to describe in words but easy to demonstrate.
 
 ## Role prompting
 
-Give the model a clear identity. Example: *"Act as a senior AI architect and explain RAG architecture for enterprise systems."* It works because the role controls tone, expertise, depth, and output style in one short phrase — far more efficient than spelling out each of those separately.
+Tell the model who it is supposed to be. Example: *"You are an experienced database engineer. Explain indexing to a junior developer on your team."* It works because one short role line sets how the answer sounds, how expert it is, how deep it goes, and how it is laid out — far more efficient than spelling out each of those separately.
 
 ## Instruction prompting
 
-Tell the model clearly and specifically what to do. The difference between weak and strong is precision:
+Spell out the task in plain, exact terms. What separates a weak prompt from a strong one is how precise it is:
 
-- **Weak:** *"Write a LinkedIn post."*
-- **Strong:** *"Write a professional LinkedIn post under 150 words for startup founders. Use a confident tone, short paragraphs, and end with a question."*
+- **Weak:** *"Write a product description."*
+- **Strong:** *"Write a product description under 100 words for busy parents. Keep the tone warm, use two short paragraphs, and finish with one call to action."*
 
-The strong version constrains length, audience, tone, and structure — leaving far less room for the model to guess wrong. Add background with **context injection** (*"The user is a beginner in Python. Explain loops using simple examples."*); more useful context yields more relevant output.
+The strong version pins down length, reader, tone, and layout, so the model has far less to guess. Add background with **context injection** (*"I am new to SQL. Show me how a JOIN works with a tiny example."*); the more relevant background you give, the better the answer fits.
 
 ## Chain-of-thought (CoT)
 
-Ask the model to reason systematically instead of jumping to an answer — "think step by step," or lay out the steps explicitly:
+Ask the model to work through the problem in order instead of jumping to an answer. Say "think step by step," or list the steps yourself:
 
 ```
-Analyze this bug step by step:
-1. Identify the issue
-2. Find the root cause
-3. Suggest the fix
+This API call times out. Work through it in order:
+1. Describe what is failing
+2. Explain why it fails
+3. Propose a change
 ```
 
-Best for multi-step problems: debugging, math, logic, system design, planning, and root-cause analysis. One practical note for professional use: ask for *concise* reasoning steps rather than long hidden thinking — you want the model to reason, not ramble.
+Use it when a problem has several stages, such as tracking down a bug, solving a math or logic puzzle, designing a system, making a plan, or finding why something broke. One practical note for work settings: ask for *short* reasoning steps, not a long stream of thinking. You want the model to reason, not ramble.
 
 ## Output formatting and delimiters
 
 Control the *shape* of the answer so it is easy to consume downstream:
 
-- **Output formatting:** *"Return the answer in a table," "Give the output in JSON," "Use bullet points only."* Structured outputs are far easier to plug into APIs, automation, reports, and workflows.
-- **Delimiters:** wrap input data in clear markers (e.g. triple quotes) to separate your *instructions* from the *data* you are operating on: *"Summarize the text inside triple quotes."* This prevents the model from confusing your instruction with the content — clean separation improves accuracy, especially on documents, transcripts, code, and emails.
+- **Output formatting:** *"Answer as a two-column table," "Reply with JSON only, using these keys," "Give me three bullets and nothing else."* A predictable shape is much easier to feed into code, scripts, reports, and other tools.
+- **Delimiters:** put the input inside clear markers (e.g. triple quotes or XML-style tags) so the model can tell your *instructions* apart from the *data* it should work on: *"Translate only the text between the tags into French."* The model then cannot mistake part of the content for a command, and answers get more accurate, especially with long documents, call transcripts, source code, and emails.
 
 ## Weak vs strong, in one line
 
-The pattern behind every technique is the same: a weak prompt leaves the model guessing; a strong prompt removes the guesswork. *"Write something about AI"* invites a generic essay; *"Explain RAG to a non-technical manager in 5 bullet points, each under 15 words"* gets you exactly what you can use. Prompt engineering is not only about answers — it is about usable answers.
+The pattern behind every technique is the same: a weak prompt leaves the model guessing; a strong prompt removes the guesswork. *"Write something about AI"* invites a generic essay; *"Explain RAG to a non-technical manager in 5 bullet points, each under 15 words"* gets you exactly what you can use. The point was never just to get a reply. It was to get one you can put to work.
 </Body>
 
 <KeyTakeaways>
 - Zero-shot (no examples) suits simple, well-defined tasks; few-shot (2–5 examples) teaches the model an output format you can't easily describe.
-- Role prompting sets tone, expertise, and depth in one phrase; instruction prompting and context injection remove ambiguity by stating constraints and background explicitly.
-- Chain-of-thought makes the model reason step by step for multi-step problems — but ask for concise reasoning in professional use.
+- A role line shapes voice, expertise, and depth at once; instruction prompting and context injection remove ambiguity by stating constraints and background explicitly.
+- Chain-of-thought makes the model reason step by step for multi-step problems; at work, ask for short steps rather than a long monologue.
 - Output formatting (tables, JSON, bullets) and delimiters (separating instructions from data) turn raw answers into usable, accurate ones.
 - The unifying rule: weak prompts make the model guess; strong, specific prompts remove the guesswork.
 </KeyTakeaways>
@@ -93,4 +93,4 @@ The pattern behind every technique is the same: a weak prompt leaves the model g
 - Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) or the [AI-era beginner readiness](/roadmap/ai-era-beginner-readiness) roadmap.
 </WhatToDoNext>
 
-<SourceNote />
+<SourceNote>Based on a LinkedIn infographic by Reshma Sriram of LuMay AI (2026). The ideas are theirs; the wording and the extra detail here are ours.</SourceNote>

@@ -33,10 +33,10 @@ Embeddings turn text, images, or other data into high-dimensional vectors where 
 
 The wide field organizes into a handful of types:
 
-- **In-process library — FAISS.** A similarity-search library (not a server) optimized for dense vectors and nearest-neighbor search. Runs inside your app, zero infrastructure, free. Ideal for prototypes and learning.
-- **Postgres extension — pgvector.** Adds vector similarity search directly to PostgreSQL. No new service to operate if you already run Postgres.
-- **Self-hosted open-source engines — Milvus, Qdrant, Weaviate, Chroma.** Milvus targets billion-scale workloads; Qdrant focuses on filtering, payloads, and efficient retrieval; Weaviate adds hybrid search, modules, and scalable semantic indexing; Chroma is a lightweight embedding DB popular for local prototypes and RAG experiments.
-- **Managed cloud services — Pinecone, and managed tiers of the above.** Pinecone is a fully managed vector DB built for fast similarity search and production retrieval. You trade some control for someone else operating it.
+- **In-process library — FAISS.** Meta's library (not a server) for finding the closest matches among dense vectors. Runs inside your app, zero infrastructure, free. Ideal for prototypes and learning.
+- **Postgres extension — pgvector.** Lets you store vectors in ordinary Postgres tables and query them by distance. No new service to operate if you already run Postgres.
+- **Self-hosted open-source engines — Milvus, Qdrant, Weaviate, Chroma.** Milvus is built for collections with billions of vectors; Qdrant is strong at combining vector search with metadata filters on each stored record; Weaviate mixes keyword and vector search and has plug-in modules; Chroma is small and easy to run on your own machine, so many people use it for first RAG experiments.
+- **Managed cloud services — Pinecone, and managed tiers of the above.** Pinecone runs the whole vector store for you as a hosted service, aimed at production apps that need quick lookups. You trade some control for someone else operating it.
 - **Vector features bolted onto existing systems — Redis, Elasticsearch/OpenSearch, MongoDB Atlas, and others.** If you already run one of these, its vector capability may be "good enough" without adding a new dependency.
 
 ## A selection guide
@@ -74,4 +74,4 @@ Pick the simplest option that clears your bar on those four, and resist switchin
 - Make sure your retrieval quality starts at the source with [Embedding model selection](/ai-engineering/embedding-model-selection).
 </WhatToDoNext>
 
-<SourceNote />
+<SourceNote>Based on a LinkedIn infographic by Alok Sharan (2026). The ideas are theirs; the wording and the extra detail here are ours.</SourceNote>

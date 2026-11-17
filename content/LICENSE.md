@@ -20,10 +20,12 @@ repository root).
 
 ## Insights
 
-Insights (`content/insights/`) are the author's own summaries of public posts and talks by
-other people. The ideas in them belong to their original authors. Each insight names and links
-its source at the bottom of the page. The CC BY-NC-SA license covers only our wording and
-arrangement, not the original authors' work; read the source for their own terms.
+Insights (`content/insights/`) are the author's own summaries of public posts, mostly
+LinkedIn infographics, by other people. The ideas in them belong to their original authors.
+Each insight credits its source at the bottom of the page: by name where the post shows its
+author, otherwise as public industry posts. The CC BY-NC-SA license covers only our wording,
+extra detail and arrangement, not the original authors' work. If you are the author of a
+source and want a credit, a link or a removal, open an issue.
 
 ## Book notes
 

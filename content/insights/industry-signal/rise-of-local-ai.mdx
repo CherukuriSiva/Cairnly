@@ -24,15 +24,15 @@ For most of the LLM era, "using AI" meant calling someone else's cloud. That is 
 <Body>
 ## The shift
 
-Open models in the small-to-mid size range — families like Gemma, Llama, Phi, and Mistral — now run usefully on consumer hardware. A modern laptop or even a phone can host a model that, a couple of years ago, would have required a cloud GPU. The headline framing is apt: your laptop is becoming an AI server. AI is moving from cloud-only apps toward local and hybrid architectures, driven by better on-device performance, lower latency, privacy needs, offline capability, and lower inference cost for many tasks.
+Open models in the small-to-mid size range — families like Gemma, Llama, Phi, and Mistral — now run usefully on consumer hardware. A modern laptop or even a phone can host a model that, a couple of years ago, would have required a cloud GPU. Put simply, the machine on your desk can now serve a model itself. Apps that once sent every request to the cloud are starting to run some of the work on the device, or to split it between the two. The reasons are practical: local hardware has gotten faster, answers come back sooner, private data can stay put, things keep working without a connection, and for many tasks it is cheaper per request.
 
 ## Cloud vs. local vs. hybrid
 
 There are now three deployment modes, each winning in different conditions:
 
-- **Cloud.** Best for large-scale reasoning, the most capable frontier models, and heavy multimodal work. Strengths: top model quality, no local setup, centralized governance. Trade-offs: data leaves the device, per-call cost, and network latency.
-- **Local.** Best for privacy-sensitive tasks, fast responses, and personal productivity. Strengths: data stays on the device, no network round-trip, offline operation. Trade-offs: limited by your hardware and the size of model it can hold.
-- **Hybrid.** Route simple, sensitive, or latency-critical work to a local model and send complex or large-context reasoning to the cloud. Strengths: balances cost, privacy, and capability. Trade-offs: added routing and observability complexity — you now have two execution paths to manage.
+- **Cloud.** The right home for the hardest reasoning, the biggest frontier models, and demanding image, audio, or video work. Strengths: top model quality, no local setup, one central place to set policy and control access. Trade-offs: data leaves the device, per-call cost, and network latency.
+- **Local.** The right home for data you cannot share, replies that must feel instant, and everyday personal tools. Strengths: data stays on the device, no network round-trip, offline operation. Trade-offs: limited by your hardware and the size of model it can hold.
+- **Hybrid.** Route simple, sensitive, or latency-critical work to a local model and send complex or large-context reasoning to the cloud. Strengths: balances cost, privacy, and capability. Trade-offs: you have to decide where each request goes and trace it in two places, because there are now two execution paths to manage.
 
 ## Ollama and the local runtime
 
@@ -40,7 +40,7 @@ The practical on-ramp for developers is a local inference runtime — Ollama bei
 
 ## What this means for developers
 
-The strategic takeaway is that **model selection is no longer enough** — *model placement* is now a core architecture decision. You are not just choosing which model, but where it runs, and that choice shapes cost, latency, privacy, and reliability. The winning systems will combine local, cloud, and hybrid inference, routing each request to the right place. The new design question every AI feature should answer: *what should run locally, and what should go to the cloud?*
+The big lesson is that **picking a model is only half the job**. Deciding *where it runs* is now a real architecture choice. That choice shapes cost, latency, privacy, and reliability. The strongest systems will mix on-device and cloud inference and send each request to whichever fits it best. So every AI feature now has to answer one more design question: *which parts stay on the device, and which parts go to a cloud model?*
 
 ## Privacy use cases that require local
 
@@ -50,7 +50,7 @@ Some domains effectively mandate local inference because the data cannot leave t
 <KeyTakeaways>
 - Capable small models (Gemma, Llama, Phi, Mistral) now run on laptops and phones, turning the device into an AI server rather than a thin client.
 - The future is a spectrum — cloud, local, and hybrid — not cloud-only; each mode wins under different cost, privacy, latency, and capability constraints.
-- Hybrid routing (simple/sensitive local, complex/large-context cloud) balances the trade-offs but adds routing and observability complexity.
+- Hybrid routing (simple/sensitive local, complex/large-context cloud) balances the trade-offs but means more routing logic and two paths to trace.
 - Local runtimes like Ollama make running open models a one-line operation, putting on-device inference in every developer's toolkit.
 - Model *placement* is now an architecture decision, not an ops detail — and privacy-bound domains (medical, legal, enterprise PII) often require local inference outright.
 </KeyTakeaways>
@@ -59,4 +59,4 @@ Some domains effectively mandate local inference because the data cannot leave t
 - Build the skills to make placement decisions deliberately by following the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
 </WhatToDoNext>
 
-<SourceNote />
+<SourceNote>Based on a LinkedIn infographic by Brij Kishore Pandey (2026). The ideas are theirs; the wording and the extra detail here are ours.</SourceNote>

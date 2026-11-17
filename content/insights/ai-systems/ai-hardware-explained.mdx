@@ -26,27 +26,27 @@ Modern AI runs on a small zoo of processors, and they are not interchangeable. T
 <Body>
 ## CPU — the general-purpose backbone
 
-The CPU handles any task, runs the operating system, and orchestrates the whole system. It has excellent single-thread performance, which makes it great for preprocessing, serving small models, and coordinating work — but it has limited parallelism, so it is slow on large models and low on raw throughput for matrix math. For prototyping and light workloads, a CPU is perfectly fine.
+The CPU is the generalist. It can run any kind of code, it hosts the operating system, and it coordinates everything else in the machine. One thread on a CPU runs faster than on any other chip here, which makes it great for preprocessing, serving small models, and coordinating work — but it has limited parallelism, so it is slow on large models and low on raw throughput for matrix math. For prototyping and light workloads, a CPU is perfectly fine.
 
 ## GPU — massive parallelism
 
-The GPU is built for matrix multiplication at scale: thousands of cores, high-bandwidth memory, and a mature ecosystem (NVIDIA CUDA being the dominant one). It is the workhorse for both training and large-model inference. The trade-offs are real: high power draw, high cost, and overkill for small tasks. When people talk about "needing GPUs," this parallel matrix-math capability is why.
+The GPU is built for matrix multiplication at scale: thousands of cores, high-bandwidth memory, and a mature ecosystem (NVIDIA CUDA being the dominant one). It is the workhorse for both training and large-model inference. The trade-offs are real: GPUs use a lot of electricity, cost a lot to buy or rent, and are wasted on small jobs. When people talk about "needing GPUs," this parallel matrix-math capability is why.
 
 ## TPU — tensor processing at scale
 
-The TPU is a custom chip built around systolic arrays of matrix units, where data flows through hardware in lockstep. It shines on large-scale training runs and pods that scale to thousands of chips, with strong performance per watt. The catch is ecosystem lock-in — it is happiest in its native framework stack and less flexible than a GPU.
+The TPU is a custom chip built around systolic arrays: grids of matrix units that pass data from one cell to the next on a shared clock. It shines on large training runs, linked into pods of thousands of chips, and it gets a lot of work done for each watt. The catch is ecosystem lock-in. It is happiest in its native framework stack and cannot adapt to as many workloads as a GPU.
 
-## NPU — AI in your pocket
+## NPU — AI on the device
 
-The NPU (Neural Processing Unit) is dedicated, low-power inference hardware found in phones, laptops, and edge devices (think on-device neural engines). It runs quantized models (INT8/INT4) for inference in milliseconds with no cloud round-trip, which means privacy and instant response. The trade-offs: it is inference-only and limited in model size.
+The NPU (Neural Processing Unit) is dedicated, low-power inference hardware found in phones, laptops, and edge devices (think on-device neural engines). It runs quantized models (INT8/INT4) and answers within milliseconds, with no trip to the cloud, so data stays private and replies feel instant. The trade-offs: it cannot train, and it only fits small models.
 
 ## LPU — deterministic, ultra-fast generation
 
-The LPU (Language Processing Unit) is purpose-built for one job: generating tokens extremely fast and deterministically, using on-chip SRAM rather than slower external memory. It delivers very high tokens-per-second for inference. The cost of that focus is flexibility — it is inference-only, holds a limited model per chip, and is less general than a GPU.
+The LPU (Language Processing Unit) is purpose-built for one job: generating tokens extremely fast and deterministically, using on-chip SRAM rather than slower external memory. It delivers very high tokens-per-second for inference. The cost of that focus is flexibility. It cannot train, each chip holds only a slice of a model, and it does far fewer kinds of work than a GPU.
 
-## DPU — the invisible layer
+## DPU — the plumbing nobody sees
 
-The DPU (Data Processing Unit) is not an AI accelerator at all — it offloads networking, storage I/O, encryption, and firewalling from the CPU and GPU. In a data center it frees the expensive compute chips to do actual AI work instead of shuffling data. You will rarely interact with it directly, but it is why large AI clusters stay efficient.
+The DPU (Data Processing Unit) is not an AI accelerator at all. It takes over network traffic, disk and storage traffic, encryption, and firewall rules so the CPU and GPU do not have to. In a data center it frees the expensive compute chips to do actual AI work instead of shuffling data. You will rarely interact with it directly, but it is why large AI clusters stay efficient.
 
 ## A decision guide
 
@@ -55,7 +55,7 @@ The DPU (Data Processing Unit) is not an AI accelerator at all — it offloads n
 - **On-device or edge?** NPU, for low-power, private, instant inference.
 - **Just prototyping?** A CPU is fine — do not buy hardware before you need it.
 
-The honest summary the field uses: choose based on latency, parallelism, power, cost, and scale — not on which chip is trending.
+In short, pick the chip that fits how fast you need answers, how parallel the work is, your power and cost budget, and how big you plan to grow. Do not pick it because it is trending.
 </Body>
 
 <KeyTakeaways>
@@ -72,4 +72,4 @@ The honest summary the field uses: choose based on latency, parallelism, power, 
 - Follow the [AI Engineer technical path](/roadmap/ai-engineer-technical-path) to apply this in real deployments.
 </WhatToDoNext>
 
-<SourceNote />
+<SourceNote>Based on a LinkedIn infographic by Brij Kishore Pandey (2026). The ideas are theirs; the wording and the extra detail here are ours.</SourceNote>

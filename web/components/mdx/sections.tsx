@@ -74,7 +74,7 @@ export function SourceNote({ children }: Children) {
       style={{ borderColor: "var(--border)", color: "var(--muted)" }}
     >
       {children ??
-        "Synthesized from recurring industry discussions across professional communities (2026). This is an original summary, not a reproduction of any single post."}
+        "Based on ideas shared in public industry posts (mostly LinkedIn, 2026). The ideas belong to their original authors; the wording and the extra detail here are ours."}
     </p>
   );
 }

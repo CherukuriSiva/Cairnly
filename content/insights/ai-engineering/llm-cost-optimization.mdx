@@ -30,19 +30,19 @@ Token-based pricing means every request has a marginal cost, and unlike a fixed 
 
 ## The 12 levers
 
-**1. Right-size the model.** The biggest single lever. Use the smallest, cheapest model that meets your quality bar, and reserve the powerful (expensive) model for genuinely hard tasks. Evaluate model families for price-performance, not just headline benchmarks.
+**1. Right-size the model.** The biggest single lever. Pick the least expensive model that still gives good-enough answers, and save the powerful (expensive) model for genuinely hard tasks. Compare model families on what you get per dollar, not just headline benchmarks.
 
-**2. Reduce input tokens.** You pay for everything you send. Strip unnecessary examples, repeated boilerplate, and irrelevant context; summarize long conversation history instead of replaying it; compress retrieved context before it goes in. Input is usually where the waste lives.
+**2. Reduce input tokens.** You pay for everything you send. Cut few-shot examples the model does not need, boilerplate you repeat on every call, and context that does not bear on the question; summarize long conversation history instead of replaying it; shrink retrieved passages to the parts that matter. Input is usually where the waste lives.
 
-**3. Reduce output tokens.** Set strict max-output limits, and ask for bullet points or structured responses instead of long prose. Shorter, more focused outputs are cheaper and often more useful.
+**3. Reduce output tokens.** Cap the output length with a hard max-tokens setting, and ask for a short list or a JSON shape rather than paragraphs. A tight answer costs less and is often easier to use.
 
 **4. Prompt caching.** Major providers let you cache a stable prefix (system prompt, instructions, few-shot examples) so repeated requests reuse it at a steep discount. Near-free to adopt if your prompts share a common head.
 
-**5. Semantic caching.** Go beyond exact-match: embed incoming queries and return a cached response when a new query is semantically close to a previous one. This avoids regenerating answers to questions you have effectively already answered.
+**5. Semantic caching.** Go beyond exact-match: embed incoming queries and return a cached response when a new query is semantically close to a previous one. You stop paying twice for questions you have effectively already answered.
 
-**6. Request batching.** Combine multiple prompts into a single efficient call where the workload allows. Batching reduces per-request overhead and improves throughput, especially for offline or bulk jobs.
+**6. Request batching.** When the workload allows, send many prompts in one call instead of one call each. You pay the fixed cost of a request less often and push more work through, which matters most for offline or bulk jobs.
 
-**7. Tiered / two-step routing.** Use a cheap model first for filtering, drafting, or simple cases, and escalate only the hard cases to a stronger, more expensive model. Most traffic is easy; do not pay frontier prices for it.
+**7. Tiered / two-step routing.** Let a low-cost model take the first pass (screening requests, writing a first draft, handling the easy ones) and hand only what it cannot handle to a bigger, pricier model. Most traffic is easy; do not pay frontier prices for it.
 
 **8. Local or smaller models for simple tasks.** Classification, extraction, and routing often run fine on small or quantized models you host yourself (e.g. via Ollama). Offloading the easy, high-volume work moves it off per-token billing entirely.
 
@@ -52,7 +52,7 @@ Token-based pricing means every request has a marginal cost, and unlike a fixed 
 
 **11. Rate limiting per user.** Cap requests per user to stop a single client — or an abusive one — from generating an unbounded bill, and to keep cost predictable as you grow.
 
-**12. Monitoring and alerts on cost spikes.** Track token consumption, request counts, and spend at the feature and prompt level. Alert on anomalies so a regression or attack does not quietly run up the bill for a week before anyone notices.
+**12. Monitoring and alerts on cost spikes.** Record how many tokens and requests each feature and each prompt uses, and what that costs. Alert on anomalies so a regression or attack does not quietly run up the bill for a week before anyone notices.
 
 ## Quick wins vs. structural changes
 
@@ -73,4 +73,4 @@ If you need savings this week, reach for the quick wins: right-size the model, t
 - Put these levers into a real system via the [AI Engineer technical path](/roadmap/ai-engineer-technical-path).
 </WhatToDoNext>
 
-<SourceNote />
+<SourceNote>Based on a LinkedIn infographic by Anurag (Anu) Karuparti (2026). The ideas are theirs; the wording and the extra detail here are ours.</SourceNote>
