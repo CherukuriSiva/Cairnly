@@ -1,13 +1,42 @@
 # Cairnly
 
-A free, public site for learning AI engineering, made for new graduates, with a chat that
-answers from the lessons. 126 lessons in six tracks, 7 roadmaps and 29 insights, all
-generated from one folder of MDX. Chat answers stream back with citations that open the exact
-lesson section they came from, and questions the lessons don't cover get an honest "not
-found" instead of a guess. You can also talk to it: a voice mode answers out loud from the same
-lessons, with live captions.
+**Learn AI engineering. Explore how it's built.**
 
-Built in public, one milestone at a time. **Now: M4 (production ready).**
+[![CI](https://github.com/CherukuriSiva/Cairnly/actions/workflows/ci.yml/badge.svg)](https://github.com/CherukuriSiva/Cairnly/actions/workflows/ci.yml)
+[![Code: MIT](https://img.shields.io/badge/code-MIT-blue)](LICENSE)
+[![Content: CC BY-NC-SA 4.0](https://img.shields.io/badge/content-CC%20BY--NC--SA%204.0-lightgrey)](content/LICENSE.md)
+
+A free AI engineering course with a tutor that cites its sources, and the open-source RAG
+app that runs it: local models, evals, safety checks, tracing and deployment, all in this repo.
+
+**[Try the tutor](https://cairnly-blond.vercel.app/ask)** ·
+**[Recorded demo](https://cairnly-blond.vercel.app/ask?demo=1)** (works even when the GPU is asleep) ·
+**[Explore the architecture](#how-it-works)** ·
+**[Run it yourself](#installation)**
+
+![Asking Cairnly a question: the answer types out with numbered citations and source cards](docs/images/ask-demo.gif)
+
+| Learn with Cairnly | Build with Cairnly |
+|---|---|
+| 126 free lessons in six tracks, 7 roadmaps and 29 insights | Hybrid search (keyword + vector) with a cross-encoder reranker |
+| A tutor whose answers cite the exact lesson section | An eval suite: 627 questions, Recall@5 0.971, gated in CI |
+| An honest "not in the lessons" instead of a guess | A confidence gate tuned on measured trade-offs |
+| Quizzes, progress tracking and a ⌘K search | An input guard and output check, with their misses published |
+| A voice mode with live captions (self-hosted, see below) | Langfuse tracing, Modal GPUs, Neon, Vercel, Helm and Terraform |
+
+<table>
+  <tr>
+    <td><img src="docs/images/home-dark.png" alt="The Cairnly home page in dark mode" /></td>
+    <td><img src="docs/images/lesson-light.png" alt="A lesson page in light mode with its sidebar and table of contents" /></td>
+  </tr>
+</table>
+
+**Licenses:** the code is MIT. The lessons and docs are CC BY-NC-SA 4.0: share and adapt them
+with credit, under the same license, but not commercially ([details](#license)).
+
+Built in public, one milestone at a time: M1 to M4 are done; next is M5, a study-planner agent
+([roadmap](#roadmap)). Ideas, bugs and pull requests are welcome: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Results (measured, not guessed)
 
@@ -103,7 +132,7 @@ API key is needed.
 ### Set up
 
 ```bash
-git clone <this repo> cairnly && cd cairnly
+git clone https://github.com/CherukuriSiva/Cairnly.git cairnly && cd cairnly
 
 # 1. Models (about 5.5 GB in all)
 ollama pull nomic-embed-text
@@ -295,5 +324,13 @@ chapter.
 
 The code is under the [MIT License](LICENSE). The content in `content/` (lessons, book notes,
 roadmaps and insights) and the docs are under
-[CC BY-NC-SA 4.0](content/LICENSE.md). Insights summarize other people's public posts and
-talks; the ideas belong to their authors, and each insight links its source.
+[CC BY-NC-SA 4.0](content/LICENSE.md). Insights summarize other people's public posts,
+mostly LinkedIn infographics; the ideas belong to their authors, and each insight credits its
+source at the bottom of the page (by name where the post shows one). Book notes are short
+summaries in our own words. If you wrote a source and want a credit, a link or a removal,
+open an issue.
+
+## Contributing
+
+Bug reports, lesson fixes and code are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md);
+issues labelled `good first issue` are small and self-contained.
