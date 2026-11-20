@@ -24,8 +24,11 @@ export interface VoiceLink {
   setMuted(muted: boolean): void;
   /** RMS of the caller's microphone and of the bot's audio right now, each 0..1. */
   levels(): { user: number; bot: number };
-  /** Close the channel, then the connection once it reports closed or after ~500 ms. Also
-   * releases the microphone. Safe to call twice. */
+  /** Silence the bot at once: drop the audio queued to play and any still on its way. Called
+   * first on a hang-up, so the bot stops talking the moment End call is pressed. */
+  stopAudio(): void;
+  /** After a hang-up: wait for the server's call.closed (or its own close), 2 s at most, then
+   * close the connection and release the microphone. Safe to call twice. */
   close(): Promise<void>;
 }
 

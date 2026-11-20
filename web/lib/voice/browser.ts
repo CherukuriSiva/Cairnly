@@ -5,7 +5,10 @@
 // Echo: the microphone asks for echo cancellation and noise suppression, and the bot's audio is
 // played through an <audio> element (a MediaStream from Web Audio, or the WebRTC track), which
 // is the path browsers' echo cancellers listen to. That is what lets the caller talk over the
-// bot without the bot hearing itself.
+// bot without the bot hearing itself (what still leaks through, the server drops: flow.py).
+//
+// Hang-up: the bot goes silent at once (stopAudio), then close() waits up to 2 s for the
+// server's call.closed before closing the connection.
 
 import { MicError, parseVoiceEvent, type ConnectOptions, type VoiceAdapter, type VoiceLink } from "@/lib/voice/adapter";
 
@@ -13,7 +16,10 @@ const IN_RATE = 16_000;
 const OUT_RATE = 24_000;
 const CHUNK_SAMPLES = 320; // 20 ms at 16 kHz
 const PLAYBACK_LEAD_S = 0.06; // a little buffer against network jitter
-const CLOSE_WAIT_MS = 500;
+// After a hang-up, how long to wait for the server's call.closed (or its own close) before
+// closing our side. The server frees the call the moment the hang-up arrives; this only lets
+// the event come back, and never holds the page longer.
+export const CLOSE_WAIT_MS = 2_000;
 const OPEN_TIMEOUT_MS = 20_000;
 const PING_MS = 1_000; // the WebRTC server treats a silent data channel as gone after 3 s
 
@@ -176,7 +182,8 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
       const samples = new Float32Array(1024);
       let muted = false;
       let closed = false;
-      let closedResolve: (() => void) | null = null;
+      let closedResolve: (() => void) | null = null; // the server said call.closed, or closed
+      element.muted = false; // a previous call's hang-up muted it
       const cleanups: (() => void)[] = [() => micSource.disconnect(), () => release()];
 
       const finish = () => {
@@ -195,7 +202,14 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
       const deliver = (data: unknown) => {
         const event = parseVoiceEvent(data);
         if (event) options.handlers.onEvent(event);
+        if (event?.kind === "call.closed") closedResolve?.(); // the server has let the call go
         return event;
+      };
+      /** Wait for the server to acknowledge the hang-up, CLOSE_WAIT_MS at most, then close. */
+      const closeGracefully = async () => {
+        if (closed) return;
+        await waitFor((resolve) => (closedResolve = resolve), CLOSE_WAIT_MS);
+        finish();
       };
 
       // Anything that fails before the call is up releases what was opened so far.
@@ -247,13 +261,10 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
               track.enabled = !value;
             },
             levels: () => ({ user: muted ? 0 : rms(userAnalyser, samples), bot: rms(botAnalyser, samples) }),
-            close: async () => {
-              if (closed) return;
-              const done = waitFor((resolve) => (closedResolve = resolve), CLOSE_WAIT_MS);
-              channel.close();
-              await done;
-              finish();
+            stopAudio: () => {
+              element.muted = true; // the bot's track keeps arriving until the peer closes
             },
+            close: closeGracefully,
           };
         }
 
@@ -268,6 +279,7 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
         playback.connect(toSpeaker);
         const sources = new Set<AudioBufferSourceNode>();
         let playhead = 0;
+        let silenced = false; // hung up: the bot's audio is no longer played
         const clear = () => {
           sources.forEach((s) => {
             try {
@@ -292,7 +304,7 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
         socket.onmessage = (e: MessageEvent) => {
           if (e.data instanceof ArrayBuffer) {
             const pcm = new Int16Array(e.data);
-            if (!pcm.length) return;
+            if (!pcm.length || silenced) return;
             const buffer = context.createBuffer(1, pcm.length, OUT_RATE);
             const channel = buffer.getChannelData(0);
             for (let i = 0; i < pcm.length; i++) channel[i] = pcm[i] / 32768;
@@ -328,12 +340,12 @@ export function browserVoiceAdapter(overrides: Partial<BrowserDeps> = {}): Voice
             muted = value;
           },
           levels: () => ({ user: muted ? 0 : rms(userAnalyser, samples), bot: rms(botAnalyser, samples) }),
-          close: async () => {
-            if (closed) return;
-            // The server closes the socket after its call.closed; wait for that, briefly.
-            await waitFor((resolve) => (closedResolve = resolve), CLOSE_WAIT_MS);
-            finish();
+          stopAudio: () => {
+            silenced = true; // audio still on its way is dropped as it arrives
+            clear();
+            element.muted = true;
           },
+          close: closeGracefully,
         };
       };
       try {

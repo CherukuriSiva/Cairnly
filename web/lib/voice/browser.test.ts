@@ -1,9 +1,9 @@
 // The browser adapter's WebSocket path with fake browser objects: what it asks of the
-// microphone, how it plays and drops the bot's audio, mute, and closing.
+// microphone, how it plays and drops the bot's audio, mute, and hanging up.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MicError } from "@/lib/voice/adapter";
-import { browserVoiceAdapter, type BrowserDeps } from "@/lib/voice/browser";
+import { browserVoiceAdapter, CLOSE_WAIT_MS, type BrowserDeps } from "@/lib/voice/browser";
 import type { VoiceEvent } from "@/lib/voice/types";
 
 /** Any Web Audio node: connect() chains, everything else is a no-op. */
@@ -48,7 +48,7 @@ function fakes() {
   };
   const track = { stop: vi.fn(), enabled: true };
   const getUserMedia = vi.fn(async () => ({ getTracks: () => [track], getAudioTracks: () => [track] }));
-  const audio = { srcObject: null, play: vi.fn(async () => {}) };
+  const audio = { srcObject: null, muted: false, play: vi.fn(async () => {}) };
   const deps: Partial<BrowserDeps> = {
     getUserMedia: getUserMedia as unknown as BrowserDeps["getUserMedia"],
     createAudioContext: () => context as unknown as AudioContext,
@@ -166,5 +166,85 @@ describe("browserVoiceAdapter (resources)", () => {
     await oneCall(adapter, f);
     expect(f.createAudioContext).toHaveBeenCalledTimes(2);
     expect(f.context.audioWorklet.addModule).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** A WebSocket call on fresh fakes, up to the open socket. */
+async function openLink(f: ReturnType<typeof fakes>) {
+  const adapter = browserVoiceAdapter(f.deps);
+  adapter.prepare();
+  await adapter.openMic();
+  const linking = adapter.connect({
+    transport: "websocket",
+    baseUrl: "https://voice.test",
+    start: async () => ({ call_id: "c", token: "t", transport: "websocket", max_seconds: 300, socket_path: "/voice/calls/c/socket?token=t" }),
+    handlers: { onEvent: () => {}, onClosed: () => {} },
+  });
+  await vi.waitFor(() => expect(f.socket.onopen).not.toBeNull());
+  f.socket.readyState = 1;
+  f.socket.onopen?.();
+  return { adapter, link: await linking };
+}
+
+describe("browserVoiceAdapter (hanging up)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("silences the bot at once: queued audio stops, audio still on its way is not played", async () => {
+    const f = fakes();
+    const { adapter, link } = await openLink(f);
+    const pcm = new Int16Array(2400).buffer;
+    f.socket.onmessage?.({ data: pcm });
+    f.socket.onmessage?.({ data: pcm });
+    link.stopAudio(); // End call was pressed
+    expect(f.stopped).toHaveLength(2);
+    expect(f.audio.muted).toBe(true);
+    f.socket.onmessage?.({ data: pcm }); // sent before the server heard the hang-up
+    expect(f.started).toHaveLength(2);
+    const closing = link.close();
+    f.socket.onclose?.();
+    await closing;
+    f.socket.onopen = null;
+    f.socket.readyState = 0;
+    adapter.prepare();
+    await adapter.openMic();
+    const next = adapter.connect({
+      transport: "websocket",
+      baseUrl: "https://voice.test",
+      start: async () => ({ call_id: "d", token: "t", transport: "websocket", max_seconds: 300, socket_path: "/x" }),
+      handlers: { onEvent: () => {}, onClosed: () => {} },
+    });
+    expect(f.audio.muted).toBe(false); // the next call is heard again
+    await vi.waitFor(() => expect(f.socket.onopen).not.toBeNull());
+    (f.socket.onopen as null | (() => void))?.();
+    await next;
+  });
+
+  it("waits for the server's call.closed before closing the socket", async () => {
+    const f = fakes();
+    const { link } = await openLink(f);
+    vi.useFakeTimers();
+    let done = false;
+    void link.close().then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(CLOSE_WAIT_MS - 500);
+    expect(done).toBe(false);
+    expect(f.socket.close).not.toHaveBeenCalled(); // the hang-up has time to arrive
+    f.socket.onmessage?.({ data: '{"kind":"call.closed","reason":"hung_up"}' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(done).toBe(true);
+    expect(f.socket.close).toHaveBeenCalled();
+  });
+
+  it("closes anyway after 2 s when the server says nothing", async () => {
+    const f = fakes();
+    const { link } = await openLink(f);
+    vi.useFakeTimers();
+    let done = false;
+    void link.close().then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(CLOSE_WAIT_MS - 1);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
+    expect(CLOSE_WAIT_MS).toBe(2_000);
+    expect(f.track.stop).toHaveBeenCalled(); // the microphone is released
   });
 });

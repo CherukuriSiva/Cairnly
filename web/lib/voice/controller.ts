@@ -120,7 +120,8 @@ export class VoiceController {
     void this.connect();
   }
 
-  /** End the call the graceful way: tell the server, let it close, then close our side. */
+  /** End the call the graceful way: silence the bot now, tell the server (which frees the call
+   * at once), wait up to 2 s for it to say so, then close our side. */
   async hangUp(): Promise<void> {
     if (!inCall(this.state) || this.state.closing) return;
     this.hungUp = true;
@@ -132,9 +133,15 @@ export class VoiceController {
       this.abort?.abort();
       return;
     }
-    link.send({ kind: "call.hangup" });
-    await link.close();
+    await this.closeLink(link);
     await this.finish();
+  }
+
+  /** The hang-up itself: the bot stops talking before anything is awaited. */
+  private closeLink(link: VoiceLink): Promise<void> {
+    link.stopAudio();
+    link.send({ kind: "call.hangup" });
+    return link.close();
   }
 
   toggleMute(): void {
@@ -156,8 +163,7 @@ export class VoiceController {
     this.link = null;
     const { adapter } = this.options;
     if (link) {
-      link.send({ kind: "call.hangup" });
-      void link.close().finally(() => adapter.dispose());
+      void this.closeLink(link).finally(() => adapter.dispose());
     } else {
       adapter.dispose();
     }
@@ -198,8 +204,7 @@ export class VoiceController {
       link.setMuted(this.state.muted);
       if (this.state.closing || this.disposed) {
         // The reader hung up while it connected.
-        link.send({ kind: "call.hangup" });
-        await link.close();
+        await this.closeLink(link);
         await this.finish();
         return;
       }

@@ -29,7 +29,7 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
 
 /** An adapter with a scriptable link; `emit` plays server events, `drop` closes from the far side. */
-function fakeAdapter({ mic = "ok" as "ok" | "mic-denied" | "no-mic" } = {}) {
+function fakeAdapter({ mic = "ok" as "ok" | "mic-denied" | "no-mic", serverCloses = Promise.resolve() } = {}) {
   const log: string[] = [];
   let options: ConnectOptions | null = null;
   let level = { user: 0, bot: 0 };
@@ -37,8 +37,11 @@ function fakeAdapter({ mic = "ok" as "ok" | "mic-denied" | "no-mic" } = {}) {
     send: (m) => log.push(`send ${m.kind}`),
     setMuted: (m) => log.push(`muted ${m}`),
     levels: () => level,
+    stopAudio: () => log.push("stop audio"),
     close: async () => {
       log.push("close");
+      await serverCloses; // the real link waits for the server's call.closed, 2 s at most
+      log.push("closed");
       options?.handlers.onClosed();
     },
   };
@@ -224,7 +227,7 @@ describe("VoiceController", () => {
     expect(v.getState()).toMatchObject({ phase: "speaking", secondsLeft: 299, savedIds: [9] });
 
     await v.hangUp();
-    expect(a.log.slice(-2)).toEqual(["send call.hangup", "close"]);
+    expect(a.log.slice(-4)).toEqual(["stop audio", "send call.hangup", "close", "closed"]);
     expect(v.getState()).toMatchObject({ phase: "ended", endReason: "hung_up" });
     expect(c.calls).toEqual(["ensure", "reload"]);
   });
@@ -343,10 +346,31 @@ describe("VoiceController", () => {
     await flush();
     v.dispose();
     await flush();
-    expect(a.log.slice(-3)).toEqual(["send call.hangup", "close", "dispose"]);
+    expect(a.log.slice(-5)).toEqual(["stop audio", "send call.hangup", "close", "closed", "dispose"]);
     const idle = fakeAdapter();
     new VoiceController({ baseUrl: BASE, adapter: idle.adapter, chat: chat().chat }).dispose();
     expect(idle.log).toEqual(["dispose"]);
+  });
+
+  it("End call silences the bot at once, before the server has answered", async () => {
+    let serverAnswers: () => void = () => {};
+    const serverCloses = new Promise<void>((resolve) => (serverAnswers = resolve));
+    const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": () => json(REPLY), "GET /voice/calls/call-1": () => json({ end_reason: "hung_up" }) });
+    const a = fakeAdapter({ serverCloses });
+    const v = new VoiceController({ baseUrl: BASE, adapter: a.adapter, chat: chat().chat, fetchImpl: f.impl });
+    v.offer(true);
+    v.start();
+    await flush();
+    a.emit({ kind: "call.ready", call_id: "call-1", max_seconds: 300 });
+    a.emit({ kind: "caption.bot", text: "RAG retrieves first." });
+    const hangingUp = v.hangUp(); // the click; nothing awaited yet
+    expect(a.log.slice(-3)).toEqual(["stop audio", "send call.hangup", "close"]);
+    expect(v.getState().closing).toBe(true);
+    await vi.advanceTimersByTimeAsync(1_000); // the server is slow to say call.closed
+    expect(a.log).not.toContain("closed");
+    serverAnswers();
+    await hangingUp;
+    expect(v.getState()).toMatchObject({ phase: "ended", endReason: "hung_up" });
   });
 
   it("mute is passed to the link", async () => {
