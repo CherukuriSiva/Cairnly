@@ -300,6 +300,39 @@ def test_barge_in_clears_the_bot_audio(voice, monkeypatch):
     asyncio.run(run())
 
 
+def test_the_bots_answer_heard_back_does_not_cut_it_off(voice, monkeypatch):
+    """Full duplex on laptop speakers: the caller's microphone hears the answer. The VAD fires,
+    the words are the bot's own: no audio.clear, no caption, no second question."""
+    base, _ = voice
+    echo = "This is sentence number 0 of a long answer about"
+    monkeypatch.setattr(server, "services", fake_services(["What is RAG?", echo],
+                                                          seconds_per_char=0.03))
+    monkeypatch.setattr(server, "answers_factory", lambda: FakeAnswers(pieces=LONG_ANSWER))
+    call = start(base).json()
+    seen: list[dict] = []
+
+    async def run():
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
+            await events_until(ws, "caption.bot", seen)  # the greeting
+            await say(ws, noise(0.4) + silence(0.6))
+            await events_until(ws, "caption.user", seen)
+            await events_until(ws, "caption.bot", seen)  # the holding line
+            await events_until(ws, "caption.bot", seen)  # the answer's first sentence plays
+            mark = len(seen)
+            await say(ws, noise(0.4) + silence(0.6))  # its echo
+            for _ in range(3):  # about 5 s of the answer: the transcript came long before
+                await events_until(ws, "caption.bot", seen)
+            heard_back = seen[mark:]
+            await ws.send(json.dumps({"kind": "call.hangup"}))
+            await events_until(ws, "call.closed", seen)
+            return heard_back
+
+    heard_back = asyncio.run(run())
+    kinds = [e["kind"] for e in heard_back]
+    assert "audio.clear" not in kinds and "caption.user" not in kinds
+    assert [a["question"] for a in asked] == ["What is RAG?"]
+
+
 def test_api_failure_is_spoken_plainly(voice, monkeypatch):
     base, _ = voice
     monkeypatch.setattr(server, "answers_factory", lambda: FakeAnswers(fail="rate"))

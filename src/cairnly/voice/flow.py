@@ -8,6 +8,12 @@ The pipeline of one call (session.py builds it):
 - CallBrain turns each finished thing the caller said into a question for the cairnly API, says
   a holding line at once, then speaks the answer sentence by sentence as its tokens arrive. It
   also sends the captions, and stops the bot when the caller talks over it (barge-in).
+- Echo: on laptop speakers the caller's microphone can pick up the bot itself. CallBrain
+  remembers what the bot said lately; a transcript of speech that began while the bot was
+  audible (or just after) and that is mostly the bot's own words, in order, is dropped. For the
+  same reason, while the bot is audible the caller's voice alone (the VAD) does not stop it: the
+  bot stops once their words are transcribed and turn out not to be its echo. When the bot is
+  silent (looking up an answer), the VAD still stops the answer at once.
 - MicGate is the half-duplex switch: while the bot speaks, the caller's audio is replaced by
   silence, so nothing they say interrupts it.
 - AudioTap watches the synthesised audio pass, to time the first sound of each turn.
@@ -20,6 +26,7 @@ at once.
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -48,6 +55,10 @@ from cairnly.voice.timings import TurnTimings
 log = logging.getLogger("cairnly.voice")
 
 GREETING_ECHO_WINDOW_S = 12  # transcripts this soon after the greeting may be its echo
+# Sound that starts this soon after the bot's audio ended may still be its echo: the room's
+# reverb, and the last of the audio still in the browser's buffer.
+ECHO_TAIL_S = 1.5
+ECHO_MEMORY_S = 60  # what the bot said is compared with transcripts for this long
 FAILURE_LINES = {"rate": speech.TOO_MANY, "busy": speech.BUSY, "gone": speech.GONE}
 
 
@@ -79,18 +90,28 @@ class CallBrain(FrameProcessor):
         self.turn: TurnTimings | None = None
         self.line_done: asyncio.Event | None = None  # set once a watched line has been played
         self.line_started = False
+        self.said: list[tuple[float, str]] = []  # (when, line) the bot said lately, oldest first
+        self.bot_quiet_at = -math.inf  # when the bot's audio last ended
+        self.over_bot = False  # the caller's current speech began while the bot was audible
 
     @property
     def busy(self) -> bool:
         """Someone is talking or an answer is on its way (idle hang-up waits)."""
         return self.user_speaking or self.bot_speaking or self.answer_task is not None
 
+    @property
+    def bot_audible(self) -> bool:
+        """The bot is speaking, or stopped so recently that its echo may still be heard."""
+        return self.bot_speaking or self.clock() - self.bot_quiet_at < ECHO_TAIL_S
+
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
         if isinstance(frame, VADUserStartedSpeakingFrame):
             self.user_speaking = True
+            self.over_bot = self.bot_audible
             await self.push_frame(frame, direction)
-            if not self.ending and (self.answer_task is not None or self.bot_speaking):
+            # Over the bot's own voice this may be its echo: wait for the words (_heard).
+            if not self.ending and self.answer_task is not None and not self.over_bot:
                 await self.barge_in()
         elif isinstance(frame, VADUserStoppedSpeakingFrame):
             self.user_speaking = False
@@ -104,6 +125,7 @@ class CallBrain(FrameProcessor):
             await self.push_frame(frame, direction)
         elif isinstance(frame, BotStoppedSpeakingFrame):
             self.bot_speaking = False
+            self.bot_quiet_at = self.clock()
             if self.line_done is not None and self.line_started:
                 self.line_done.set()
             await self.push_frame(frame, direction)
@@ -142,10 +164,11 @@ class CallBrain(FrameProcessor):
         text = frame.text.strip()
         if not text:
             return
-        if (not self.answered_once and self.clock() - self.started < GREETING_ECHO_WINDOW_S
-                and speech.is_greeting_echo(text)):
-            log.info("dropped a transcript that echoes the greeting")
+        if self._is_echo(text):
+            log.info("dropped a transcript that echoes the bot")  # never the words (PRIVACY.md)
             return
+        if not self.ending and (self.answer_task is not None or self.bot_speaking):
+            await self.barge_in()  # words of the caller's own, over the bot: they take the floor
         await self.event(protocol.user_caption(text))
         if self.ending:
             return
@@ -162,6 +185,17 @@ class CallBrain(FrameProcessor):
         self.turn.mark("speech_end", self.speech_end or self.clock())
         self.turn.mark("transcript")
         self.answer_task = self.create_task(self._answer(question, self.turn))
+
+    def _is_echo(self, text: str) -> bool:
+        """What the caller's microphone heard is the bot itself. Only speech that began while
+        the bot was audible is compared with all it said lately; in the first seconds of a call
+        (the greeting may still be ringing) only with the greeting, and two words at least."""
+        if self.over_bot or self.bot_audible:
+            now = self.clock()
+            return speech.is_echo(text, [line for at, line in self.said
+                                         if now - at < ECHO_MEMORY_S])
+        return (not self.answered_once and self.clock() - self.started < GREETING_ECHO_WINDOW_S
+                and speech.is_greeting_echo(text))
 
     async def _answer(self, question: str, turn: TurnTimings) -> None:
         if self.tap is not None:
@@ -208,6 +242,9 @@ class CallBrain(FrameProcessor):
     async def _speak(self, text: str, answer: bool = False, holding: bool = False) -> None:
         if answer:
             self.answer_heard = True
+        now = self.clock()
+        self.said = [(at, line) for at, line in self.said if now - at < ECHO_MEMORY_S]
+        self.said.append((now, text))
         await self.push_frame(OutputTransportMessageFrame(
             message=protocol.bot_caption(text, holding)))
         await self.push_frame(TTSSpeakFrame(text, append_to_context=False))
