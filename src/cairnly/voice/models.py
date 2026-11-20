@@ -34,6 +34,11 @@ from cairnly.voice.settings import VoiceSettings
 VAD = VADParams(confidence=0.7, start_secs=0.2, stop_secs=0.7, min_volume=0.5)
 # Steers Whisper towards the course's vocabulary (spelling of RAG, LLM, embeddings...).
 STT_PROMPT = "A question about AI engineering: RAG, LLMs, embeddings, vector search, evals."
+# How long text to speech may take to start a sentence. Kokoro synthesizes a whole sentence
+# before its first chunk, and a long one takes several seconds on a shared CPU. Pipecat's
+# default (3 s) closes such a sentence as silent: it reports an error, ends "bot speaking" too
+# early, and after three in a row stops the voice for the rest of the call.
+TTS_FIRST_AUDIO_WAIT_S = 15.0
 
 
 @dataclass
@@ -133,6 +138,7 @@ def real_services(settings: VoiceSettings) -> SpeechServices:
             # with the shared one.
             TTSService.__init__(
                 self, push_start_frame=True, push_stop_frames=True,
+                stop_frame_timeout_s=TTS_FIRST_AUDIO_WAIT_S,
                 settings=self.Settings(model=None, voice=voice, language="en-us", speed=1.0))
             self._kokoro = kokoro
             self._resampler = create_stream_resampler()
@@ -188,6 +194,7 @@ class ToneTTS(TTSService):
 
     def __init__(self, seconds_per_char: float = 0.06, **kwargs):
         super().__init__(push_start_frame=True, push_stop_frames=True, sample_rate=OUT_RATE,
+                         stop_frame_timeout_s=TTS_FIRST_AUDIO_WAIT_S,
                          settings=TTSSettings(model=None, voice=None, language=None), **kwargs)
         self.seconds_per_char = seconds_per_char
 
