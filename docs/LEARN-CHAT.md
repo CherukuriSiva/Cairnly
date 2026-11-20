@@ -179,7 +179,7 @@ answers `call.closed`, and closes; the browser waits up to 2 seconds for that be
 its side.
 
 **Calls are a scarce resource.** `calls.py` decides who may call: one call at a time, 10 calls
-a day per address, 60 minutes a day for the whole site, 5 minutes per call, hang-up after 50
+a day per address, 15 minutes a day for the whole site in production, 5 minutes per call, hang-up after 50
 quiet seconds or on "goodbye". A start carries a random key, so a retried request never opens a
 second call, and a call has exactly one socket: the server checks the token and claims the call
 in one step before it accepts the socket, so a second socket with the same token is refused. Every call records why it ended (farewell, idle, max_duration, hung_up, replaced,

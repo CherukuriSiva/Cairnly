@@ -53,7 +53,7 @@ caller audio -> [half-duplex gate] -> Silero VAD -> Whisper large-v3-turbo -> br
   on the same conversation replaces the old one), one call at a time, a 5-minute limit with a
   notice 30 s before, a hang-up after 50 s of silence or on a spoken goodbye, and an end reason
   per call (farewell, idle, max_duration, hung_up, replaced, error) readable for an hour.
-  Budgets per UTC day: 10 calls per address and **60 voice minutes for the whole site**; a call
+  Budgets per UTC day: 10 calls per address and **60 voice minutes for the whole site** (production: 15 since 2026-11-21, about 450 minutes a month, so voice fits the $30 monthly Modal credit); a call
   never gets more time than the budget has left, and once it is spent a start is refused and
   the microphone disappears after that click. A call has exactly one socket: the token is
   checked and the call claimed in one step before the socket is accepted, and a socket without

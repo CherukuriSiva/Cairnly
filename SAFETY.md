@@ -152,7 +152,7 @@ because a call holds a GPU:
   seconds before the end, then the bot says goodbye) and hangs up after 50 seconds in which
   nobody spoke
 - 10 calls a day from one IP address, 5 call starts a minute from one IP address
-- 60 minutes of calls a day for the whole site; a call never gets more time than is left, and
+- 15 minutes of calls a day for the whole site in production (60 is the local default); a call never gets more time than is left, and
   once the minutes are spent a call is refused and the microphone disappears (after that
   click) for a minute, after which a click asks again; new calls start again the next UTC day.
   A hang-up stops a call's minutes the moment it reaches the server

@@ -72,7 +72,7 @@ Run every command from the repo root.
 
 The voice server is a third Modal app, `cairnly-voice` ([deploy/modal_voice.py](../deploy/modal_voice.py)):
 one T4 container with Whisper large-v3-turbo and Kokoro baked in, the WebSocket transport, at
-most 60 call minutes a day (`VOICE_MINUTES_PER_DAY`), switched off after 2 idle minutes. It asks
+most 15 call minutes a day (`VOICE_MINUTES_PER_DAY`, sized for the $30 monthly Modal credit), switched off after 2 idle minutes. It asks
 the deployed `cairnly-api` for every answer, so deploy the API (with `migrate`) first. It holds
 no database URL and no model token.
 

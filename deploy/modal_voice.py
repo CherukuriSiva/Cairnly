@@ -15,8 +15,8 @@ What it does:
   container downloads nothing when it starts.
 - Serves the voice routes and the call WebSockets from ONE container on a T4 GPU
   (max_containers=1). Calls, budgets and end reasons live in that process's memory, and the
-  daily voice-minute cap (VOICE_MINUTES_PER_DAY, 60) is what keeps the GPU inside the Modal
-  spend limit. The container switches off after 2 idle minutes.
+  daily voice-minute cap (VOICE_MINUTES_PER_DAY, 15 here) is what keeps the GPU inside the
+  Modal spend limit. The container switches off after 2 idle minutes.
 - Uses the WebSocket transport only: audio travels over the same HTTPS endpoint as the routes.
   Peer-to-peer WebRTC to a Modal container would need STUN hole-punching to work for every
   caller, and a TURN service for those behind carrier-grade NAT; see ADR 0019.
@@ -55,7 +55,7 @@ VOICE_ENV = {
     "VOICE_STT_COMPUTE": "float16",
     "VOICE_MAX_CALLS": "1",
     "VOICE_MAX_CALL_S": "300",
-    "VOICE_MINUTES_PER_DAY": "60",
+    "VOICE_MINUTES_PER_DAY": "15",  # about 450 min a month: inside the $30 Modal credit
     "VOICE_CALLS_PER_IP_PER_DAY": "10",
     "VOICE_HALF_DUPLEX": "0",  # 1: the caller cannot talk over the bot
     "LANGFUSE_TRACING_ENVIRONMENT": "production",
