@@ -5,8 +5,10 @@
 //
 // The voice server runs on a GPU that sleeps when nobody calls, and any request to it wakes it.
 // So nothing is sent to it until the reader clicks the microphone: the first click asks for its
-// status (once per page) and starts the call, showing "Waking the voice model" with the seconds
-// it takes. A refusal hides the microphone with one neutral line.
+// status (once per page, unless a call was refused) and starts the call, showing "Waking the
+// voice model" with the seconds it takes. A refusal hides the microphone with one neutral line
+// for a minute (REFUSAL_COOLDOWN_MS); then the mic is back and its next click asks again. Only a
+// click ever asks: the mic coming back sends nothing.
 
 import { inCall, initialVoiceState, showMic, voiceReducer, type VoiceAction } from "@/lib/voice/machine";
 import { MicError, type VoiceAdapter, type VoiceLink } from "@/lib/voice/adapter";
@@ -20,6 +22,7 @@ export const TICK_MS = 1_000;
 // At zero the server says a short goodbye and closes the call itself; the browser hangs up
 // on its own only if the call is still open this long after the deadline.
 export const DEADLINE_GRACE_MS = 5_000;
+export const REFUSAL_COOLDOWN_MS = 60_000;
 const MAX_CLOSING_WAIT_S = 3;
 const DEFAULT_ICE = ["stun:stun.l.google.com:19302"];
 
@@ -63,6 +66,7 @@ export class VoiceController {
   private finishing: Promise<void> | null = null;
   private disposed = false;
   private abort: AbortController | null = null; // cancels the setup's requests on a hang-up
+  private cooldown: ReturnType<typeof setTimeout> | null = null; // the mic is back when it ends
 
   constructor(private readonly options: VoiceControllerOptions) {}
 
@@ -159,6 +163,7 @@ export class VoiceController {
     this.disposed = true;
     this.abort?.abort();
     this.stopTimers();
+    if (this.cooldown) clearTimeout(this.cooldown);
     const link = this.link;
     this.link = null;
     const { adapter } = this.options;
@@ -218,10 +223,18 @@ export class VoiceController {
     }
   }
 
-  /** Voice said no (off, busy, a limit) or could not be reached: hide the mic, say so once. */
+  /** Voice said no (off, busy, a limit) or could not be reached: hide the mic and say so once,
+   * then offer it again after the cool-down. Its status is asked again on the next click. */
   private refused(): void {
     this.status = null;
-    if (!this.disposed) this.dispatch({ type: "status", available: false, said: true });
+    if (!this.disposed) {
+      this.dispatch({ type: "status", available: false, said: true });
+      if (this.cooldown) clearTimeout(this.cooldown);
+      this.cooldown = setTimeout(() => {
+        this.cooldown = null;
+        if (!this.disposed) this.dispatch({ type: "cooled" });
+      }, REFUSAL_COOLDOWN_MS);
+    }
     this.fail("unavailable");
   }
 

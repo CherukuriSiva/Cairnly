@@ -30,7 +30,8 @@ export type VoiceAction =
   | { type: "closing" }
   | { type: "ended"; reason: EndReason }
   | { type: "failed"; failure: VoiceFailure }
-  | { type: "dismiss" };
+  | { type: "dismiss" }
+  | { type: "cooled" }; // a minute after a refusal: offer the mic again
 
 export const initialVoiceState: VoiceState = {
   phase: "idle",
@@ -57,8 +58,9 @@ export const initialVoiceState: VoiceState = {
   botLevel: 0,
 };
 
-/** The microphone button shows until a call has been refused: the voice server is not asked
- * anything before the reader clicks it (asking would wake its GPU for every visit). */
+/** The microphone button shows once the page offers voice, and hides for a minute after a
+ * refusal. The voice server is not asked anything before the reader clicks it (asking would
+ * wake its GPU for every visit), and each click after a refusal asks it again. */
 export function showMic(state: VoiceState): boolean {
   return state.offered && state.available !== false && !state.closing && !inCall(state);
 }
@@ -182,6 +184,12 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
       return { ...state, phase: "failed", failure: action.failure, closing: false, wakingSince: null, wakingSeconds: null, userLevel: 0, botLevel: 0 };
     case "dismiss":
       return inCall(state) ? state : { ...initialVoiceState, offered: state.offered, available: state.available, saidUnavailable: state.saidUnavailable };
+    case "cooled": {
+      // Not asked yet again (null): the mic shows, and its next click asks the server.
+      if (state.available !== false) return state;
+      const refusal = state.phase === "failed" && state.failure === "unavailable";
+      return refusal ? { ...initialVoiceState, offered: state.offered, available: null } : { ...state, available: null, saidUnavailable: false };
+    }
   }
 }
 

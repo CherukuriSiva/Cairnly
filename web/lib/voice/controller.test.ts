@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MicError, parseVoiceEvent, type ConnectOptions, type VoiceAdapter, type VoiceLink } from "@/lib/voice/adapter";
-import { VoiceController } from "@/lib/voice/controller";
+import { REFUSAL_COOLDOWN_MS, VoiceController } from "@/lib/voice/controller";
 import { failureLine, phaseLabel, showMic } from "@/lib/voice/machine";
 import type { VoiceEvent } from "@/lib/voice/types";
 
@@ -156,6 +156,7 @@ describe("VoiceController", () => {
     expect(v.getState()).toMatchObject({ phase: "ended", endReason: "hung_up", wakingSeconds: null });
     expect(a.log).toContain("release");
     expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status"]);
+    expect(showMic(v.getState())).toBe(true); // no cool-down after an early hang-up: the mic is back
   });
 
   it("a click on a refusing or unreachable voice server hides the mic with one neutral line", async () => {
@@ -179,6 +180,41 @@ describe("VoiceController", () => {
       await flush();
       expect(f.calls).toHaveLength(1);
     }
+  });
+
+  it("offers the mic again a minute after a refusal; only the next click asks again", async () => {
+    const f = fakeFetch({ "GET /voice/status": [() => json({ ...STATUS, available: false }), () => json(STATUS)], "POST /voice/calls": () => json(REPLY) });
+    const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: f.impl });
+    v.offer(true);
+    v.start();
+    await flush();
+    expect(failureLine(v.getState().failure)).toBe("Voice isn't available right now."); // the neutral line
+    expect(showMic(v.getState())).toBe(false);
+    await vi.advanceTimersByTimeAsync(REFUSAL_COOLDOWN_MS - 1_000);
+    expect(showMic(v.getState())).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(v.getState()).toMatchObject({ phase: "idle", available: null, saidUnavailable: false });
+    expect(showMic(v.getState())).toBe(true);
+    expect(f.calls).toHaveLength(1); // the mic came back without asking anything
+    v.start();
+    await flush();
+    expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status", "GET /voice/status", "POST /voice/calls"]);
+    expect(v.getState().phase).toBe("connecting");
+  });
+
+  it("a refused start (503) asks the status again on the next click after the cool-down", async () => {
+    const f = fakeFetch({ "GET /voice/status": () => json(STATUS), "POST /voice/calls": [() => json({ detail: "x" }, 503, { "Retry-After": "30" }), () => json(REPLY)] });
+    const v = new VoiceController({ baseUrl: BASE, adapter: fakeAdapter().adapter, chat: chat().chat, fetchImpl: f.impl });
+    v.offer(true);
+    v.start();
+    await flush();
+    expect(v.getState()).toMatchObject({ phase: "failed", failure: "unavailable", available: false });
+    v.dismiss();
+    await vi.advanceTimersByTimeAsync(REFUSAL_COOLDOWN_MS);
+    expect(showMic(v.getState())).toBe(true);
+    v.start();
+    await flush();
+    expect(f.calls.map((c) => c.key)).toEqual(["GET /voice/status", "POST /voice/calls", "GET /voice/status", "POST /voice/calls"]);
   });
 
   it("calls the browser's fetch as a plain function (a method call is an Illegal invocation)", async () => {

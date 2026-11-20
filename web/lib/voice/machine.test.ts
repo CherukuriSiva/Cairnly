@@ -91,6 +91,18 @@ describe("voiceReducer", () => {
     expect(showMic(s)).toBe(false);
   });
 
+  it("offers the mic again once a refusal has cooled down", () => {
+    const refused = run([{ type: "offer", offered: true }, { type: "start" }, { type: "status", available: false, said: true }, { type: "failed", failure: "unavailable" }]);
+    expect(showMic(refused)).toBe(false);
+    const back = voiceReducer(refused, { type: "cooled" });
+    expect(back).toMatchObject({ phase: "idle", available: null, saidUnavailable: false, failure: null });
+    expect(showMic(back)).toBe(true);
+    const dismissed = voiceReducer(refused, { type: "dismiss" });
+    expect(voiceReducer(dismissed, { type: "cooled" })).toMatchObject({ available: null, saidUnavailable: false });
+    const fine = run([{ type: "offer", offered: true }]);
+    expect(voiceReducer(fine, { type: "cooled" })).toBe(fine); // nothing to cool down from
+  });
+
   it("counts the seconds the voice model takes to wake", () => {
     let s = run([{ type: "offer", offered: true }, { type: "start" }, { type: "waking", now: 1_000 }]);
     expect(s).toMatchObject({ phase: "connecting", wakingSeconds: 0 });

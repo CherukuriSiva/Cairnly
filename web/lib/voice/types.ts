@@ -56,7 +56,7 @@ export interface StartReply {
 export interface VoiceState {
   phase: VoicePhase;
   offered: boolean; // the page offers voice (the API saves conversations); nothing asked yet
-  available: boolean | null; // null: not asked yet (the mic shows); false hides the microphone
+  available: boolean | null; // null: not asked yet (the mic shows); false (a refusal) hides it for a minute
   saidUnavailable: boolean; // a call was refused, or the server could not be reached
   wakingSince: number | null; // ms since epoch: the first request to the voice server left
   wakingSeconds: number | null; // seconds since then, until the server answers the start
