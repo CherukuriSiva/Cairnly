@@ -4,7 +4,8 @@ A call ends in one of these ways (its reason is recorded in the CallBook):
 
 - the caller says goodbye (farewell), or stays silent for `idle_s` (idle), or the call reaches
   its length (max_duration): the bot says a short goodbye first, then the call closes;
-- the caller presses End call (hung_up): no goodbye, the call closes at once;
+- the caller presses End call (hung_up): no goodbye, the call closes at once, and its place and
+  minutes are released the moment the hang-up arrives;
 - a new call on the same conversation (replaced), or the browser goes away (hung_up);
 - something breaks (error).
 
@@ -214,18 +215,19 @@ class CallSession:
         self.end("farewell", speech.FAREWELL)
 
     async def _caller_hung_up(self) -> None:
-        if self.ending is None:
-            self.book.closing(self.call.id, "hung_up")
-            self.ending = asyncio.create_task(self._close("hung_up"))
+        """End call: the place and the minutes are released at once (the browser waits up to
+        2 s for call.closed); the book then tells this session to close (_hangup_from_book)."""
+        self.book.hang_up(self.call.id)
 
     async def _gone(self) -> None:
-        """The browser went away without hanging up."""
-        self.book.closing(self.call.id, "hung_up")
+        """The browser went away without hanging up: the same, without the goodbye events."""
+        self.book.finish(self.call.id, "hung_up")
         if self.worker is not None:
             await self.worker.cancel(reason="caller disconnected")
 
     def _hangup_from_book(self, reason: str) -> None:
-        """The CallBook ends this call (it was replaced): may come from another task."""
+        """The CallBook ends this call (a hang-up, or it was replaced): may come from another
+        task or thread."""
         if self.loop is None:
             return
         line = None if reason in ("replaced", "hung_up") else speech.FAREWELL

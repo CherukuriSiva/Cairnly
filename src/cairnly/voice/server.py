@@ -201,7 +201,7 @@ def end_call(body: EndRequest, call_id: str = CallId) -> dict:
     call = book.get(call_id)
     if call is None or not hmac.compare_digest(call.token, body.token):
         raise HTTPException(status_code=404, detail=NOT_FOUND)
-    book.end(call_id, "hung_up")
+    book.hang_up(call_id)  # the place and the minutes are released now
     return call.public()
 
 

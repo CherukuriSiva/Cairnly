@@ -12,6 +12,8 @@ Everything here is plain Python with an injectable clock, so the rules are teste
   A call never gets more time than the budget has left.
 - **Concurrency.** At most `max_calls` calls at once (one by default: one container, one GPU).
   A call that is still closing holds its place; a start then gets "closing" and retries once.
+  A hang-up is the exception: it frees the place (and stops counting minutes) the moment it
+  arrives, while the call's pipeline closes behind it.
   A call has exactly one socket: the first to present the token claims it; any other is
   refused. A start that never connects frees its place after `CONNECT_WINDOW_S`.
 - **End reasons.** Each call records why it ended (first reason wins) and keeps it for an hour,
@@ -195,6 +197,18 @@ class CallBook:
             hangup(reason)
         else:
             self.finish(call_id, reason)
+
+    def hang_up(self, call_id: str) -> None:
+        """The caller hung up (End call, or the browser went away). The call's place and its
+        minutes are released now, not once its pipeline has finished closing, so the next call
+        can start at once and the closing seconds cost nothing. Its session, if it has one, is
+        then told to close."""
+        with self._lock:
+            call = self.calls.get(call_id)
+            hangup = call.hangup if call is not None and call.active else None
+        self.finish(call_id, "hung_up")
+        if hangup is not None:
+            hangup("hung_up")
 
     def finish(self, call_id: str, reason: str) -> None:
         """The call is over: record its reason (first wins) and charge its minutes."""

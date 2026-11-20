@@ -416,9 +416,35 @@ def test_hanging_up_mid_answer_ends_the_call_at_once(voice, monkeypatch):
 
     asyncio.run(run())
     deadline = time.monotonic() + 3  # nowhere near the time the queued speech would take
-    while server.book.get(call["call_id"]).state != "closed":
+    assert server.book.get(call["call_id"]).state == "closed"  # released when the hang-up came
+    while server.sessions:  # and its pipeline, with all that queued speech, is gone too
         assert time.monotonic() < deadline, "the call is still closing"
         time.sleep(0.05)
+
+
+def test_a_hang_up_frees_the_place_before_the_call_has_closed(voice, monkeypatch):
+    """The place and the minutes are released when the hang-up arrives: by the time the
+    browser gets call.closed, a new call can start (no 409 "still closing")."""
+    base, _ = voice
+    call = start(base).json()
+    seen: list[dict] = []
+
+    async def run():
+        async with connect(f"ws://{base}{call['socket_path']}", origin=ORIGIN) as ws:
+            await events_until(ws, "caption.bot", seen)  # the greeting
+            await ws.send(json.dumps({"kind": "call.hangup"}))
+            assert (await events_until(ws, "call.closed", seen))["reason"] == "hung_up"
+            ended = server.book.get(call["call_id"])
+            assert ended.state == "closed" and ended.end_reason == "hung_up"
+            other = httpx.post(f"http://{base}/voice/calls", json={
+                "conversation_id": "55555555-5555-4555-8555-555555555555", "key": "key-0000002"})
+            assert other.status_code == 200
+            return ended.ended_at, server.book.used_s
+
+    ended_at, used = asyncio.run(run())
+    time.sleep(0.3)  # the old pipeline has finished closing since: nothing more is charged
+    assert server.book.get(call["call_id"]).ended_at == ended_at
+    assert server.book.used_s == used
 
 
 def test_no_spoken_text_reaches_the_logs(voice, monkeypatch):
@@ -447,7 +473,7 @@ def test_no_spoken_text_reaches_the_logs(voice, monkeypatch):
         asyncio.run(run())
         loguru.info("probe: the server's loguru sink")
         loguru.debug("probe: a debug line")
-        while server.book.get(call["call_id"]).state != "closed":
+        while server.sessions:  # the session has ended (and logged how)
             time.sleep(0.05)
     finally:
         logging.getLogger("cairnly").removeHandler(ours)

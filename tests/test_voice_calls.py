@@ -63,6 +63,24 @@ def test_one_call_at_a_time_and_closing_is_retryable():
     assert b.start(CONV_B, "key-0004", "2.2.2.2", "websocket")[1]
 
 
+def test_a_hang_up_frees_the_place_and_stops_the_minutes_at_once():
+    clock = Clock()
+    b = book(clock, minutes_per_day=10)
+    told: list[str] = []
+    a, _ = b.start(CONV_A, "key-0001", "1.1.1.1", "websocket")
+    b.went_live(a.id)
+    a.hangup = told.append  # the live session
+    clock.t += 60
+    b.hang_up(a.id)
+    assert told == ["hung_up"]  # the session is told to close its pipeline
+    assert b.get(a.id).public()["state"] == "closed" and a.end_reason == "hung_up"
+    clock.t += 30  # the pipeline takes its time to close: those seconds are not charged
+    b.finish(a.id, "hung_up")  # what the session reports once it has closed
+    assert b.budget_left() == 600 - 60
+    assert b.start(CONV_B, "key-0002", "2.2.2.2", "websocket")[1]  # no "still closing"
+    b.hang_up("not-a-call")  # unknown or already ended: nothing happens
+
+
 def test_calls_per_address_per_day():
     clock = Clock()
     b = book(clock, max_calls=5)
