@@ -11,3 +11,6 @@
 
 # Local settings files, at any depth.
 .env*
+
+# The one exception: public build settings (NEXT_PUBLIC_ values only, never a secret).
+!/web/.env.production
