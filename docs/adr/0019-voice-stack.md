@@ -30,7 +30,8 @@ caller audio -> [half-duplex gate] -> Silero VAD -> Whisper large-v3-turbo -> br
   after 0.7 s of silence.
 - **Whisper large-v3-turbo** through faster-whisper (CTranslate2): float16 on a T4 in
   production, int8 on the CPU locally (12 threads cut a 4 s question from 3.8 s to 1.6 s on the
-  benchmark laptop). Pipecat's own Whisper service insists on mlx-whisper on Apple silicon, so
+  benchmark laptop). The course's words go in as `hotwords`, with faster-whisper's own VAD on
+  (see the addendum). Pipecat's own Whisper service insists on mlx-whisper on Apple silicon, so
   `models.WhisperSTT` wraps faster-whisper directly; the model is loaded once per process.
 - **Kokoro-82M** through kokoro-onnx on the CPU (voice `af_heart`), shared by all calls.
 - **The brain** (`flow.CallBrain`) runs no model. Each finished turn goes to the API's `/ask`
@@ -44,8 +45,9 @@ caller audio -> [half-duplex gate] -> Silero VAD -> Whisper large-v3-turbo -> br
   and every queued sentence (a Pipecat interruption); the WebSocket also tells the browser to
   drop the audio it has queued. `VOICE_HALF_DUPLEX=1` instead replaces the caller's audio with
   silence while the bot speaks. The browser asks for echo cancellation and plays the bot through
-  an `<audio>` element, the path its echo canceller listens to. A transcript in the first
-  seconds that is mostly the greeting's own words is dropped as its echo.
+  an `<audio>` element, the path its echo canceller listens to. A transcript that is mostly the
+  bot's own recent words is dropped as its echo, and while the bot is audible it is the
+  caller's transcribed words, not their voice alone, that stop it (addendum).
 - **Call control** (`calls.py`, plain Python, tested with a fake clock): `GET /voice/status`,
   an idempotent `POST /voice/calls` (the same browser key never opens a second call; a new call
   on the same conversation replaces the old one), one call at a time, a 5-minute limit with a
@@ -75,7 +77,7 @@ API has saved conversations; **loading `/ask` sends nothing to the voice server.
 click asks for its status (once per page, not again after each call) and starts the call,
 showing "Waking the voice model…" with the seconds it takes; a refusal (off, busy, a limit, the
 minutes spent) or a server that cannot be reached hides the mic with one neutral line, "Voice
-isn't available right now."
+isn't available right now.", for a minute (addendum).
 
 ### Transport: WebSocket in production, WebRTC locally
 
@@ -179,3 +181,64 @@ need no GPU at all, which would cut the cost of every wake-up (see below).
   every install.
 - Calls, budgets and end reasons live in one process's memory, like the API's limits (ADR
   0014): a restart forgets them, and a second container would double them.
+
+## Addendum, 2026-11-21: transcripts, echo, hang-up, refusals
+
+**Whisper wrote its hint into transcripts.** A caller's question came back as "A question about
+AI engineering. What is? RAG RAG, LLMs, embeddings, vector search, evals. RAG, LLMs, ...". The
+hint went in as `initial_prompt`, which Whisper treats as text said just before; on a pause, a
+quiet start or no speech at all it carries on writing it. Reproduced locally (faster-whisper
+1.2.1, large-v3-turbo int8, `say` voices plus silence and noise): 1.5 s of silence gave "RAG,
+LLMs, embeddings, vector search, evals." and 2 s of faint noise "RG, LLMs, embeddings, vector
+search, VIR, LLMs, findings, vector search, evals.", both with `no_speech_prob` 0.00, so the
+existing no-speech filter (0.6) never fired: turbo's no-speech estimate is useless here. Tried
+on the same clips: the hint as `hotwords` (faster-whisper puts it in the prompt slot without
+the sentence) did not echo it, but on silence still made up "Thank you" after 7.5 s of
+temperature fallbacks; `vad_filter=True` (faster-whisper's bundled Silero) returned nothing for
+silence and noise in 3 ms and transcribed every spoken test question as before (1.5 s of
+leading silence, a 1.2 s pause mid-question, speech at 5% volume, "Why?"). **Decision:** `hotwords`
+("RAG, LLM, LoRA, embeddings, vector search, evals"; LoRA now comes out as "LoRA", not "Laura"),
+`vad_filter=True`, the no-speech filter kept, and `speech.drop_hint_echo` on every transcript:
+it removes the old prompt sentence and any run of three or more hint terms with only
+punctuation between them, keeping a single term in such a run that breaks the hint's order (the
+caller's own "RAG" in "RAG RAG, LLMs, ..."). One or two terms ("RAG or LLMs?") are always kept;
+a two-term leak would get through. The benchmark uses the same function.
+
+**Echo and barge-in.** How barge-in worked (Pipecat 1.15.0, checked in the installed package):
+`VADProcessor` only emits `VADUserStartedSpeakingFrame`/`VADUserStoppedSpeakingFrame`; the
+transport has no VAD of its own here, and the pipeline has no LLM user aggregator, so no
+Pipecat turn strategy interrupts anything. `CallBrain` itself called `broadcast_interruption()`
+on the VAD's start frame whenever the bot spoke or an answer was on its way, before any
+transcript existed. With full duplex on laptop speakers, the bot's own voice in the microphone
+therefore cut the bot off, and its transcript was then asked as a question. A transcript check
+alone could not stop the cut. Pipecat 1.15 does have turn-start strategies
+(`TranscriptionUserTurnStartStrategy`, `MinWordsUserTurnStartStrategy`, with
+`enable_interruptions`), but they run inside `UserTurnProcessor` / the LLM user aggregator,
+which would also take over ending the turn, and none compares the words with what the bot said.
+**Decision**, in `CallBrain`: it keeps what the bot said (greeting, holding line, answer
+sentences, with times) for 60 s. Speech that starts while the bot is audible (speaking, or
+stopped less than 1.5 s ago) no longer interrupts on the VAD; when its transcript arrives it is
+dropped as echo if at least 70% of its words are, in order, the bot's recent words (longest
+common subsequence), with a fixed log line and no text; otherwise the caller takes the floor:
+the bot is interrupted then and the words become the question. With the bot silent (an answer
+being looked up), the VAD interrupts at once as before. The greeting check of the first 12 s
+stays. **Trade-off:** over the bot, an interruption now lands when the caller pauses (0.7 s of
+silence) plus speech-to-text time (1.7 s on the laptop CPU; less on the T4, not measured),
+instead of 0.2 s after they start; the bot talks over them meanwhile. And with strong echo the
+VAD may hear one long segment of bot-plus-caller; if the bot's words are 70% of it, the
+caller's few words are dropped with it. Half duplex is unchanged (the gate means the VAD hears
+nothing while the bot speaks).
+
+**Hang-up.** The server released a call's place and stopped counting its minutes only once the
+pipeline had finished closing, and the browser closed its socket 500 ms after sending the
+hang-up whatever the server did. Now `CallBook.hang_up` charges the minutes up to the hang-up and
+frees the place the moment it arrives (the socket's `call.hangup`, the end route, or a browser
+that went away); the session then closes behind it. The browser silences the bot first
+(`VoiceLink.stopAudio`: queued buffers stopped, audio still arriving dropped, the `<audio>`
+element muted until the next call), sends the hang-up, and waits up to 2 s, never longer, for
+`call.closed` or the server's close.
+
+**Refusals.** A refusal hid the mic until a reload. It now hides it with the same neutral line
+for 60 s; then the mic comes back with nothing sent, and its next click asks the status again.
+A hang-up while connecting never hides it. The cost: someone who clicks once a minute after
+refusals asks `/voice/status` each time, which wakes the GPU if it slept; only a click does.

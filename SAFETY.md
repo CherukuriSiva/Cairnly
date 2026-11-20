@@ -154,7 +154,8 @@ because a call holds a GPU:
 - 10 calls a day from one IP address, 5 call starts a minute from one IP address
 - 60 minutes of calls a day for the whole site; a call never gets more time than is left, and
   once the minutes are spent a call is refused and the microphone disappears (after that
-  click) until the page is reloaded; new calls start again the next UTC day
+  click) for a minute, after which a click asks again; new calls start again the next UTC day.
+  A hang-up stops a call's minutes the moment it reaches the server
 - every spoken question goes through `/ask` with the same guard, gate and output check as a
   typed one; all of them reach the API from the voice server's one address, so the API's
   per-address limit (10 a minute, 200 a day) also caps spoken questions for the whole site

@@ -152,12 +152,31 @@ as the tokens arrive, instead of waiting for the whole answer. Written answers h
 code blocks, tables, links and `[n]` markers; `SpeechChunker` drops or rewrites all of those so
 nothing odd is read aloud.
 
-**Talking over the bot (barge-in).** If the VAD hears the caller while the bot speaks, the brain
-cancels the answer and sends an interruption, which empties every queue of speech still to be
-played; on the WebSocket, the browser also drops the audio it has buffered. It only works if
-the bot does not hear itself: the browser's echo cancellation removes the bot's voice from the
-microphone. Where that fails (some speakers, some rooms), `VOICE_HALF_DUPLEX=1` replaces the
-caller's audio with silence while the bot speaks.
+**Talking over the bot (barge-in).** When the caller talks over the bot, the brain cancels the
+answer and sends an interruption, which empties every queue of speech still to be played; on
+the WebSocket, the browser also drops the audio it has buffered. The catch is that the bot may
+hear itself: the browser's echo cancellation removes most of the bot's voice from the
+microphone, but on laptop speakers some gets through, and to the VAD an echo is just a voice.
+So the brain remembers what the bot said in the last minute, and while the bot is audible (or
+was until 1.5 s ago) a voice alone does not stop it: it waits for the words. Words that are
+mostly the bot's own, in the same order, are its echo and are dropped (the log says so without
+quoting them); words of the caller's own stop the bot and become the next question. The price
+is time: over the bot, an interruption lands only once the caller pauses and Whisper has
+transcribed them, about a second later than the VAD would. While the bot is silent (looking up
+an answer) the VAD still stops it at once. Where echo is worse still, `VOICE_HALF_DUPLEX=1`
+replaces the caller's audio with silence while the bot speaks.
+
+**Speech to text that makes things up.** Whisper gets a short list of the course's words
+(`hotwords`: RAG, LLM, LoRA...) so it spells them right. Given as a prompt sentence instead,
+the list came back as if the caller had said it: a silent segment turned into "RAG, LLMs,
+embeddings, vector search, evals." So the voice server lets faster-whisper's own VAD skip
+segments with no speech, passes the words as hotwords, and removes any run of them that still
+leaks into a transcript (`speech.drop_hint_echo`), keeping a caller's own "What is RAG?".
+
+**Hanging up.** End call silences the bot in the browser at once, then sends the hang-up. The
+server frees the call's place and stops counting its minutes the moment the hang-up arrives,
+answers `call.closed`, and closes; the browser waits up to 2 seconds for that before it closes
+its side.
 
 **Calls are a scarce resource.** `calls.py` decides who may call: one call at a time, 10 calls
 a day per address, 60 minutes a day for the whole site, 5 minutes per call, hang-up after 50
@@ -171,8 +190,9 @@ and any request to it, even "are calls possible?", wakes it for two minutes. So 
 nothing when it loads: the mic shows whenever the site has a voice URL and the API saves
 conversations. The click asks for the status (once per page), starts the call and shows
 "Waking the voice model…" with a seconds counter while the GPU starts; if voice says no, the
-mic goes away with one neutral line. The cost of a status check is paid only by someone who
-wants to talk.
+mic goes away for a minute with one neutral line, then comes back, and its next click asks
+again. The mic coming back sends nothing. The cost of a status check is paid only by someone
+who wants to talk.
 
 **WebSocket or WebRTC?** WebRTC is made for live audio, but it sends media over UDP, and a
 server in the cloud is only reachable that way for every caller with a TURN relay (phones on

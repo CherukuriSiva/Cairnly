@@ -35,7 +35,9 @@ app, `cairnly-voice`) for the length of the call, and plays its answers.
 - The voice server keeps, in its memory only: your IP address and how many calls it started
   today (for the per-address limit; forgotten when the server restarts or the day ends), and
   for each call its id, its conversation id, its state and why it ended, for one hour, so your
-  browser can read how the call ended.
+  browser can read how the call ended. During a call it also holds the bot's own sentences of
+  the last minute, to recognise its voice coming back through your microphone (echo); they go
+  with the call.
 - Per-turn timings (how long each step took, no text) go to the operator's Langfuse project.
 - The microphone is used only during a call; the browser shows its own indicator while it is.
 
