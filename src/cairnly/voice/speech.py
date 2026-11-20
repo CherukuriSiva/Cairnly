@@ -7,12 +7,13 @@ the written answer has a code example), links keep their words, markers and URLs
 sentence goes to text to speech as soon as it is complete, so the bot starts talking long before
 the answer is finished.
 
-Also here: the bot's fixed lines, and two checks on what the caller said (a goodbye, and the
-bot's own greeting heard back through the caller's speakers).
+Also here: the bot's fixed lines, and checks on what the caller said: a goodbye, the bot's own
+words heard back through the caller's speakers (echo), and Whisper repeating its vocabulary hint
+as if someone had said it.
 """
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 GREETING = "Hi, I'm Cairnly. Ask me anything about the AI engineering lessons."
 HOLDING = "Let me check the lessons."
@@ -174,14 +175,131 @@ def is_farewell(text: str) -> bool:
     return any(f" {phrase} " in joined for phrase in FAREWELLS)
 
 
-def is_greeting_echo(text: str, greeting: str = GREETING, share: float = 0.7) -> bool:
-    """The caller's microphone picked up the bot's own greeting: most of the words heard are
-    greeting words. Only checked in the first seconds of a call."""
+ECHO_SHARE = 0.7  # this much of what was heard, in order, the bot just said: its own echo
+ECHO_WORDS = 400  # compare with at most the bot's last this many words
+
+
+def _in_order(heard: list[str], said: list[str]) -> int:
+    """How many of the heard words appear in what was said, in the same order (the longest
+    common subsequence of the two word lists)."""
+    row = [0] * (len(said) + 1)
+    for word in heard:
+        diagonal = 0
+        for j, spoken in enumerate(said, start=1):
+            above = row[j]
+            row[j] = diagonal + 1 if word == spoken else max(row[j], row[j - 1])
+            diagonal = above
+    return row[-1]
+
+
+def is_echo(text: str, said: Sequence[str], share: float = ECHO_SHARE) -> bool:
+    """The caller's microphone picked up the bot's own voice: most of the words heard are, in
+    order, words the bot just said. `said` is what the bot said lately, oldest first. A caller
+    who talks over the bot with words of their own ("wait, what about LoRA?") is not echo."""
     heard = _words(text)
-    if len(heard) < 2:
+    spoken = [w for line in said for w in _words(line)][-ECHO_WORDS:]
+    if not heard or not spoken:
         return False
-    said = set(_words(greeting))
-    return sum(w in said for w in heard) / len(heard) >= share
+    return _in_order(heard, spoken) / len(heard) >= share
+
+
+def is_greeting_echo(text: str, greeting: str = GREETING, share: float = ECHO_SHARE) -> bool:
+    """The greeting heard back: echo of the greeting, two words or more."""
+    return len(_words(text)) >= 2 and is_echo(text, [greeting], share)
+
+
+# -- Whisper's vocabulary hint, heard as speech ------------------------------------------------
+
+MIN_HINT_RUN = 3  # this many hint terms in a row, with only punctuation between, is no question
+HINT_GAP = re.compile(r"[\s,.;:!?-]*")
+TOKEN = re.compile(r"[A-Za-z0-9'’]+")
+
+
+def _norm(word: str) -> str:
+    """Lowercase, and singular enough to match "LLMs" with "LLM" and "evals" with "eval"."""
+    word = word.lower().replace("’", "'").removesuffix("'s")
+    return word[:-1] if len(word) > 3 and word.endswith("s") else word
+
+
+def drop_hint_echo(text: str, hint: str) -> str:
+    """Remove Whisper's echo of the vocabulary hint it was given.
+
+    Speech to text gets a hint ("RAG, LLM, LoRA, ..."; formerly a sentence with a colon before
+    the terms) so it spells the course's words right. On a pause or a quiet start it sometimes
+    writes the hint itself into the transcript, once or several times. Removed: the sentence
+    before the colon, and every run of MIN_HINT_RUN or more hint terms with only punctuation
+    between them, except a single term in such a run that is not part of the hint's own order
+    (in "What is? RAG RAG, LLMs, embeddings..." the first RAG is the caller's). A caller who
+    uses a term or two ("What is RAG?", "RAG or fine-tuning?") is left alone.
+    """
+    preamble, _, listed = hint.rpartition(":")
+    terms = [tuple(_norm(w) for w in TOKEN.findall(t)) for t in listed.split(",")]
+    terms = sorted((p for p in enumerate(terms) if p[1]), key=lambda p: -len(p[1]))
+    tokens = list(TOKEN.finditer(text))
+    words = [_norm(m.group()) for m in tokens]
+
+    def joined(a: int, b: int) -> bool:  # only punctuation between token a and token b
+        return HINT_GAP.fullmatch(text[tokens[a].end():tokens[b].start()]) is not None
+
+    def matches(i: int, phrase: tuple[str, ...]) -> bool:
+        n = len(phrase)
+        return (tuple(words[i:i + n]) == phrase
+                and all(joined(k, k + 1) for k in range(i, i + n - 1)))
+
+    cut: set[int] = set()
+    lead = tuple(_norm(w) for w in TOKEN.findall(preamble))
+    for i in range(len(tokens)):
+        if lead and matches(i, lead):
+            cut.update(range(i, i + len(lead)))
+
+    found: list[tuple[int, int, int]] = []  # (term index, first token, token after it)
+    i = 0
+    while i < len(tokens):
+        term = next(((t, len(p)) for t, p in terms if i not in cut and matches(i, p)), None)
+        if term is None:
+            i += 1
+            continue
+        found.append((term[0], i, i + term[1]))
+        i += term[1]
+
+    runs: list[list[tuple[int, int, int]]] = []
+    for hit in found:
+        last = runs[-1][-1] if runs else None
+        if last is not None and last[2] == hit[1] and joined(hit[1] - 1, hit[1]):
+            runs[-1].append(hit)
+        else:
+            runs.append([hit])
+    for run in runs:
+        if len(run) < MIN_HINT_RUN:
+            continue
+        pieces: list[list[tuple[int, int, int]]] = []  # parts that follow the hint's order
+        for hit in run:
+            if pieces and hit[0] == pieces[-1][-1][0] + 1:
+                pieces[-1].append(hit)
+            else:
+                pieces.append([hit])
+        kept: set[int] = set()
+        for piece in pieces:
+            if len(piece) == 1 and piece[0][0] not in kept:
+                kept.add(piece[0][0])
+                continue
+            for _, first, after in piece:
+                cut.update(range(first, after))
+
+    if not cut:
+        return text
+    out = [text[:tokens[0].start()] if tokens else text]
+    for k, token in enumerate(tokens):
+        gap = text[token.end():tokens[k + 1].start() if k + 1 < len(tokens) else len(text)]
+        if k not in cut:
+            out.append(token.group() + gap)
+        elif k + 1 >= len(tokens) or k + 1 not in cut:  # keep where a sentence ended
+            end = re.search(r"[.!?]", gap)
+            out.append(f"{end.group()} " if end else " ")
+    clean_text = re.sub(r"\s+([,.;:!?])", r"\1", "".join(out))
+    clean_text = re.sub(r"([,.;:!?])(?:\s*[,.;:!?])+", r"\1", clean_text)
+    clean_text = re.sub(r"\s+", " ", re.sub(r"^[\s,.;:!?-]+", "", clean_text)).strip()
+    return clean_text if re.search(r"[A-Za-z0-9]", clean_text) else ""
 
 
 def sentences(text: str) -> Iterator[str]:

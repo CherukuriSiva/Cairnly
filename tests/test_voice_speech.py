@@ -1,5 +1,13 @@
 from cairnly.voice import speech
-from cairnly.voice.speech import SpeechChunker, clean, is_farewell, is_greeting_echo, speakable
+from cairnly.voice.speech import (
+    SpeechChunker,
+    clean,
+    drop_hint_echo,
+    is_echo,
+    is_farewell,
+    is_greeting_echo,
+    speakable,
+)
 
 ANSWER = """RAG means **retrieval-augmented generation** [1]. It finds relevant text first, e.g. \
 lesson sections, and then writes an answer from them [2, 3].
@@ -84,3 +92,44 @@ def test_greeting_echo():
     assert is_greeting_echo("hi I'm Cairnly")
     assert not is_greeting_echo("What are the lessons about evals?")
     assert not is_greeting_echo("lessons")  # one word is not enough to tell
+
+
+OLD_HINT = "A question about AI engineering: RAG, LLMs, embeddings, vector search, evals."
+HOTWORDS = "RAG, LLM, LoRA, embeddings, vector search, evals"
+
+
+def test_whisper_hint_echo_is_removed():
+    # A real caller's transcript from production, with the old prompt sentence as the hint.
+    leaked = ("A question about AI engineering. What is? RAG RAG, LLMs, embeddings, vector search,"
+              " evals. RAG, LLMs, embeddings, vector search, evals. When should we use it instead"
+              " of fine tuning?")
+    assert drop_hint_echo(leaked, OLD_HINT) == (
+        "What is? RAG. When should we use it instead of fine tuning?")
+    # A silent segment transcribed as the hint itself: nothing was said.
+    assert drop_hint_echo("RAG, LLMs, embeddings, vector search, evals.", OLD_HINT) == ""
+    assert drop_hint_echo("RAG, LLMs, embeddings, vector search, evals.", HOTWORDS) == ""
+    assert drop_hint_echo("Can you explain LoRA? RAG, LLM, LoRA, embeddings, vector search, evals",
+                          HOTWORDS) == "Can you explain LoRA?"
+    # The hotwords repeated twice in a row (a repeated run).
+    assert drop_hint_echo("rag llm lora embeddings vector search evals rag llm lora embeddings "
+                          "vector search evals how do evals work", HOTWORDS) == "how do evals work"
+
+
+def test_a_callers_own_use_of_the_terms_is_kept():
+    for said in ("What is RAG?", "What is RAG? When should we use it instead of fine tuning?",
+                 "What's the difference between RAG and LLMs?", "RAG, LLMs, and embeddings?",
+                 "How do embeddings work in vector search?", "Can you explain LoRA?",
+                 "evals, RAG, embeddings: which one first?", "A question about evals"):
+        assert drop_hint_echo(said, HOTWORDS) == said, said
+        assert drop_hint_echo(said, OLD_HINT) == said, said
+
+
+def test_echo_of_what_the_bot_just_said():
+    said = [speech.HOLDING, "RAG retrieves lesson text first.", "Then the model writes an answer."]
+    assert is_echo("retrieves lesson text first then the model", said)
+    assert is_echo("RAG.", said)  # one word the bot just said, heard while it spoke
+    assert is_echo("the model writes an answer", said)
+    assert not is_echo("wait, what about LoRA?", said)  # the caller's own words take the floor
+    assert not is_echo("Stop.", said)
+    assert not is_echo("first text lesson retrieves RAG", said)  # the same words, out of order
+    assert not is_echo("anything", [])

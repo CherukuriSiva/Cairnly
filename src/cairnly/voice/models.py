@@ -26,14 +26,23 @@ from pipecat.services.tts_service import TTSService
 from pipecat.transcriptions.language import Language
 from pipecat.utils.time import time_now_iso8601
 
+from cairnly.voice import speech
 from cairnly.voice.protocol import IN_RATE, OUT_RATE
 from cairnly.voice.settings import VoiceSettings
 
 # Speech start needs 0.2 s of voice; the turn ends after 0.7 s of silence. Shorter stops cut
 # people off mid-thought, longer ones make every answer feel slow.
 VAD = VADParams(confidence=0.7, start_secs=0.2, stop_secs=0.7, min_volume=0.5)
-# Steers Whisper towards the course's vocabulary (spelling of RAG, LLM, embeddings...).
-STT_PROMPT = "A question about AI engineering: RAG, LLMs, embeddings, vector search, evals."
+# Steers Whisper towards the course's vocabulary (spelling of RAG, LLM, LoRA...). Passed as
+# `hotwords`, not `initial_prompt`: with the prompt sentence Whisper wrote the hint itself into
+# transcripts (all of it for a silent segment, and repeated runs mid-question); hotwords did not
+# on the same audio (ADR 0019, addendum). Whatever still leaks is removed by
+# speech.drop_hint_echo.
+STT_HOTWORDS = "RAG, LLM, LoRA, embeddings, vector search, evals"
+# Whisper large-v3-turbo's no-speech probability is near 0 even for pure silence, so this filter
+# alone lets hallucinations through; faster-whisper's own Silero pass (vad_filter) drops
+# segments with no speech before Whisper sees them.
+NO_SPEECH = 0.6
 # How long text to speech may take to start a sentence. Kokoro synthesizes a whole sentence
 # before its first chunk, and a long one takes several seconds on a shared CPU. Pipecat's
 # default (3 s) closes such a sentence as silent: it reports an error, ends "bot speaking" too
@@ -86,6 +95,15 @@ def kokoro_model():
     return _shared("kokoro", load)
 
 
+def transcribe(model, samples: np.ndarray) -> str:
+    """One VAD segment (16 kHz float samples) as text, without Whisper's hallucinations: no
+    text for silence or noise, and no echo of the vocabulary hint."""
+    segments, _ = model.transcribe(samples, language="en", beam_size=1, hotwords=STT_HOTWORDS,
+                                   vad_filter=True)
+    text = " ".join(s.text.strip() for s in segments if s.no_speech_prob < NO_SPEECH)
+    return speech.drop_hint_echo(text.strip(), STT_HOTWORDS)
+
+
 class WhisperSTT(SegmentedSTTService):
     """Whisper through faster-whisper on one VAD segment at a time, with the shared model.
     (Pipecat's own Whisper service insists on mlx-whisper on Apple silicon; this one runs the
@@ -105,15 +123,9 @@ class WhisperSTT(SegmentedSTTService):
 
     async def run_stt(self, audio: bytes) -> AsyncGenerator[Frame, None]:
         samples = np.frombuffer(audio, dtype=np.int16).astype(np.float32) / 32768
-
-        def transcribe() -> str:
-            segments, _ = self.model.transcribe(samples, language="en", beam_size=1,
-                                                initial_prompt=STT_PROMPT)
-            return " ".join(s.text.strip() for s in segments if s.no_speech_prob < 0.6)
-
         await self.start_processing_metrics()
         try:
-            text = (await asyncio.to_thread(transcribe)).strip()
+            text = await asyncio.to_thread(transcribe, self.model, samples)
         except Exception as exc:
             yield ErrorFrame(error=f"speech to text failed: {exc}")
             return

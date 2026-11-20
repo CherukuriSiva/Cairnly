@@ -176,15 +176,13 @@ def synth_questions(folder: Path) -> list[dict]:
 def whisper_engine():
     from faster_whisper import WhisperModel
 
-    from cairnly.voice.models import STT_PROMPT
+    from cairnly.voice.models import transcribe as server_transcribe
 
     model = WhisperModel(WHISPER, device="cpu", compute_type="int8",
                          cpu_threads=min(12, os.cpu_count() or 4))
 
-    def transcribe(audio: np.ndarray) -> str:
-        segments, _ = model.transcribe(audio, language="en", beam_size=1,
-                                       initial_prompt=STT_PROMPT)
-        return " ".join(s.text.strip() for s in segments)
+    def transcribe(audio: np.ndarray) -> str:  # exactly what the voice server does
+        return server_transcribe(model, audio)
 
     return "Whisper large-v3-turbo (faster-whisper, int8, CPU)", transcribe
 
